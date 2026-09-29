@@ -76,3 +76,11 @@ Así nadie puede listar todas las salas: solo entra quien conoce el código. Las
 ## Novedades 1.5
 - Teclado propio en pantalla para escribir el código de sala (funciona en cualquier dispositivo; el teclado físico también sirve).
 - Fondo del mapa convertido en un mundo de caramelo: arcoíris, sol sonriente, islas de chocolate, paletas, cupcakes, dulces con símbolos matemáticos y dragones pastel con estela de arcoíris. El cielo cambia de color (día → atardecer → noche mágica) al recorrer el mapa.
+
+## Novedades 1.6
+- **Salas arregladas**: el área de juego no se dibujaba (solo se veía la pregunta). Ya se ve el villano, las cápsulas y tu héroe.
+- **Pantalla completa en cualquier dispositivo** (Mac, PC, iPhone, Android): el juego ocupa toda la altura, sin franjas vacías.
+- **Pregunta grande**: se quitó el 3‑2‑1. La pregunta sale grande con una barra de tiempo, luego se acomoda en su recuadro y ahí caen las respuestas (más lentas; suben un poco de velocidad con el nivel).
+- **Mapa en camino** estilo mapa de niveles: niveles numerados en zigzag, camino que se ilumina al avanzar, tu héroe marca dónde vas.
+- **3 juegos por distrito**: Nivel 1 *Disparo*, Nivel 2 *Carrera* (elige la puerta correcta corriendo por carriles), Nivel 3 *Pares* (une problema con resultado contra reloj). Puedes elegir cualquiera desbloqueado; el siguiente se abre al superar el anterior.
+- Tarjetas de nivel a todo color. Las salas siguen usando el juego de disparo.

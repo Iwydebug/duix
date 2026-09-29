@@ -282,7 +282,7 @@
     o = o || {};
     const cv = document.createElement('canvas'); cv.className = 'ambient'; cv.setAttribute('aria-hidden', 'true');
     container.insertBefore(cv, container.firstChild);
-    const sc = candyScene(o.seed || 'candy'), ctx = cv.getContext('2d'), PIX = 3, scEl = container.querySelector('#screen');
+    const sc = scene({ seed: o.seed || 'hub', mode: 'hub' }), ctx = cv.getContext('2d'), PIX = 3, scEl = container.querySelector('#screen');
     let W = 0, H = 0, raf = 0, dead = false, last = 0, t0 = performance.now(), scroll = 0, prog = 0;
     const still = !!o.still;
     const readScroll = () => { if (!scEl) return; scroll = scEl.scrollTop / PIX; const range = scEl.scrollHeight - scEl.clientHeight; prog = range > 40 ? Math.min(1, scEl.scrollTop / range) : 0; if (still) sc.full(ctx, W, H, 12, 1, scroll, prog); };

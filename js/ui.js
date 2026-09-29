@@ -231,21 +231,32 @@
     const daily = St.ensureDaily(); const dn = daily.ids.filter((id) => daily.done[id]).length;
     // siguiente distrito disponible
     const next = V.find((v) => St.unlocked(v) && !St.isCleared(v.id) && !v.endless) || (St.unlocked(Vby('duinity')) ? Vby('duinity') : V[0]);
-    const map = h('div', { class: 'map' });
+    // Camino sinuoso estilo mapa de niveles: el nivel 1 abajo, se sube en zigzag hasta el jefe final
+    const ROW = 128, PADT = 90, PADB = 80, n = V.length, HT = PADT + PADB + (n - 1) * ROW;
+    const px = (i) => 50 + 25 * Math.sin(i * Math.PI / 2 + 0.0) * (i === 0 ? 0 : 1), py = (i) => HT - PADB - i * ROW;
+    const map = h('div', { class: 'wmap', style: `height:${HT}px` });
+    const NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'wpath'); svg.setAttribute('viewBox', `0 0 100 ${HT}`); svg.setAttribute('preserveAspectRatio', 'none');
+    const seg = (i) => { const x0 = px(i), y0 = py(i), x1 = px(i + 1), y1 = py(i + 1), my = (y0 + y1) / 2; return `M${x0} ${y0} C${x0} ${my} ${x1} ${my} ${x1} ${y1}`; };
+    const mk = (d, cls) => { const p = document.createElementNS(NS, 'path'); p.setAttribute('d', d); p.setAttribute('class', cls); svg.appendChild(p); return p; };
+    for (let i = 0; i < n - 1; i++) mk(seg(i), 'wp-b');
+    for (let i = 0; i < n - 1; i++) mk(seg(i), 'wp-r');
+    for (let i = 0; i < n - 1; i++) mk(seg(i), 'wp-d');
+    for (let i = 0; i < n - 1; i++) { const pr = St.prog(V[i].id); if (pr.tier >= 1) mk(seg(i), 'wp-lit'); }
+    map.appendChild(svg);
+    // adornos del camino (símbolos de cálculo y hitos)
+    ['∫', 'Σ', 'π', '∞', 'f(x)', 'lím', 'dx', '√', 'log', 'sen', 'Δ', '0/0'].forEach((s, k) => { const sy = PADT + k * (HT - PADT - PADB) / 12 + 40; map.appendChild(h('span', { class: 'wdeco ' + (k % 2 ? 'r' : 'l'), style: `top:${sy}px`, text: s })); });
     V.forEach((v, i) => {
-      const unl = St.unlocked(v), pr = St.prog(v.id), cleared = pr.tier >= 1, secret = v.boss && !unl;
-      const side = i % 2 ? 'r' : 'l';
+      const unl = St.unlocked(v), pr = St.prog(v.id), cleared = pr.tier >= 1, secret = v.boss && !unl, isNext = v === next && unl;
+      const size = v.boss ? 96 : 78;
       const stars = h('div', { class: 'stars', 'aria-label': pr.stars + ' de 3 estrellas' }, [0, 1, 2].map((k) => img(k < pr.stars ? 'star' : 'starEmpty', 2)));
-      const card = h('button', { class: `node ${side}${unl ? '' : ' locked'}${cleared ? ' cleared' : ''}${v.boss ? ' boss' : ''}${v === next && unl ? ' next' : ''}`, 'aria-label': `${secret ? 'Distrito secreto' : v.district}${unl ? '' : ', bloqueado'}`,
+      const nd = h('button', { class: `lnode${unl ? '' : ' locked'}${cleared ? ' cleared' : ''}${v.boss ? ' boss' : ''}${isNext ? ' next' : ''}`, style: `left:${px(i)}%;top:${py(i)}px;--sz:${size}px;--glow:${v.glow || '#7b4dff'}`, 'aria-label': `Nivel ${v.n}: ${secret ? 'distrito secreto' : v.district}${unl ? '' : ', bloqueado'}`,
         onclick: () => { if (!unl) { sfx('deny'); toast(secret ? 'Vence a todos los villanos anteriores para descubrir este distrito.' : 'Derrota primero al villano anterior.', 'warn'); return; } sfx('select'); go('district', { id: v.id }); } },
-        h('div', { class: 'nsprite' }, villainEl(v, v.boss ? 92 : 78, !unl), !unl ? img('lock', 3, null, 'nlock') : null),
-        h('div', { class: 'ntext' },
-          h('b', { class: 'nname', text: secret ? '???' : v.district }),
-          h('span', { class: 'nvil', text: secret ? 'Jefe misterioso' : v.name }),
-          unl && !v.endless ? stars : null,
-          v.endless && unl ? h('span', { class: 'nbest', text: 'Récord: ' + p.stats.duinityBest + ' aciertos' }) : null,
-          v === next && unl && !cleared ? h('span', { class: 'new', text: '¡Nuevo!' }) : null));
-      map.appendChild(h('div', { class: 'mrow ' + side }, card, h('div', { class: 'mpin' + (cleared ? ' done' : unl ? ' open' : '') }, h('span', { text: String(v.n) }))));
+        h('span', { class: 'lcircle' }, villainEl(v, size - 16, !unl), !unl ? img('lock', 3, null, 'nlock') : null),
+        h('span', { class: 'lnum', text: String(v.n) }),
+        h('span', { class: 'lrib' }, h('b', { text: secret ? '???' : v.district }), unl && !v.endless ? stars : null, v.endless && unl ? h('small', { text: 'Récord ' + p.stats.duinityBest }) : null),
+        isNext && !cleared ? h('span', { class: 'lnew', text: '¡NUEVO!' }) : null);
+      map.appendChild(nd);
+      if (isNext) map.appendChild(h('span', { class: 'lhero', style: `left:${px(i)}%;top:${py(i) - size / 2 - 18}px` }, headThumb(p.look, 'lhead')));
     });
     sc.appendChild(h('div', { class: 'hubwrap' }, topbar(),
       h('div', { class: 'cta' }, h('div', { class: 'cta-l' }, h('b', { text: 'Ciudad Límite' }), h('small', { text: `${stats.districts}/14 villanos · ${stats.stars}/42 ★` })),
@@ -253,7 +264,7 @@
       h('button', { class: 'btn big playnext', onclick: () => { sfx('select'); go('district', { id: next.id }); } }, img('play', 3), h('span', { text: 'Continuar: ' + (next.boss && !St.unlocked(next) ? 'Siguiente' : next.name) })),
       map));
     if (params.welcome) later(() => toast(`¡Bienvenido, <b>${esc(p.name)}</b>! Ciudad Límite te necesita.`, '', 3800), 400);
-    if (params.scrollTo) later(() => { const n = $('.node.next', sc); if (n) n.scrollIntoView({ block: 'center' }); }, 60);
+    later(() => { const n = $('.lnode.next', sc) || $('.lnode', sc); if (n) { const r = n.getBoundingClientRect(), s = sc.getBoundingClientRect(); sc.scrollTop += r.top - s.top - s.height / 2 + r.height / 2; } }, 60);
   };
 
   /* ============================================================
@@ -267,10 +278,17 @@
     const tierUnlocked = (t) => t === 1 || pr.tier >= t - 1;
     const repaso = h('div', { class: 'repaso', hidden: true }, h('h3', { text: 'Repaso rápido: ' + v.tema }), repasoList(v.topic));
     const tiers = h('div', { class: 'tiers' });
-    const NAMES = ['Fácil', 'Normal', 'Difícil'], MUL = ['×1', '×1,5', '×2'];
+    const MUL = ['×1', '×1,5', '×2'];
+    const GM = [['🎯', 'Disparo', 'Dispara a la cápsula con la respuesta correcta antes de que caiga.'], ['🏃', 'Carrera', 'Corre por los carriles y cruza la puerta con la respuesta correcta.'], ['🧩', 'Pares', 'Une cada problema con su resultado antes de que se acabe el tiempo.']];
     function renderTiers() {
       tiers.innerHTML = '';
-      [1, 2, 3].forEach((t) => tiers.appendChild(h('button', { class: 'tier' + (t === tier ? ' on' : '') + (tierUnlocked(t) ? '' : ' off'), disabled: !tierUnlocked(t), 'aria-pressed': t === tier ? 'true' : 'false', onclick: () => { tier = t; sfx('click'); renderTiers(); } }, h('b', { text: NAMES[t - 1] }), h('small', { text: tierUnlocked(t) ? 'Premios ' + MUL[t - 1] : 'Bloqueado' }), !tierUnlocked(t) ? img('lock', 2) : null)));
+      [1, 2, 3].forEach((t) => {
+        const un = tierUnlocked(t), done = pr.tier >= t, g = GM[t - 1];
+        tiers.appendChild(h('button', { class: `tier t${t}` + (t === tier ? ' on' : '') + (un ? '' : ' off') + (done ? ' done' : ''), disabled: !un, 'aria-pressed': t === tier ? 'true' : 'false', onclick: () => { tier = t; sfx('click'); renderTiers(); } },
+          h('span', { class: 'tico', text: g[0] }),
+          h('span', { class: 'tbody' }, h('b', { text: `Nivel ${t} · ${g[1]}` }), h('small', { text: un ? g[2] : `Se desbloquea al vencer el Nivel ${t - 1}` })),
+          h('span', { class: 'tside' }, un ? h('em', { text: 'Premios ' + MUL[t - 1] }) : img('lock', 3), done ? h('span', { class: 'tchk', text: '✔ Superado' }) : null)));
+      });
     }
     renderTiers();
     const info = v.endless ? `Supervivencia sin fin con todos los temas. La dificultad sube sola. Tu récord: ${p.stats.duinityBest} aciertos.` : v.boss ? 'Jefe final: preguntas de TODOS los temas mezclados.' : `Tema: ${v.tema}.`;
@@ -283,7 +301,7 @@
       h('p', { class: 'dinfo', text: info }),
       h('button', { class: 'btn ghost', onclick: () => { sfx('click'); repaso.hidden = !repaso.hidden; } }, img('book', 3, '#ffd23f'), h('span', { text: ' Repaso rápido' })), repaso,
       v.endless ? null : h('div', { class: 'dstat' }, h('span', { text: 'Mejor: ' }), h('div', { class: 'stars' }, [0, 1, 2].map((k) => img(k < pr.stars ? 'star' : 'starEmpty', 2))), h('span', { text: ` · Victorias: ${pr.wins}` })),
-      v.endless ? null : h('h3', { class: 'h3', text: 'Dificultad' }), v.endless ? null : tiers,
+      v.endless ? null : h('h3', { class: 'h3', text: 'Elige tu juego' }), v.endless ? null : tiers,
       h('button', { class: 'btn big fight', onclick: () => { A.unlock(); sfx('select'); startBattle(v, v.endless ? 2 : tier); } }, img('bolt', 3), h('span', { text: ' ¡A luchar!' }))));
     if (pr.plays === 0 && !v.endless) later(() => toast('Consejo: abre el <b>Repaso rápido</b> antes de luchar.', '', 3200), 500);
   };
@@ -298,11 +316,12 @@
     const v = Vby(params.id), p = St.profile();
     $('#nav').hidden = true; A.play(v.boss ? 'boss' : 'battle');
     const holder = h('div', { class: 'btholder' }); sc.appendChild(holder);
-    battle = B.start({
+    battle = (root.DuiXGames || B).start({
       container: holder, villain: v, tier: params.tier, look: p.look, perks: St.perks(),
       onEnd: (res) => finishBattle(v, params.tier, res),
       onQuit: () => { battle = null; go('district', { id: v.id, tier: params.tier }); },
     });
+    root.__battle = battle;
   };
   function finishBattle(v, tier, res) {
     const mul = [1, 1.5, 2][tier - 1];

@@ -1,8 +1,8 @@
 /* DuiX — service worker: guarda el juego para usarlo sin internet */
-const VERSION = 'duix-v1.5.0';
+const VERSION = 'duix-v1.6.0';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './css/style.css',
-  './js/data.js', './js/questions.js', './js/store.js', './js/audio.js', './js/sprites.js', './js/hero.js', './js/ambient.js', './js/battle.js', './js/ui.js', './js/firebase-config.js', './js/net.js', './js/vendor/qrcode.js', './js/rooms.js', './js/vendor/firebase-app-compat.js', './js/vendor/firebase-database-compat.js', './js/app.js',
+  './js/data.js', './js/questions.js', './js/store.js', './js/audio.js', './js/sprites.js', './js/hero.js', './js/ambient.js', './js/battle.js', './js/games.js', './js/ui.js', './js/firebase-config.js', './js/net.js', './js/vendor/qrcode.js', './js/rooms.js', './js/vendor/firebase-app-compat.js', './js/vendor/firebase-database-compat.js', './js/app.js',
   './fonts/bangers-latin-400-normal.woff2', './fonts/press-start-2p-latin-400-normal.woff2',
   './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png', './icons/apple-touch-icon.png'
 ];
