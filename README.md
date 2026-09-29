@@ -72,3 +72,7 @@ Así nadie puede listar todas las salas: solo entra quien conoce el código. Las
 - **Preguntas por pelea:** bajan al subir la dificultad. Villanos: 4 · 3 · 2. Jefes (Indeterminado): 5 · 4 · 3.
 - Arreglo del cuadro del código de sala (no dejaba escribir en algunos celulares).
 - Las reglas de Firebase son las mismas de la versión 1.3 (no hay que cambiarlas).
+
+## Novedades 1.5
+- Teclado propio en pantalla para escribir el código de sala (funciona en cualquier dispositivo; el teclado físico también sirve).
+- Fondo del mapa convertido en un mundo de caramelo: arcoíris, sol sonriente, islas de chocolate, paletas, cupcakes, dulces con símbolos matemáticos y dragones pastel con estela de arcoíris. El cielo cambia de color (día → atardecer → noche mágica) al recorrer el mapa.

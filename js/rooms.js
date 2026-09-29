@@ -64,23 +64,38 @@
    * MENÚ DE SALAS
    * ============================================================ */
   SCREENS.rooms = (params, sc) => {
-    // OJO: no se toca el texto mientras se escribe (en Android rompe el teclado predictivo); se limpia al entrar.
-    const codeIn = h('input', { class: 'input code4', type: 'text', inputmode: 'text', enterkeyhint: 'go', placeholder: 'CÓDIGO', 'aria-label': 'Código de la sala (4 letras)', autocapitalize: 'characters', autocomplete: 'off', autocorrect: 'off', spellcheck: 'false' });
-    if (params.code) codeIn.value = cleanCode(params.code);
+    // Teclado propio en pantalla (funciona igual en cualquier celular, tablet o computador; el teclado físico también sirve)
+    let code = cleanCode(params.code);
+    const boxes = h('div', { class: 'codeboxes', role: 'group', 'aria-label': 'Código de la sala, 4 letras' });
+    const drawBoxes = () => { boxes.innerHTML = ''; for (let i = 0; i < 4; i++) boxes.appendChild(h('span', { class: 'cbox' + (code[i] ? ' has' : '') + (i === code.length ? ' cur' : ''), text: code[i] || '' })); enterBtn.disabled = code.length !== 4; };
     const msg = h('p', { class: 'hint err', role: 'alert' });
     const resume = h('div', { class: 'resume', hidden: true });
-    const joinBtn = h('button', { class: 'btn big', type: 'button', onclick: () => joinRoom(codeIn.value, msg, joinBtn) }, 'Entrar');
-    codeIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); joinBtn.click(); } });
+    const enterBtn = h('button', { class: 'btn big', type: 'button', onclick: () => joinRoom(code, msg, enterBtn) }, 'Entrar');
+    const press = (ch) => { if (code.length < 4) { code += ch; sfx('click'); msg.textContent = ''; drawBoxes(); } };
+    const back = () => { if (code.length) { code = code.slice(0, -1); sfx('click'); drawBoxes(); } };
+    const ROWS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
+    const kb = h('div', { class: 'osk', 'aria-label': 'Teclado de letras' }, ROWS.map((row, ri) => h('div', { class: 'oskrow' }, row.split('').map((ch) => h('button', { type: 'button', class: 'oskkey', 'aria-label': ch, onclick: () => press(ch) }, ch)), ri === 2 ? h('button', { type: 'button', class: 'oskkey wide', 'aria-label': 'Borrar', onclick: back }, '⌫') : null)));
+    const onKey = (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return; const tag = e.target && e.target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (/^[a-zA-Z]$/.test(e.key)) { press(e.key.toUpperCase()); e.preventDefault(); }
+      else if (e.key === 'Backspace') { back(); e.preventDefault(); }
+      else if (e.key === 'Enter' && code.length === 4) { e.preventDefault(); enterBtn.click(); }
+    };
+    const onPaste = (e) => { const t = cleanCode((e.clipboardData && e.clipboardData.getData('text')) || ''); if (t) { code = t; drawBoxes(); e.preventDefault(); } };
+    document.addEventListener('keydown', onKey); document.addEventListener('paste', onPaste);
+    K.onLeave(() => { document.removeEventListener('keydown', onKey); document.removeEventListener('paste', onPaste); });
     sc.appendChild(h('div', { class: 'rooms' }, K.topbar(), h('h1', { class: 'h1', text: 'Salas' }),
       h('p', { class: 'hint', text: 'Lucha junto a tus compañeros contra el mismo villano: mismas preguntas, ranking en vivo, y el villano pierde vida con los aciertos de todos. Necesitas internet.' }),
       resume,
-      h('div', { class: 'set-block roomcard' }, h('h3', { text: 'Unirme a una sala' }), h('div', { class: 'joinrow' }, codeIn, joinBtn), msg),
+      h('div', { class: 'set-block roomcard' }, h('h3', { text: 'Unirme a una sala' }), h('p', { class: 'hint', text: 'Escribe el código de 4 letras:' }), boxes, kb, msg, enterBtn),
       h('div', { class: 'set-block roomcard' }, h('h3', { text: 'Crear una sala' }), h('p', { class: 'hint', text: 'Tú eliges cuántas preguntas, la dificultad y los temas. Los demás entran con un código o un QR.' }), h('button', { class: 'btn', type: 'button', onclick: () => { sfx('select'); go('roomCreate'); } }, 'Crear sala'))));
-    if (params.code && cleanCode(params.code).length === 4) later(() => joinBtn.click(), 350);
+    drawBoxes();
+    if (code.length === 4) later(() => enterBtn.click(), 350);
     const sess = lsGet(LSK);
     if (sess && sess.code) {
-      N.ready().then(() => N.get('rooms/' + sess.code + '/state')).then((s) => {
-        if (!s || s.phase === 'end') { lsDel(LSK); return; }
+      N.ready().then(() => N.get('rooms/' + sess.code + '/state')).then((st) => {
+        if (!st || st.phase === 'end') { lsDel(LSK); return; }
         resume.hidden = false; resume.appendChild(h('div', { class: 'set-block roomcard' }, h('h3', { text: 'Tienes una sala abierta: ' + sess.code }), h('div', { class: 'row' },
           h('button', { class: 'btn small', type: 'button', onclick: () => go('room', { code: sess.code, role: sess.role }) }, 'Volver a la sala'),
           h('button', { class: 'btn small ghost', type: 'button', onclick: () => { lsDel(LSK); resume.hidden = true; } }, 'Olvidar'))));

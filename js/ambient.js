@@ -153,19 +153,145 @@
     };
   }
 
+  /* ---------- MUNDO DE CARAMELO (mapa y menús) ---------- */
+  const hex2 = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const lerpC = (a, b, t) => { const x = hex2(a), y = hex2(b); return 'rgb(' + x.map((v, i) => Math.round(v + (y[i] - v) * t)).join(',') + ')'; };
+  const ZONES = [['#3aa7ff', '#8ad8ff', '#d6f2ff'], ['#ff6fbf', '#ffab9e', '#ffe6a8'], ['#4a2fb8', '#a56bff', '#ff9fe0']];
+  const CANDY = ['#ff7ac8', '#5df2c0', '#ffe45c', '#ffa63d', '#5cc8ff', '#b58cff', '#ff5d6e'];
+  const INK = '#4a1f6e';
+
+  function candyScene(seedStr) {
+    const R = mulberry(hashStr(seedStr || 'candy'));
+    const PI = Math.PI, r0 = (v) => Math.round(v);
+    const rect = (c, x, y, w, h, col) => { c.fillStyle = col; c.fillRect(r0(x), r0(y), r0(w), r0(h)); };
+    const circ = (c, x, y, r, col) => { c.fillStyle = col; c.beginPath(); c.arc(r0(x), r0(y), r, 0, 2 * PI); c.fill(); };
+
+    /* ----- objetos de dulce ----- */
+    function lolli(c, x, y, r, c1, c2) {
+      rect(c, x - 1, y + r, 2, r * 2.2, '#fff4e0'); rect(c, x, y + r, 1, r * 2.2, '#dcc9a6');
+      circ(c, x, y, r + 1.4, INK); circ(c, x, y, r, c1);
+      c.fillStyle = c2; for (let u = 0; u < 1; u += 0.012) { const rad = u * (r - 0.8), th = u * PI * 5; c.fillRect(r0(x + Math.cos(th) * rad - 0.5), r0(y + Math.sin(th) * rad - 0.5), 1.6, 1.6); }
+      rect(c, x - r * 0.55, y - r * 0.65, 2, 2, 'rgba(255,255,255,.9)');
+    }
+    function cane(c, x, y, h) {
+      const pts = []; for (let i = 0; i < h; i++) pts.push([x, y + 5 + i]); for (let a = PI; a >= 0; a -= 0.22) pts.push([x + 5 + Math.cos(a) * 5, y + 5 - Math.sin(a) * 5]);
+      pts.forEach(([px, py]) => rect(c, px - 2.5, py - 2.5, 5, 5, INK)); pts.forEach(([px, py], i) => rect(c, px - 1.5, py - 1.5, 3, 3, Math.floor(i / 3) % 2 ? '#ffffff' : '#ff4d6d'));
+    }
+    function gum(c, x, y, r, col) {
+      c.fillStyle = INK; c.beginPath(); c.arc(r0(x), r0(y), r + 1.4, PI, 0); c.lineTo(x + r + 1.4, y + r * 0.6 + 1.4); c.lineTo(x - r - 1.4, y + r * 0.6 + 1.4); c.fill();
+      c.fillStyle = col; c.beginPath(); c.arc(r0(x), r0(y), r, PI, 0); c.lineTo(x + r, y + r * 0.6); c.lineTo(x - r, y + r * 0.6); c.fill();
+      for (let i = 0; i < 6; i++) rect(c, x - r + 2 + (i * 5) % (r * 2 - 3), y - r * 0.8 + (i * 3) % (r * 1.2), 1, 1, 'rgba(255,255,255,.9)');
+      rect(c, x - r * 0.5, y - r * 0.6, 2, 2, 'rgba(255,255,255,.9)');
+    }
+    function cupcake(c, x, y, s, col) {
+      c.fillStyle = INK; c.beginPath(); c.moveTo(x - 7 * s - 1, y); c.lineTo(x + 7 * s + 1, y); c.lineTo(x + 5 * s + 1, y + 9 * s + 1); c.lineTo(x - 5 * s - 1, y + 9 * s + 1); c.fill();
+      c.fillStyle = '#ffd08a'; c.beginPath(); c.moveTo(x - 6 * s, y + 1); c.lineTo(x + 6 * s, y + 1); c.lineTo(x + 4.5 * s, y + 8.5 * s); c.lineTo(x - 4.5 * s, y + 8.5 * s); c.fill();
+      for (let i = -2; i <= 2; i++) rect(c, x + i * 2.4 * s, y + 1, 1, 8 * s, 'rgba(180,110,50,.45)');
+      circ(c, x, y - 2 * s, 8 * s + 1.4, INK); circ(c, x, y - 2 * s, 8 * s, col); circ(c, x, y - 7 * s, 5.5 * s + 1.4, INK); circ(c, x, y - 7 * s, 5.5 * s, col); circ(c, x, y - 11 * s, 3 * s, '#ff2d55'); rect(c, x - 1, y - 12 * s, 1.5, 1.5, '#fff');
+    }
+    function donut(c, x, y, r, col) {
+      c.lineWidth = r * 0.95 + 3; c.strokeStyle = INK; c.beginPath(); c.arc(x, y, r * 0.62, 0, 2 * PI); c.stroke();
+      c.lineWidth = r * 0.95; c.strokeStyle = '#f3b26a'; c.beginPath(); c.arc(x, y, r * 0.62, 0, 2 * PI); c.stroke();
+      c.lineWidth = r * 0.6; c.strokeStyle = col; c.beginPath(); c.arc(x, y - 0.5, r * 0.64, 0, 2 * PI); c.stroke();
+      for (let i = 0; i < 9; i++) { const a = i * 0.7 + 0.3; rect(c, x + Math.cos(a) * r * 0.64, y + Math.sin(a) * r * 0.64, 2, 1, CANDY[(i * 2) % CANDY.length]); }
+    }
+    function cone(c, x, y, s) {
+      c.fillStyle = INK; c.beginPath(); c.moveTo(x - 6 * s - 1, y); c.lineTo(x + 6 * s + 1, y); c.lineTo(x, y + 16 * s + 2); c.fill();
+      c.fillStyle = '#eaa55a'; c.beginPath(); c.moveTo(x - 5 * s, y + 1); c.lineTo(x + 5 * s, y + 1); c.lineTo(x, y + 15 * s); c.fill();
+      c.strokeStyle = 'rgba(150,90,30,.6)'; c.lineWidth = 1; for (let i = -2; i <= 2; i++) { c.beginPath(); c.moveTo(x + i * 2.2 * s, y + 1); c.lineTo(x, y + 14 * s); c.stroke(); }
+      circ(c, x, y - 1 * s, 7 * s + 1.4, INK); circ(c, x, y - 1 * s, 7 * s, '#ff9ad5'); circ(c, x, y - 8 * s, 6 * s + 1.4, INK); circ(c, x, y - 8 * s, 6 * s, '#7ff0d0'); circ(c, x, y - 13 * s, 2.4 * s, '#ff2d55');
+    }
+    function star(c, x, y, r, col) {
+      const path = (rr) => { c.beginPath(); for (let i = 0; i < 10; i++) { const a = -PI / 2 + i * PI / 5, q = i % 2 ? rr * 0.45 : rr; c.lineTo(x + Math.cos(a) * q, y + Math.sin(a) * q); } c.closePath(); };
+      c.fillStyle = INK; path(r + 1.6); c.fill(); c.fillStyle = col; path(r); c.fill(); rect(c, x - r * 0.2, y - r * 0.5, 2, 2, 'rgba(255,255,255,.9)');
+    }
+    function cloud(c, x, y, s) {
+      const bl = [[0, 0, 7], [8, -3, 9], [17, 0, 7], [8, 3, 8], [-1, 3, 5], [18, 3, 5]];
+      bl.forEach(([dx, dy, rr]) => circ(c, x + dx * s, y + dy * s + 2, rr * s, '#ffd1ec')); bl.forEach(([dx, dy, rr]) => circ(c, x + dx * s, y + dy * s, rr * s, '#ffffff'));
+    }
+    function island(c, x, y, w, t, i) {
+      const bob = Math.sin(t * 0.7 + i * 2) * 2;
+      y += bob; c.fillStyle = '#5b3520'; c.beginPath(); c.moveTo(x - w / 2, y); c.lineTo(x + w / 2, y); c.quadraticCurveTo(x + w * 0.2, y + w * 0.7, x, y + w * 0.75); c.quadraticCurveTo(x - w * 0.2, y + w * 0.7, x - w / 2, y); c.fill();
+      c.fillStyle = '#7b4a2e'; c.beginPath(); c.moveTo(x - w / 2, y); c.lineTo(x + w / 2, y); c.quadraticCurveTo(x + w * 0.25, y + w * 0.5, x, y + w * 0.55); c.quadraticCurveTo(x - w * 0.25, y + w * 0.5, x - w / 2, y); c.fill();
+      c.fillStyle = INK; c.beginPath(); c.ellipse(x, y, w / 2 + 1.4, w * 0.16 + 1.4, 0, PI, 2 * PI); c.fill();
+      c.fillStyle = '#8affc9'; c.beginPath(); c.ellipse(x, y, w / 2, w * 0.15, 0, PI, 2 * PI); c.fill();
+      c.fillStyle = '#ff9ad5'; for (let k = -2; k <= 2; k++) { c.beginPath(); c.arc(x + k * w * 0.18, y - w * 0.05, 2.6, 0, PI); c.fill(); }
+      lolli(c, x - w * 0.22, y - w * 0.32, 5, CANDY[i % 7], '#fff'); gum(c, x + w * 0.2, y - w * 0.1, 5, CANDY[(i + 3) % 7]);
+    }
+    function rainbow(c, w, h, scroll) {
+      const cx = w * 0.5, cy = h * 0.66 - scroll * 0.08, base = w * 0.62;
+      ['#ff4d6d', '#ff9a3d', '#ffe45c', '#5df2a0', '#5cc8ff', '#7a7cff', '#c58bff'].forEach((col, i) => { c.strokeStyle = col; c.globalAlpha = 0.5; c.lineWidth = 5; c.beginPath(); c.arc(cx, cy, base - i * 5, PI, 2 * PI); c.stroke(); }); c.globalAlpha = 1;
+    }
+    function sun(c, x, y, t) {
+      for (let i = 0; i < 12; i++) { const a = i * PI / 6 + t * 0.25, l = i % 2 ? 6 : 10; c.strokeStyle = '#fff2a8'; c.lineWidth = 2; c.beginPath(); c.moveTo(x + Math.cos(a) * 12, y + Math.sin(a) * 12); c.lineTo(x + Math.cos(a) * (12 + l), y + Math.sin(a) * (12 + l)); c.stroke(); }
+      circ(c, x, y, 13, INK); circ(c, x, y, 11.6, '#ffe45c'); rect(c, x - 5, y - 2, 2, 3, INK); rect(c, x + 3, y - 2, 2, 3, INK); c.strokeStyle = INK; c.lineWidth = 1.6; c.beginPath(); c.arc(x, y + 1, 5, 0.2, PI - 0.2); c.stroke(); rect(c, x - 8, y + 2, 3, 2, 'rgba(255,120,150,.7)'); rect(c, x + 5, y + 2, 3, 2, 'rgba(255,120,150,.7)');
+    }
+    function candyBall(c, x, y, r, col, sym) {
+      circ(c, x, y, r + 1.5, INK); circ(c, x, y, r, col); c.fillStyle = 'rgba(255,255,255,.45)'; c.beginPath(); c.ellipse(x - r * 0.35, y - r * 0.4, r * 0.35, r * 0.22, -0.6, 0, 2 * PI); c.fill();
+      c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = `700 ${Math.round(r * (sym.length > 2 ? 0.85 : 1.3))}px ${FONT}`; c.lineWidth = 2.4; c.strokeStyle = INK; c.strokeText(sym, x, y + 1, r * 1.7); c.fillStyle = '#fff'; c.fillText(sym, x, y + 1, r * 1.7);
+    }
+    const sparkle = (c, x, y, s, col) => { rect(c, x - s, y, s * 2 + 1, 1, col); rect(c, x, y - s, 1, s * 2 + 1, col); };
+
+    /* ----- elementos de la escena (fijos por semilla) ----- */
+    const near = Array.from({ length: 18 }, (_, i) => ({ kind: ['lolli', 'cane', 'gum', 'cupcake', 'donut', 'cone', 'star'][Math.floor(R() * 7)], side: i % 2, fx: 0.01 + R() * 0.08, wy: R(), s: 0.85 + R() * 0.5, c1: CANDY[Math.floor(R() * 7)], c2: CANDY[Math.floor(R() * 7)] }));
+    const islands = Array.from({ length: 4 }, () => ({ fx: 0.12 + R() * 0.76, wy: R(), w: 34 + R() * 20 }));
+    const clouds = Array.from({ length: 7 }, () => ({ x: R(), wy: R(), s: 0.7 + R() * 0.9, sp: 0.004 + R() * 0.008 }));
+    const balls = Array.from({ length: 8 }, () => ({ x: 0.05 + R() * 0.9, ph: R(), sp: 0.009 + R() * 0.014, r: 7 + Math.floor(R() * 5), c: CANDY[Math.floor(R() * 7)], s: SYMS.all[Math.floor(R() * SYMS.all.length)], sway: 3 + R() * 6 }));
+    const sparks = Array.from({ length: 34 }, () => ({ x: R(), y: R(), ph: R() * TAU }));
+    const conf = Array.from({ length: 30 }, () => ({ x: R(), ph: R(), sp: 0.02 + R() * 0.03, c: CANDY[Math.floor(R() * 7)], sw: R() * TAU }));
+    const drag = [['#ff9ad5', '#d0559f', '#ffe1f3'], ['#7fe8c8', '#2fa98a', '#d4fff1'], ['#ffe27a', '#e0a416', '#fff6c9'], ['#9ec5ff', '#4f7fe0', '#e0ecff']].map((cl, i) => ({ c: cl, per: 30 + R() * 20, gap: 2 + R() * 6, off: R() * 50, y: 0.08 + R() * 0.55, dir: i % 2 ? -1 : 1, s: i === 0 ? 1.8 : 1.3 }));
+    const wrapY = (wy, f, scroll, P, m) => (((wy * P - scroll * f) % P) + P) % P - m;
+
+    return {
+      full(ctx, w, h, t, px, scroll, prog) {
+        scroll = scroll || 0; prog = Math.max(0, Math.min(1, prog || 0));
+        ctx.imageSmoothingEnabled = false;
+        // cielo por zonas (día → atardecer → noche mágica)
+        const zi = prog < 0.5 ? 0 : 1, zt = prog < 0.5 ? prog * 2 : (prog - 0.5) * 2, A = ZONES[zi], Bz = ZONES[zi + 1];
+        const g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, lerpC(A[0], Bz[0], zt)); g.addColorStop(0.55, lerpC(A[1], Bz[1], zt)); g.addColorStop(1, lerpC(A[2], Bz[2], zt)); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+        const night = prog > 0.6 ? (prog - 0.6) / 0.4 : 0;
+        if (night > 0) { ctx.globalAlpha = night; stars.slice(0, 40).forEach((s) => { const tw = Math.sin(t * 1.6 + s.ph); if (tw > -0.4) rect(ctx, s.x * w, s.y * h, 1, 1, '#fff'); }); ctx.globalAlpha = 1; }
+        ctx.lineJoin = 'round';
+        sun(ctx, w * 0.82, h * 0.11 - scroll * 0.04, t); rainbow(ctx, w, h, scroll);
+        clouds.forEach((cl, i) => { const y = wrapY(cl.wy, 0.14, scroll, h * 1.5, 30), x = ((cl.x + t * cl.sp) % 1) * (w + 80) - 40; ctx.globalAlpha = 0.92; cloud(ctx, x, y, cl.s); }); ctx.globalAlpha = 1;
+        islands.forEach((il, i) => island(ctx, il.fx * w, wrapY(il.wy, 0.3, scroll, h * 1.9, 50), il.w, t, i));
+        near.forEach((o, i) => {
+          const x = o.side ? w - o.fx * w - 8 : o.fx * w + 8, y = wrapY(o.wy, 0.65, scroll, h * 1.7, 40), s = o.s;
+          if (o.kind === 'lolli') lolli(ctx, x, y, 8 * s, o.c1, '#fff'); else if (o.kind === 'cane') cane(ctx, x - 5, y, 22 * s); else if (o.kind === 'gum') gum(ctx, x, y, 8 * s, o.c1);
+          else if (o.kind === 'cupcake') cupcake(ctx, x, y + 6, s * 0.9, o.c1); else if (o.kind === 'donut') donut(ctx, x, y, 10 * s, o.c1); else if (o.kind === 'cone') cone(ctx, x, y, s * 0.85); else star(ctx, x, y, 8 * s, '#ffe45c');
+        });
+        // dragones de caramelo con estela de arcoíris
+        drag.forEach((d, i) => {
+          const cyc = d.per + d.gap, tt = (t + d.off) % cyc; if (tt > d.per) return;
+          const p = tt / d.per, dw = 28 * d.s, x = d.dir > 0 ? -dw + p * (w + dw * 2) : w + dw - p * (w + dw * 2), y = h * d.y + Math.sin(t * 0.9 + i * 2) * 5, fr = [0, 1, 2, 1][Math.floor(t * 5 + i) % 4];
+          for (let k = 0; k < 14; k++) { const tx = x + (d.dir > 0 ? -1 : 1) * (k * 4 + 6) - (d.dir > 0 ? 0 : 0), ty = y + 11 * d.s + Math.sin(t * 6 - k * 0.7) * 2; ctx.globalAlpha = 0.85 * (1 - k / 14); rect(ctx, tx, ty, 4, 3, `hsl(${(k * 28 + t * 120) % 360},95%,62%)`); } ctx.globalAlpha = 1;
+          ctx.save(); ctx.translate(r0(x), r0(y)); if (d.dir < 0) ctx.scale(-1, 1); ctx.imageSmoothingEnabled = false; ctx.drawImage(dragonSprite(d.c[0], d.c[1], d.c[2], fr), 0, 0, r0(28 * d.s), r0(20 * d.s)); ctx.restore();
+        });
+        // caramelos con símbolos matemáticos flotando
+        balls.forEach((b, i) => { const p = fract(b.ph + t * b.sp), y = h + 20 - p * (h + 40), x = b.x * w + Math.sin(t * 0.6 + i * 2) * b.sway; ctx.globalAlpha = Math.max(0, Math.min(1, Math.sin(p * PI) * 2)) * 0.95; candyBall(ctx, x, y, b.r, b.c, b.s); }); ctx.globalAlpha = 1;
+        // confeti de chispitas
+        conf.forEach((f) => { const p = fract(f.ph + t * f.sp), y = -6 + p * (h + 12), x = f.x * w + Math.sin(t + f.sw) * 4; rect(ctx, x, y, 1, 3, f.c); });
+        sparks.forEach((s) => { const tw = Math.sin(t * 2.2 + s.ph); if (tw > 0.55) sparkle(ctx, s.x * w, s.y * h, tw > 0.85 ? 2 : 1, '#fff'); });
+      },
+    };
+  }
+  const stars = Array.from({ length: 50 }, (_, i) => { const r = mulberry(i * 977 + 5); return { x: r(), y: r() * 0.7, ph: r() * TAU }; });
+
   /* ---------- montaje en pantalla (mapa y menús) ---------- */
   function mount(container, o) {
     o = o || {};
     const cv = document.createElement('canvas'); cv.className = 'ambient'; cv.setAttribute('aria-hidden', 'true');
     container.insertBefore(cv, container.firstChild);
-    const sc = scene({ seed: o.seed || 'hub', mode: 'hub' }), ctx = cv.getContext('2d'), PIX = 3;
-    let W = 0, H = 0, raf = 0, dead = false, last = 0, t0 = performance.now();
+    const sc = candyScene(o.seed || 'candy'), ctx = cv.getContext('2d'), PIX = 3, scEl = container.querySelector('#screen');
+    let W = 0, H = 0, raf = 0, dead = false, last = 0, t0 = performance.now(), scroll = 0, prog = 0;
     const still = !!o.still;
-    function size() { const r = container.getBoundingClientRect(); W = Math.max(60, Math.round(r.width / PIX)); H = Math.max(80, Math.round(r.height / PIX)); cv.width = W; cv.height = H; if (still) sc.full(ctx, W, H, 12, 1); }
-    function loop(ts) { if (dead) return; raf = requestAnimationFrame(loop); if (ts - last < 33) return; last = ts; if (document.hidden) return; sc.full(ctx, W, H, (ts - t0) / 1000 + 4, 1); }
+    const readScroll = () => { if (!scEl) return; scroll = scEl.scrollTop / PIX; const range = scEl.scrollHeight - scEl.clientHeight; prog = range > 40 ? Math.min(1, scEl.scrollTop / range) : 0; if (still) sc.full(ctx, W, H, 12, 1, scroll, prog); };
+    function size() { const r = container.getBoundingClientRect(); W = Math.max(60, Math.round(r.width / PIX)); H = Math.max(80, Math.round(r.height / PIX)); cv.width = W; cv.height = H; readScroll(); if (still) sc.full(ctx, W, H, 12, 1, scroll, prog); }
+    function loop(ts) { if (dead) return; raf = requestAnimationFrame(loop); if (ts - last < 33) return; last = ts; if (document.hidden) return; sc.full(ctx, W, H, (ts - t0) / 1000 + 4, 1, scroll, prog); }
+    if (scEl) scEl.addEventListener('scroll', readScroll, { passive: true });
     size(); const ro = root.ResizeObserver ? new ResizeObserver(size) : null; if (ro) ro.observe(container);
     if (!still) raf = requestAnimationFrame(loop);
-    return { destroy() { dead = true; cancelAnimationFrame(raf); if (ro) ro.disconnect(); if (cv.parentNode) cv.parentNode.removeChild(cv); } };
+    return { destroy() { dead = true; cancelAnimationFrame(raf); if (ro) ro.disconnect(); if (scEl) scEl.removeEventListener('scroll', readScroll); if (cv.parentNode) cv.parentNode.removeChild(cv); } };
   }
 
   root.DuiXAmbient = { scene, mount, SYMS };

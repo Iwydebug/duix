@@ -400,3 +400,24 @@ body.reduce *, body.reduce *::before, body.reduce *::after { animation-duration:
 .rvil { display: flex; align-items: center; gap: 10px; justify-content: center; text-align: left; } .rvil small { display: block; color: var(--muted); font-size: 12px; }
 .rmine { font-size: 15px; } .rmine b { font-family: var(--disp); font-weight: 400; font-size: 34px; color: var(--sun); }
 .cdnum { font-family: var(--disp); font-size: 120px; line-height: 1; color: var(--sun); text-shadow: 4px 4px 0 var(--ink); } .cdvil { display: grid; place-items: center; min-height: 130px; }
+
+/* Teclado propio para el código de sala */
+.codeboxes { display: flex; justify-content: center; gap: 8px; margin: 6px 0 10px; }
+.cbox { width: 56px; height: 68px; display: grid; place-items: center; font-family: var(--disp); font-size: 46px; line-height: 1; color: var(--ink); background: #fff; border: 4px solid var(--ink); border-radius: 12px; box-shadow: 3px 4px 0 var(--ink); }
+.cbox.has { background: var(--sun); } .cbox.cur { border-color: var(--sky, #5ce1e6); animation: cbl 1s steps(2) infinite; }
+@keyframes cbl { 50% { box-shadow: 3px 4px 0 var(--ink), 0 0 0 3px rgba(92,225,230,.5); } }
+.osk { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 10px; }
+.oskrow { display: flex; justify-content: center; gap: 5px; }
+.oskkey { flex: 1; max-width: 38px; min-width: 0; height: 46px; font-family: var(--disp); font-size: 22px; color: #fff; background: var(--panel, #3b2f86); border: 3px solid var(--ink); border-radius: 9px; box-shadow: 0 3px 0 var(--ink); }
+.oskkey:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); background: var(--sun); color: var(--ink); }
+.oskkey.wide { max-width: 62px; flex: 1.6; background: #6b2b52; }
+.btn:disabled { opacity: .5; }
+
+/* Legibilidad sobre el mundo de caramelo */
+.screen.amb .top { background: rgba(26, 16, 51, .78); border-radius: 18px; padding: 6px 8px; }
+.screen.amb .cta { background: rgba(26, 16, 51, .82); border-radius: 16px; padding: 8px 10px; border: 3px solid var(--ink); }
+.screen.amb .hint, .screen.amb p.hint { background: rgba(26, 16, 51, .8); color: #ece6ff; padding: 8px 12px; border-radius: 12px; }
+.screen.amb .node.locked { opacity: 1; background: #2b2360; }
+.screen.amb .map::before { border-color: #8a2a72; background-color: #ff7ac8; background-image: repeating-linear-gradient(180deg, #fff 0 12px, transparent 12px 26px); }
+.screen.amb .h1 { text-shadow: 3px 3px 0 var(--ink), -1px -1px 0 var(--ink), 1px -1px 0 var(--ink), -1px 1px 0 var(--ink); }
+.screen.amb .set-block, .screen.amb .roomcard { background: rgba(43, 35, 96, .96); }
