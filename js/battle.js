@@ -22,7 +22,8 @@
     let lastSnap = '';
     const weapon = D.ITEM_BY_ID[look.weapon] || D.ITEM_BY_ID['wp-rayo'];
     const startHearts = 3 + (perks.hearts || 0);
-    const baseSpeed = [22, 28, 35][tier - 1];
+    const FALL_T = cfg.fallSecs || [27, 23, 19][tier - 1]; // segundos que tarda una cápsula en llegar al héroe
+    const baseSpeed = () => (LH * 0.8) / FALL_T;
 
     const st = {
       hp: maxHp, hearts: startHearts, maxHearts: startHearts, shield: perks.shield || 0, score: 0, streak: 0, bestStreak: 0, correct: 0, answered: 0, coins: 0, power: 0,
@@ -50,7 +51,7 @@
         <div class="bt-keys">Toca una respuesta para dispararle<br><small>Teclado: 1-4 · H pista · Espacio poder</small></div>
         <button class="bt-btn bt-super" disabled><img alt="" src="${S.icon('bolt', 3)}"><span>Poder</span><i class="bt-pw"><b></b></i></button>
       </div>
-      <div class="bt-pausemenu" hidden><div class="bt-pbox"><h2>Pausa</h2><button class="btn big" data-a="resume">Seguir luchando</button>${cfg.lockSettings ? '' : '<div class="bt-pset"><b>Música</b><div class="seg bt-mpick"></div><label class="set bt-sfxrow"><span>Efectos de sonido</span><input type="checkbox" class="bt-sfxchk"><span class="sw2"></span></label></div>'}<button class="btn ghost" data-a="quit">Salir del combate</button></div></div>`;
+      <div class="bt-pausemenu" hidden><div class="bt-pbox"><h2>Pausa</h2><button class="btn big" data-a="resume">Seguir luchando</button>${cfg.room || !cfg.onRestart ? '' : '<button class="btn" data-a="restart">↻ Reiniciar</button>'}${cfg.lockSettings ? '' : '<div class="bt-pset"><b>Música</b><div class="seg bt-mpick"></div><label class="set bt-sfxrow"><span>Efectos de sonido</span><input type="checkbox" class="bt-sfxchk"><span class="sw2"></span></label></div>'}<button class="btn ghost" data-a="quit">Salir del combate</button></div></div>`;
     if (room) wrap.classList.add('room');
     root_.appendChild(wrap);
     if (cfg.extraTop) wrap.insertBefore(cfg.extraTop, wrap.querySelector('.bt-boss'));
@@ -135,7 +136,7 @@
       const tb = $('.bt-qtable'); tb.innerHTML = '';
       if (q.table) { let h = '<table><tr>' + q.table.head.map((c, i) => (i ? '<td>' : '<th>') + esc(c) + (i ? '</td>' : '</th>')).join('') + '</tr>'; q.table.rows.forEach((r) => { h += '<tr>' + r.map((c, i) => (i ? '<td class="' + (c === '?' ? 'qm' : '') + '">' : '<th>') + esc(c) + (i ? '</td>' : '</th>')).join('') + '</tr>'; }); tb.innerHTML = h + '</table>'; }
       $('.bt-explain').hidden = true;
-      const speed = baseSpeed * (1 + Math.min(0.3, st.qIndex * 0.015)) * (1 - (perks.slow || 0)) * (endless ? 1 + Math.min(0.6, st.correct * 0.02) : 1);
+      const speed = baseSpeed() * (1 + Math.min(0.15, st.qIndex * 0.01)) * (1 - (perks.slow || 0)) * (endless ? 1 + Math.min(0.6, st.correct * 0.02) : 1);
       caps.length = 0;
       q.options.forEach((t, i) => {
         const lay = wrapText(t, LANE_W - 20), h = Math.max(36, lay.lines.length * lay.fs * 1.22 + 14);
@@ -145,7 +146,7 @@
       if (st.qIndex === 1) {
         st.state = 'read'; st.stateT = 0;
         const more = cfg.moreTime ? 1.7 : 1, len = q.text.length + (q.table ? 30 : 0) + q.options.reduce((a, o) => a + o.length, 0) * 0.4;
-        st.readFor = Math.min(8, Math.max(2.6, 1.4 + len * 0.045)) * more;
+        st.readFor = Math.min(10, Math.max(4, 2 + len * 0.06)) * more;
         showBig(q);
       } else { // flujo continuo: la pregunta cambia con un golpe y las cápsulas ya vienen cayendo
         st.state = 'play'; st.stateT = 0; const qb = $('.bt-q'); qb.classList.remove('flip'); void qb.offsetWidth; qb.classList.add('flip'); A.sfx('tick');
@@ -404,7 +405,7 @@
       draw(); chk.checked = !!St.settings().sfx; chk.addEventListener('change', () => St.setSetting('sfx', chk.checked));
     }
     $('.bt-pause').addEventListener('click', () => togglePause(true));
-    $('.bt-pausemenu').addEventListener('click', (e) => { const a = e.target.dataset && e.target.dataset.a; if (a === 'resume') togglePause(false); if (a === 'quit') { destroy(); cfg.onQuit && cfg.onQuit(); } });
+    $('.bt-pausemenu').addEventListener('click', (e) => { const a = e.target.dataset && e.target.dataset.a; if (a === 'resume') togglePause(false); if (a === 'quit') { destroy(); cfg.onQuit && cfg.onQuit(); } if (a === 'restart' && cfg.onRestart) { destroy(); cfg.onRestart(); } });
     const onVis = () => { if (document.hidden && !room) togglePause(true); };
     document.addEventListener('visibilitychange', onVis);
 

@@ -31,7 +31,7 @@
       <div class="bt-boss"><span class="bt-bname">${esc(v.name)}</span><div class="bt-hpbar"><i></i></div><span class="bt-hptxt"></span></div>
       ${bodyHtml}
       <div class="bt-ctl">${ctlHtml}</div>
-      <div class="bt-pausemenu" hidden><div class="bt-pbox"><h2>Pausa</h2><button class="btn big" data-a="resume">Seguir jugando</button><div class="bt-pset"><b>Música</b><div class="seg bt-mpick"></div><label class="set bt-sfxrow"><span>Efectos de sonido</span><input type="checkbox" class="bt-sfxchk"><span class="sw2"></span></label></div><button class="btn ghost" data-a="quit">Salir</button></div></div>`;
+      <div class="bt-pausemenu" hidden><div class="bt-pbox"><h2>Pausa</h2><button class="btn big" data-a="resume">Seguir jugando</button><button class="btn" data-a="restart">↻ Reiniciar</button><div class="bt-pset"><b>Música</b><div class="seg bt-mpick"></div><label class="set bt-sfxrow"><span>Efectos de sonido</span><input type="checkbox" class="bt-sfxchk"><span class="sw2"></span></label></div><button class="btn ghost" data-a="quit">Salir</button></div></div>`;
     cfg.container.appendChild(wrap);
     const $ = (s) => wrap.querySelector(s);
     const api = { wrap, $, st, v, perks, tier, destroyed: false, raf: 0, last: 0, onTick: null, onResume: null };
@@ -66,7 +66,7 @@
       const draw = () => { mp.innerHTML = ''; [['arcade', 'Arcade'], ['calma', 'Calmada'], ['off', 'Sin música']].forEach(([id, label]) => { const b = el('button', 'segb' + (now() === id ? ' on' : ''), label); b.type = 'button'; b.addEventListener('click', () => { A.unlock(); if (id === 'off') St.setSetting('music', false); else { St.setSetting('musicStyle', id); St.setSetting('music', true); } draw(); }); mp.appendChild(b); }); };
       draw(); chk.checked = !!St.settings().sfx; chk.addEventListener('change', () => St.setSetting('sfx', chk.checked)); }
     $('.bt-pause').addEventListener('click', () => api.toggle(true));
-    $('.bt-pausemenu').addEventListener('click', (e) => { const a = e.target.dataset && e.target.dataset.a; if (a === 'resume') api.toggle(false); if (a === 'quit') { api.destroy(); cfg.onQuit && cfg.onQuit(); } });
+    $('.bt-pausemenu').addEventListener('click', (e) => { const a = e.target.dataset && e.target.dataset.a; if (a === 'resume') api.toggle(false); if (a === 'quit') { api.destroy(); cfg.onQuit && cfg.onQuit(); } if (a === 'restart' && cfg.onRestart) { api.destroy(); cfg.onRestart(); } });
     const onVis = () => { if (document.hidden) api.toggle(true); };
     document.addEventListener('visibilitychange', onVis);
     const loop = (ts) => {
@@ -120,7 +120,7 @@
    * NIVEL 2 · CARRERA
    * ------------------------------------------------------------------ */
   function startRun(cfg) {
-    const v = cfg.villain, N = v.boss ? 8 : 6;
+    const v = cfg.villain, N = v.boss ? 4 : 3;
     const body = `<div class="bt-q"><div class="bt-qtag"></div><div class="bt-qtext"></div><div class="bt-qtable"></div><div class="bt-explain" hidden></div></div>
       <div class="bt-field"><canvas></canvas><div class="bt-banner" hidden></div></div>${BIGHTML}`;
     const ctl = `<button class="bt-btn bt-hint"><img alt="" src="${S.icon('bulb', 3)}"><span>Pista</span><em></em></button>
@@ -135,8 +135,8 @@
     const keys = {}; let drag = false;
     const hintCost = () => Math.max(1, Math.round(20 * ((cfg.perks || {}).hintCost || 1)));
     const villain = S.villainCanvas(v);
-    const D = 330, SPAWN_Y = -80;
-    const baseV = () => (44 + Math.min(20, spawned * 2.2)) * (1 - (cfg.perks || {}).slow * 0.5 || 1) * (slowT > 0 ? 0.5 : 1);
+    const D = 430, SPAWN_Y = -80;
+    const baseV = () => (LH * 0.75 / 17) * (1 + Math.min(0.2, spawned * 0.05)) * (1 - (cfg.perks || {}).slow * 0.5 || 1) * (slowT > 0 ? 0.5 : 1);
     function resize() { const f = $('.bt-field'); const w = f.clientWidth, h = f.clientHeight; if (w < 10 || h < 10) return; dpr = Math.min(2.5, root.devicePixelRatio || 1); W = w; H = h; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.width = W + 'px'; cv.style.height = H + 'px'; LH = H * (LW / W); if (!hero.y) { hero.y = hero.ty = LH - 60; } }
     function wrapLines(text, maxW) {
       const tokens = []; let cur = '';
@@ -212,7 +212,7 @@
       const sp = 250; let kx = 0, ky = 0; if (keys.arrowleft || keys.a) kx -= 1; if (keys.arrowright || keys.d) kx += 1; if (keys.arrowup || keys.w) ky -= 1; if (keys.arrowdown || keys.s) ky += 1;
       if (kx || ky) { hero.tx = clamp(hero.tx + kx * sp * dt, 20, LW - 20); hero.ty = clamp(hero.ty + ky * sp * dt, LH * 0.3, LH - 40); }
       if (stun <= 0) { const dx = hero.tx - hero.x; hero.x += dx * Math.min(1, dt * 12); hero.y += (hero.ty - hero.y) * Math.min(1, dt * 12); if (Math.abs(dx) > 1.5) hero.face = dx > 0 ? 1 : -1; }
-      if (state === 'intro') { if (sT > 0.1 && !st.said) { st.said = true; c.banner('¡A CORRER!', 'go', 1200); } if (sT > 1.3) { const q = makeQ(); st.nextQ = q; fillQ(c, q, topicTag(v, q)); state = 'read'; sT = 0; const len = q.text.length + (q.table ? 30 : 0) + q.options.reduce((a, o) => a + o.length, 0) * 0.4; readFor = Math.min(8, Math.max(2.6, 1.4 + len * 0.045)); intro.show(q, readFor, topicTag(v, q)); } }
+      if (state === 'intro') { if (sT > 0.1 && !st.said) { st.said = true; c.banner('¡A CORRER!', 'go', 1200); } if (sT > 1.3) { const q = makeQ(); st.nextQ = q; fillQ(c, q, topicTag(v, q)); state = 'read'; sT = 0; const len = q.text.length + (q.table ? 30 : 0) + q.options.reduce((a, o) => a + o.length, 0) * 0.4; readFor = Math.min(10, Math.max(4, 2 + len * 0.06)); intro.show(q, readFor, topicTag(v, q)); } }
       else if (state === 'read') { if (sT >= readFor) { state = 'settle'; sT = 0; intro.settle(); A.sfx('tick'); } }
       else if (state === 'settle') { if (sT >= 0.55) { intro.end(); state = 'play'; sT = 0; A.sfx('go'); c.banner('¡YA!', 'go', 550); spawnWall(SPAWN_Y); curIdx = 0; prog(); } }
       else if (state === 'play') {
@@ -309,18 +309,17 @@
     return { lines: [text.slice(0, 9)], fs: 8 };
   }
   function startMaze(cfg) {
-    const v = cfg.villain, N = v.boss ? 7 : 5, NCH = v.boss ? 2 : 1;
+    const v = cfg.villain, N = v.boss ? 3 : 2;
     const body = `<div class="bt-q"><div class="bt-qtag"></div><div class="bt-qtext"></div><div class="bt-qtable"></div><div class="bt-explain" hidden></div></div>
       <div class="bt-field"><canvas></canvas><div class="bt-banner" hidden></div></div>${BIGHTML}`;
     const ctl = `<button class="bt-btn bt-hint"><img alt="" src="${S.icon('bulb', 3)}"><span>Pista</span><em></em></button>
-      <div class="bt-keys">Desliza el dedo para guiar a tu héroe por el laberinto<br><small>Teclado: flechas o WASD · H pista</small></div>`;
+      <div class="bt-keys">¡Cómete al fantasma con la respuesta correcta!<br><small>Desliza o usa flechas/WASD · Σ = poder · H pista</small></div>`;
     const c = core(cfg, 'maze', body, ctl), st = c.st, $ = c.$, cv = $('.bt-field canvas'), ctx = cv.getContext('2d');
     st.sigma = 0;
     const intro = qIntro(c), LW = 360, COLS = 11, T = LW / COLS;
     let W = 0, H = 0, dpr = 1, LH = 560, ROWS = 11, oy = 0, grid = null, state = 'intro', sT = 0, readFor = 3, q = null, qn = 0, ended = false, shake = 0, flash = 0, fright = 0, invul = 0, dots = 0, hintT = 0;
     const parts = [], floats = [], pills = [], dotSet = new Map();
     const hero = { i: 5, j: 9, ni: 5, nj: 9, p: 1, dir: [0, 0], want: [0, 0], face: 1 };
-    const chasers = [];
     const hintCost = () => Math.max(1, Math.round(20 * ((cfg.perks || {}).hintCost || 1)));
     const villain = S.villainCanvas(v);
     const rnd = (() => { let s = (Date.now() ^ 0x9e3779b9) >>> 0; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; })();
@@ -337,16 +336,16 @@
       for (let j = 1; j < ROWS - 1; j++) for (let i = 1; i < COLS - 1; i++) if (grid[j][i] === 1 && ((i % 2 === 0) !== (j % 2 === 0)) && rnd() < 0.32) grid[j][i] = 0;
       dotSet.clear(); for (let j = 0; j < ROWS; j++) for (let i = 0; i < COLS; i++) if (grid[j][i] === 0) dotSet.set(i + ',' + j, true);
       const si = Math.floor(COLS / 2) | 1, sj = ROWS - 2; hero.i = hero.ni = si; hero.j = hero.nj = sj; hero.p = 1; hero.dir = [0, 0]; hero.want = [0, 0]; dotSet.delete(si + ',' + sj);
-      chasers.length = 0; for (let k = 0; k < NCH; k++) chasers.push({ i: k ? COLS - 2 : 1, j: 1, ni: k ? COLS - 2 : 1, nj: 1, p: 1, dir: [0, 0], home: [k ? COLS - 2 : 1, 1], eaten: 0 });
     }
     function bfs(fi, fj) { const d = Array.from({ length: ROWS }, () => Array(COLS).fill(-1)); const qu = [[fi, fj]]; d[fj][fi] = 0; for (let h = 0; h < qu.length; h++) { const [x, y] = qu[h]; [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([a, b]) => { if (pass(x + a, y + b) && d[y + b][x + a] < 0) { d[y + b][x + a] = d[y][x] + 1; qu.push([x + a, y + b]); } }); } return d; }
     function placePills() {
-      pills.length = 0; const d = bfs(hero.ni, hero.nj), cand = []; for (let j = 1; j < ROWS - 1; j += 2) for (let i = 1; i < COLS - 1; i += 2) if (grid[j][i] === 0 && d[j][i] >= 4) cand.push([i, j]);
+      pills.length = 0; const d = bfs(hero.ni, hero.nj), cand = []; for (let j = 1; j < ROWS - 1; j++) for (let i = 1; i < COLS - 1; i++) if (grid[j][i] === 0 && d[j][i] >= 5) cand.push([i, j]);
       cand.sort(() => rnd() - 0.5); const pick = [];
       for (const [i, j] of cand) { if (pick.every(([a, b]) => Math.abs(a - i) + Math.abs(b - j) >= 4)) pick.push([i, j]); if (pick.length === q.options.length) break; }
       for (const [i, j] of cand) { if (pick.length >= q.options.length) break; if (!pick.some(([a, b]) => a === i && b === j)) pick.push([i, j]); }
-      q.options.forEach((t, k) => { const lay = fitText(ctx, t, T * 2.5, 2, 14); pills.push({ i: pick[k][0], j: pick[k][1], text: t, lines: lay.lines, fs: lay.fs, ok: k === q.correct, gone: false, crossed: false, mark: 0, k }); });
-      if (rnd() < 0.6 && cand.length > 6) { const s = cand[cand.length - 1]; if (!pills.some((p) => p.i === s[0] && p.j === s[1])) pills.push({ i: s[0], j: s[1], sigma: true, gone: false }); }
+      q.options.forEach((t, k) => { const lay = fitText(ctx, t, T * 2.6, 2, 14); pills.push({ i: pick[k][0], j: pick[k][1], ni: pick[k][0], nj: pick[k][1], p: 1, dir: [0, 0], home: [pick[k][0], pick[k][1]], jail: 0, ghost: true, text: t, lines: lay.lines, fs: lay.fs, ok: k === q.correct, gone: false, mark: 0, k }); });
+      const far = []; for (let j = 1; j < ROWS - 1; j += 2) for (let i = 1; i < COLS - 1; i += 2) if (grid[j][i] === 0 && d[j][i] >= 3 && !pick.some(([a, b]) => a === i && b === j)) far.push([i, j]);
+      far.sort(() => rnd() - 0.5); far.slice(0, 2).forEach(([i, j]) => pills.push({ i, j, sigma: true, gone: false }));
     }
     function makeQ() { let x; try { x = Q.generate(v.topic, v.topic === 'mix' ? 3 : cfg.tier); } catch (e) { x = Q.generate('fracciones', 1); } return x; }
     const fl = (x, y, text, col, size) => floats.push({ x, y, text, c: col || '#fff', size: size || 20, t: 0, life: 0.9 });
@@ -356,25 +355,29 @@
     const prog = () => c.hud(1 - st.answered / N, st.answered + '/' + N);
     function newQuestion(first) { q = makeQ(); qn++; if (first) fillQ(c, q, topicTag(v, q)); else { fillQ(c, q, topicTag(v, q)); const qb = $('.bt-q'); qb.classList.remove('flip'); void qb.offsetWidth; qb.classList.add('flip'); A.sfx('tick'); } placePills(); }
     function finish(win) { if (ended) return; ended = true; st.over = true; st.win = win; state = 'end'; sT = 0; if (win) { A.sfx('levelup'); c.banner('¡VICTORIA!', 'go'); } else { A.sfx('lose'); c.banner('¡DERROTA!', 'lose'); } }
-    function respawn() { invul = 2.2; hero.i = hero.ni = Math.floor(COLS / 2) | 1; hero.j = hero.nj = ROWS - 2; hero.p = 1; hero.dir = [0, 0]; hero.want = [0, 0]; chasers.forEach((ch) => { ch.i = ch.ni = ch.home[0]; ch.j = ch.nj = ch.home[1]; ch.p = 1; ch.dir = [0, 0]; }); }
+    function respawn() { invul = 2.2; hero.i = hero.ni = Math.floor(COLS / 2) | 1; hero.j = hero.nj = ROWS - 2; hero.p = 1; hero.dir = [0, 0]; hero.want = [0, 0]; }
     function eatPill(pl) {
-      if (pl.sigma) { pl.gone = true; st.sigma++; fright = 6; A.sfx('levelup'); const p = posOf(hero); burst(p.x, p.y, ['#c58bff', '#fff', '#5ce1e6'], 26, 180, 0.8); fl(p.x, p.y - 20, '+1 Σ  ¡PODER!', '#e2b8ff', 18); return; }
-      if (pl.gone) return; pl.gone = true; st.answered += 1; const p = posOf(hero);
+      if (pl.sigma) { pl.gone = true; st.sigma++; fright = 7; A.sfx('levelup'); const p = posOf(hero); burst(p.x, p.y, ['#c58bff', '#fff', '#5ce1e6'], 26, 180, 0.8); fl(p.x, p.y - 20, '¡PODER! Los fantasmas huyen', '#e2b8ff', 16); return; }
+      if (pl.gone) return; const p = posOf(hero);
       if (pl.ok) {
+        pl.gone = true; st.answered += 1;
         const clean = !q.wrong; if (clean) { st.correct++; st.streak++; st.bestStreak = Math.max(st.bestStreak, st.streak); } else st.streak = 0;
         const r = c.gain(clean, 0); burst(p.x, p.y, ['#ffe14a', '#fff', '#3ddc97'], 30, 210, 0.8); fl(p.x, p.y - 20, '+' + r.g, '#ffe14a', 24); A.sfx('correct'); A.sfx('hit'); setTimeout(() => A.sfx('coin'), 90); shake = 6; if (st.streak >= 3 && clean) A.sfx('combo', st.streak);
         if (st.answered >= N) return finish(true);
         prog(); newQuestion(false);
-      } else {
-        st.answered--; st.streak = 0; q.wrong = true; c.log(q, pl.k); c.damage(); burst(p.x, p.y, ['#ff3b5c', '#7a6aa8'], 22, 170, 0.6); fl(p.x, p.y - 20, '✖', '#ff4d4d', 30); shake = 10; flash = 0.35;
-        explainBox(c, 'Ese no era. ' + (q.hint ? '💡 ' + q.hint : 'Sigue buscando la respuesta correcta.')); if (st.hearts <= 0) { st.answered++; return finish(false); }
-        // el error cuenta como intento de esa pregunta
+      } else if (fright > 0) {
+        pl.jail = 5; pl.i = pl.ni = pl.home[0]; pl.j = pl.nj = pl.home[1]; pl.p = 1; st.score += 150; A.sfx('hit'); const cp = posOf(pl); burst(cp.x, cp.y, ['#c58bff', '#fff'], 22, 180, 0.7); fl(cp.x, cp.y - 10, '¡A la cárcel! +150', '#e2b8ff', 16);
+      } else if (invul <= 0) {
+        st.streak = 0; q.wrong = true; c.log(q, pl.k); c.damage(); burst(p.x, p.y, ['#ff3b5c', '#7a6aa8'], 22, 170, 0.6); fl(p.x, p.y - 20, '✖ ¡Ese no era!', '#ff4d4d', 22); shake = 10; flash = 0.35; A.sfx('boom');
+        explainBox(c, 'Ese no era. ' + (q.hint ? '💡 ' + q.hint : 'Sigue buscando la respuesta correcta.'));
+        if (st.hearts <= 0) return finish(false);
+        pl.jail = 3; pl.i = pl.ni = pl.home[0]; pl.j = pl.nj = pl.home[1]; pl.p = 1; respawn();
       }
     }
     function hint() {
-      if (state !== 'play') return; const wr = pills.filter((p) => !p.sigma && !p.ok && !p.gone && !p.crossed); if (wr.length < 2) { A.sfx('deny'); return; }
+      if (state !== 'play') return; const wr = pills.filter((p) => p.ghost && !p.ok && !p.gone); if (wr.length < 2) { A.sfx('deny'); return; }
       if (!St.spend(hintCost())) { A.sfx('deny'); return; }
-      wr[Math.floor(rnd() * wr.length)].crossed = true; st.hintsUsed++; A.sfx('hint'); hintT = 1; if (q.hint) explainBox(c, '💡 Pista: ' + q.hint); prog();
+      { const g = wr[Math.floor(rnd() * wr.length)]; g.gone = true; const gp = posOf(g); burst(gp.x, gp.y, ['#ff4d4d', '#fff'], 16, 140, 0.6); } st.hintsUsed++; A.sfx('hint'); hintT = 1; if (q.hint) explainBox(c, '💡 Pista: ' + q.hint); prog();
     }
     $('.bt-hint em').textContent = hintCost(); $('.bt-hint').addEventListener('click', () => { A.unlock(); hint(); });
     // entrada: deslizar, tocar (dirección desde el héroe) o teclado
@@ -399,7 +402,8 @@
     const chaserChoose = (ch) => {
       const opts = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([a, b]) => pass(ch.i + a, ch.j + b) && !(a === -ch.dir[0] && b === -ch.dir[1] && (ch.dir[0] || ch.dir[1])));
       if (!opts.length) return [-ch.dir[0], -ch.dir[1]];
-      if (Math.random() < 0.28) return opts[Math.floor(Math.random() * opts.length)];
+      const chase = fright > 0 ? 0.75 : 0.42;
+      if (Math.random() > chase) return opts[Math.floor(Math.random() * opts.length)];
       const d = bfs(hero.ni, hero.nj); let best = null, bv = fright > 0 ? -1 : 1e9; opts.forEach(([a, b]) => { const val = d[ch.j + b][ch.i + a]; if (fright > 0 ? val > bv : val < bv) { bv = val; best = [a, b]; } }); return best || opts[0];
     };
     c.onTick = (dt) => {
@@ -408,24 +412,22 @@
       parts.forEach((p) => { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 260 * dt; }); for (let i = parts.length - 1; i >= 0; i--) if (parts[i].t >= parts[i].life) parts.splice(i, 1);
       floats.forEach((f) => { f.t += dt; f.y -= 26 * dt; }); for (let i = floats.length - 1; i >= 0; i--) if (floats[i].t >= floats[i].life) floats.splice(i, 1);
       shake = Math.max(0, shake - dt * 30); flash = Math.max(0, flash - dt); fright = Math.max(0, fright - dt); invul = Math.max(0, invul - dt); hintT = Math.max(0, hintT - dt);
-      if (state === 'intro') { if (sT > 0.1 && !st.said) { st.said = true; c.banner('¡AL LABERINTO!', 'go', 1200); } if (sT > 1.3) { newQuestion(true); state = 'read'; sT = 0; const len = q.text.length + (q.table ? 30 : 0) + q.options.reduce((a, o) => a + o.length, 0) * 0.4; readFor = Math.min(8, Math.max(2.6, 1.4 + len * 0.045)); intro.show(q, readFor, topicTag(v, q)); } }
+      if (state === 'intro') { if (sT > 0.1 && !st.said) { st.said = true; c.banner('¡AL LABERINTO!', 'go', 1200); } if (sT > 1.3) { newQuestion(true); state = 'read'; sT = 0; const len = q.text.length + (q.table ? 30 : 0) + q.options.reduce((a, o) => a + o.length, 0) * 0.4; readFor = Math.min(10, Math.max(4, 2 + len * 0.06)); intro.show(q, readFor, topicTag(v, q)); } }
       else if (state === 'read') { if (sT >= readFor) { state = 'settle'; sT = 0; intro.settle(); A.sfx('tick'); } }
       else if (state === 'settle') { if (sT >= 0.55) { intro.end(); state = 'play'; sT = 0; A.sfx('go'); c.banner('¡YA!', 'go', 550); prog(); } }
       else if (state === 'play') {
         // héroe: permite invertir en pleno paso
         if (hero.p < 1 && (hero.want[0] === -hero.dir[0] && hero.want[1] === -hero.dir[1]) && (hero.want[0] || hero.want[1])) { const a = [hero.i, hero.j]; hero.i = hero.ni; hero.j = hero.nj; hero.ni = a[0]; hero.nj = a[1]; hero.p = 1 - hero.p; hero.dir = hero.want; }
-        stepEnt(hero, dt, 6.2, heroChoose); if (hero.dir[0]) hero.face = hero.dir[0];
+        stepEnt(hero, dt, 4.3, heroChoose); if (hero.dir[0]) hero.face = hero.dir[0];
         const hp = posOf(hero), ti = Math.round(hp.x / T - 0.5), tj = Math.round((hp.y - oy) / T - 0.5);
         const key = ti + ',' + tj; if (dotSet.has(key)) { dotSet.delete(key); st.score += 5; dots++; if (dots % 10 === 0) { st.coins += 1; A.sfx('coin'); fl(hp.x, hp.y - 20, '+1¢', '#ffd23f', 14); } else if (dots % 3 === 0) A.sfx('tick'); }
-        for (const pl of pills) { if (pl.gone) continue; if (Math.abs(pl.i - (hero.i + (hero.ni - hero.i) * hero.p)) < 0.6 && Math.abs(pl.j - (hero.j + (hero.nj - hero.j) * hero.p)) < 0.6) { eatPill(pl); if (ended) break; } }
-        if (!ended) chasers.forEach((ch) => {
-          if (ch.eaten > 0) { ch.eaten -= dt; if (ch.eaten <= 0) { ch.i = ch.ni = ch.home[0]; ch.j = ch.nj = ch.home[1]; ch.p = 1; } return; }
-          stepEnt(ch, dt, fright > 0 ? 2.6 : 3.7 + Math.min(1.2, qn * 0.2), chaserChoose);
-          const cp = posOf(ch); if (Math.hypot(cp.x - hp.x, cp.y - hp.y) < T * 0.62) {
-            if (fright > 0) { ch.eaten = 4; st.score += 150; A.sfx('hit'); burst(cp.x, cp.y, ['#c58bff', '#fff'], 22, 180, 0.7); fl(cp.x, cp.y - 10, '+150', '#e2b8ff', 20); }
-            else if (invul <= 0) { c.damage(); st.streak = 0; A.sfx('boom'); burst(hp.x, hp.y, ['#ff3b5c', '#fff'], 26, 200, 0.8); shake = 12; flash = 0.4; if (st.hearts <= 0) { finish(false); return; } respawn(); }
-          }
-        });
+        for (const pl of pills.slice()) {
+          if (pl.gone || ended) continue;
+          if (pl.sigma) { if (Math.abs(pl.i - (hero.i + (hero.ni - hero.i) * hero.p)) < 0.6 && Math.abs(pl.j - (hero.j + (hero.nj - hero.j) * hero.p)) < 0.6) eatPill(pl); continue; }
+          if (pl.jail > 0) { pl.jail -= dt; continue; }
+          stepEnt(pl, dt, fright > 0 ? 1.7 : 2.4 + Math.min(1, cfg.tier * 0.1 + qn * 0.2), chaserChoose);
+          const cp = posOf(pl); if (Math.hypot(cp.x - hp.x, cp.y - hp.y) < T * 0.66) eatPill(pl);
+        }
         c.hud(1 - st.answered / N, st.answered + '/' + N);
       }
       else if (state === 'end') { if (sT > (st.win ? 2.6 : 2.0) && !st.reported) { st.reported = true; const r = c.report(); r.sigma = st.sigma; cfg.onEnd(r); } }
@@ -442,19 +444,24 @@
       }
       // puntos
       ctx.fillStyle = '#ffe9a8'; dotSet.forEach((_, k) => { const [i, j] = k.split(',').map(Number); ctx.fillRect(Math.round(px(i)) - 2, Math.round(py(j)) - 2, 4, 4); });
-      // respuestas
+      // píldoras de poder y fantasmas-respuesta
       pills.forEach((pl) => {
-        if (pl.gone) return; const x = px(pl.i), y = py(pl.j), bob = Math.sin(t * 4 + pl.i) * 2;
-        if (pl.sigma) { ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(x, y + bob, 15, 0, 6.283); ctx.fill(); ctx.fillStyle = '#c58bff'; ctx.beginPath(); ctx.arc(x, y + bob, 12, 0, 6.283); ctx.fill(); ctx.fillStyle = '#1a1033'; ctx.font = `800 18px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('Σ', x, y + bob + 1); return; }
-        const lh = pl.fs * 1.15, w = Math.max(...pl.lines.map((l) => (ctx.font = `800 ${pl.fs}px ${FONT}`, ctx.measureText(l).width))) + 14, h = pl.lines.length * lh + 10, col = LANE_COL[pl.k];
-        ctx.save(); ctx.translate(x, y + bob); ctx.fillStyle = '#000'; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-w / 2 - 3, -h / 2 - 3, w + 6, h + 6, 12) : ctx.rect(-w / 2 - 3, -h / 2 - 3, w + 6, h + 6); ctx.fill();
-        ctx.fillStyle = pl.crossed ? '#3c3760' : '#3a2aa0'; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-w / 2, -h / 2, w, h, 10) : ctx.rect(-w / 2, -h / 2, w, h); ctx.fill(); ctx.strokeStyle = pl.crossed ? '#6a6390' : col; ctx.lineWidth = 3; ctx.stroke();
-        ctx.fillStyle = pl.crossed ? '#8a83b0' : '#fff'; ctx.font = `800 ${pl.fs}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; pl.lines.forEach((l, i) => ctx.fillText(l, 0, -h / 2 + 5 + lh * (i + 0.5) + 1));
-        if (pl.crossed) { ctx.strokeStyle = '#ff4d4d'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(-w / 2 + 4, -h / 2 + 4); ctx.lineTo(w / 2 - 4, h / 2 - 4); ctx.moveTo(w / 2 - 4, -h / 2 + 4); ctx.lineTo(-w / 2 + 4, h / 2 - 4); ctx.stroke(); }
+        if (pl.gone) return;
+        if (pl.sigma) { const x = px(pl.i), y = py(pl.j), bob = Math.sin(t * 5 + pl.i) * 2, r = 11 + Math.sin(t * 6) * 1.5; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(x, y + bob, r + 3, 0, 6.283); ctx.fill(); ctx.fillStyle = '#c58bff'; ctx.beginPath(); ctx.arc(x, y + bob, r, 0, 6.283); ctx.fill(); ctx.fillStyle = '#1a1033'; ctx.font = `800 16px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('Σ', x, y + bob + 1); return; }
+        const home = { x: px(pl.home[0]), y: py(pl.home[1]) };
+        if (pl.jail > 0) { ctx.strokeStyle = '#8a83b0'; ctx.lineWidth = 3; ctx.strokeRect(home.x - T * 0.45, home.y - T * 0.45, T * 0.9, T * 0.9); for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(home.x + k * T * 0.25, home.y - T * 0.45); ctx.lineTo(home.x + k * T * 0.25, home.y + T * 0.45); ctx.stroke(); } ctx.fillStyle = '#c9c2ee'; ctx.font = `700 12px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('🔒 ' + Math.ceil(pl.jail) + 's', home.x, home.y - T * 0.6); return; }
+        const p = posOf(pl), col = LANE_COL[pl.k], fr = fright > 0, blink = fr && fright < 2 && Math.floor(t * 8) % 2, bw = T * 0.95, by = p.y + Math.sin(t * 6 + pl.k) * 1.5;
+        ctx.save(); ctx.translate(p.x, by);
+        ctx.fillStyle = fr ? (blink ? '#fff' : '#2a4bff') : col; ctx.strokeStyle = '#000'; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(0, -bw * 0.1, bw / 2, Math.PI, 0); const wob = Math.sin(t * 12 + pl.k) * 1.5; ctx.lineTo(bw / 2, bw / 2); for (let k = 0; k < 4; k++) { ctx.lineTo(bw / 2 - (k + 0.5) * (bw / 4), bw / 2 - 5 + (k % 2 ? 0 : wob)); ctx.lineTo(bw / 2 - (k + 1) * (bw / 4), bw / 2); } ctx.closePath(); ctx.fill(); ctx.stroke();
+        const ex = pl.dir[0] * 2, ey = pl.dir[1] * 2; [-1, 1].forEach((sg) => { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(sg * bw * 0.2, -bw * 0.15, bw * 0.13, 0, 6.283); ctx.fill(); ctx.fillStyle = fr ? '#ff4d6d' : '#1a1033'; ctx.beginPath(); ctx.arc(sg * bw * 0.2 + ex, -bw * 0.15 + ey, bw * 0.06, 0, 6.283); ctx.fill(); });
         ctx.restore();
+        const lh = pl.fs * 1.15; ctx.font = `800 ${pl.fs}px ${FONT}`; const w = Math.max(...pl.lines.map((l) => ctx.measureText(l).width)) + 12, h = pl.lines.length * lh + 8;
+        const lx = clamp(p.x, w / 2 + 2, LW - w / 2 - 2), ly = Math.max(h / 2 + 2, by - bw * 0.62 - h / 2);
+        ctx.fillStyle = '#000'; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(lx - w / 2 - 2, ly - h / 2 - 2, w + 4, h + 4, 9) : ctx.rect(lx - w / 2 - 2, ly - h / 2 - 2, w + 4, h + 4); ctx.fill();
+        ctx.fillStyle = '#2a1f86'; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(lx - w / 2, ly - h / 2, w, h, 8) : ctx.rect(lx - w / 2, ly - h / 2, w, h); ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.stroke();
+        ctx.fillStyle = '#fff'; ctx.font = `800 ${pl.fs}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; pl.lines.forEach((l, i) => ctx.fillText(l, lx, ly - h / 2 + 4 + lh * (i + 0.5) + 1));
       });
-      // secuaces
-      chasers.forEach((ch, k) => { if (ch.eaten > 0) return; const p = posOf(ch), s = T * 1.15, fr = fright > 0; ctx.save(); ctx.translate(p.x, p.y + Math.sin(t * 8 + k) * 1.5); if (fr) { ctx.filter = 'hue-rotate(160deg) brightness(1.4)'; ctx.globalAlpha = fright < 2 && Math.floor(t * 8) % 2 ? 0.5 : 1; } ctx.drawImage(villain, -s / 2, -s / 2, s, s); ctx.restore(); });
       // héroe
       { const p = posOf(hero), hh = T * 1.9, hs = hh / S.HERO_H, hw = S.HERO_W * hs, moving = hero.dir[0] || hero.dir[1], hc = S.heroCanvas(cfg.look, moving ? 'idle' : 'idle', moving ? Math.floor(t * 10) % 4 : 0);
         ctx.save(); ctx.translate(p.x, p.y + T * 0.42); if (invul > 0 && Math.floor(invul * 14) % 2) ctx.globalAlpha = 0.4; ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.beginPath(); ctx.ellipse(0, 0, T * 0.4, T * 0.12, 0, 0, 6.283); ctx.fill(); if (hero.face < 0) ctx.scale(-1, 1); ctx.drawImage(hc, -hw / 2, -hh + 2, hw, hh); ctx.restore();

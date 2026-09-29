@@ -179,6 +179,7 @@
   /* ============================================================
    * CREADOR DE HÉROE
    * ============================================================ */
+  const stageDeco = () => [h('div', { class: 'wspot' }), [0, 1, 2, 3, 4, 5, 6, 7].map((i) => h('i', { class: 'wspark', style: `left:${8 + i * 11}%;animation-delay:${(i * 0.37).toFixed(2)}s;--sz:${6 + (i % 3) * 3}px` }))];
   SCREENS.creator = (_, sc) => {
     const first = !St.list().length;
     const look = Object.assign({}, St.DEFAULT_LOOK, { gender: 'm', hair: 'hair-corto', suit: 'suit-rojo' });
@@ -231,11 +232,12 @@
     const t1 = h('canvas', { class: 'px tease' }), t2 = h('canvas', { class: 'px tease' }); liveHero(t1, () => fantasy, { scale: 2 }); liveHero(t2, () => fantasy2, { scale: 2 });
     renderGender(); buildGroups();
     sc.appendChild(h('div', { class: 'creator' },
-      h('h1', { class: 'h1', text: first ? 'Crea tu héroe' : 'Nuevo héroe' }),
-      h('div', { class: 'cstage' }, cv, h('button', { class: 'btn small ghost dice', onclick: rand }, '🎲 Sorpréndeme')),
-      nameIn, genderRow, groups,
-      h('div', { class: 'teaser' }, t1, h('p', {}, h('b', { text: '¡Y hay mucho más!' }), h('br'), 'Alas, mascotas dragón, armaduras, túnicas, cascos y armas mágicas. Se compran con las monedas que ganas en el Vestidor.'), t2),
-      h('div', { class: 'row' }, !first || St.list().length ? h('button', { class: 'btn ghost', onclick: () => go(St.list().length ? 'profiles' : 'title') }, 'Atrás') : null, h('button', { class: 'btn big', onclick: ready }, '¡Listo para luchar!'))));
+      h('div', { class: 'cstage wstage' }, stageDeco(), h('div', { class: 'wpod' }, cv), h('button', { class: 'btn small ghost dice', onclick: rand }, '🎲 Sorpréndeme')),
+      h('div', { class: 'cscroll' },
+        h('h1', { class: 'h1', text: first ? 'Crea tu héroe' : 'Nuevo héroe' }),
+        nameIn, genderRow, groups,
+        h('div', { class: 'teaser' }, t1, h('p', {}, h('b', { text: '¡Y hay mucho más!' }), h('br'), 'Alas, mascotas dragón, armaduras, túnicas, cascos y armas mágicas. Se compran con las monedas que ganas en el Vestidor.'), t2),
+        h('div', { class: 'row' }, !first || St.list().length ? h('button', { class: 'btn ghost', onclick: () => go(St.list().length ? 'profiles' : 'title') }, 'Atrás') : null, h('button', { class: 'btn big', onclick: ready }, '¡Listo para luchar!')))));
     nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') ready(); });
   };
 
@@ -314,6 +316,12 @@
         h('div', { class: 'ctabtns' }, h('button', { class: 'chip', onclick: () => { sfx('click'); go('goals'); } }, '📋 ', h('b', { text: dn + '/3' })))),
       h('button', { class: 'btn big playnext', onclick: playNext }, img('play', 3), h('span', { text: 'Continuar: ' + nextV.name + (nx.v.endless ? '' : ' · Nivel ' + nextT) })),
       map));
+    // iconos flotantes fijos a los costados del mapa (como en Candy Crush)
+    { const mk = (ico, label, fn, badge, cls) => h('button', { class: 'dockbtn ' + (cls || ''), 'aria-label': label, onclick: () => { sfx('select'); fn(); } }, h('span', { class: 'dico', text: ico }), h('small', { text: label }), badge ? h('i', { class: 'dbadge', text: badge }) : null);
+      const spins = St.spinsLeft();
+      const L = h('div', { class: 'hubdock left' }, mk('🎡', 'Ruleta', () => go('wheel'), spins ? String(spins) : '', 'wheelbtn'), mk('🎁', 'Vestidor', () => go('wardrobe')));
+      const Rr = h('div', { class: 'hubdock right' }, mk('🏆', 'Metas', () => go('goals'), dn ? dn + '/3' : ''), mk('👥', 'Salas', () => go('rooms')));
+      app().appendChild(L); app().appendChild(Rr); cleanups.push(() => { L.remove(); Rr.remove(); }); }
     if (params.welcome) later(() => toast(`¡Bienvenido, <b>${esc(p.name)}</b>! El Mundo DuiX te necesita.`, '', 3800), 400);
     later(() => { mapTop = map.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop; const y = py(fromIdx >= 0 ? fromIdx : nextIdx) + mapTop; sc.scrollTop = y - sc.clientHeight * 0.6; zoom(); if (fromIdx >= 0 && fromIdx < nextIdx) { const y2 = py(nextIdx) + mapTop; const s0 = sc.scrollTop, s1 = y2 - sc.clientHeight * 0.6, T0 = performance.now(); const sm = (ts) => { const k = Math.min(1, (ts - T0 - 700) / (300 + (nextIdx - fromIdx) * 380)); if (k > 0) sc.scrollTop = s0 + (s1 - s0) * k; if (k < 1 && cur && cur.name === 'hub') requestAnimationFrame(sm); }; requestAnimationFrame(sm); } }, 40);
   };
@@ -371,6 +379,7 @@
       container: holder, villain: v, tier: params.tier, look: p.look, perks: St.perks(),
       onEnd: (res) => finishBattle(v, params.tier, res),
       onQuit: () => { battle = null; go('district', { id: v.id, tier: params.tier }); },
+      onRestart: () => { battle = null; go('battle', { id: v.id, tier: params.tier }); },
     });
     root.__battle = battle;
   };
@@ -464,7 +473,7 @@
     const lookNow = () => Object.assign({}, p.look, pv);
     let forcePose = null, forceUntil = 0;
     liveHero(stage, lookNow, { scale: 6, pose: () => (forcePose && Date.now() < forceUntil ? forcePose : (cat === 'weapon' || Math.floor(Date.now() / 1600) % 4 === 0 ? 'shoot' : 'idle')) });
-    const stageBox = h('div', { class: 'wstage' }, h('div', { class: 'wspot' }), h('div', { class: 'wring' }), [0, 1, 2, 3, 4, 5, 6, 7].map((i) => h('i', { class: 'wspark', style: `left:${8 + i * 11}%;animation-delay:${(i * 0.37).toFixed(2)}s;--sz:${6 + (i % 3) * 3}px` })), stage, h('div', { class: 'wname', text: p.name }));
+    const stageBox = h('div', { class: 'wstage' }, stageDeco(), h('div', { class: 'wpod' }, stage), h('div', { class: 'wname', text: p.name }));
     stageBox.style.cursor = 'pointer';
     stageBox.addEventListener('click', () => { forcePose = 'shoot'; forceUntil = Date.now() + 700; stage.classList.remove('jump'); void stage.offsetWidth; stage.classList.add('jump'); sfx('select'); });
     const tabs = h('div', { class: 'ctabs', role: 'tablist' });

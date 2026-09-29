@@ -123,29 +123,39 @@
   /* ============================================================
    * CREAR SALA
    * ============================================================ */
-  SCREENS.roomCreate = (_, sc) => {
-    const c = { n: 8, level: 0, topics: new Set(TOPICS.map((v) => v.topic)), more: false, hostPlays: true };
+  function configBlocks(c) {
     const chips = h('div', { class: 'tchips' });
     const drawChips = () => { chips.innerHTML = ''; TOPICS.forEach((v) => chips.appendChild(h('button', { type: 'button', class: 'tchip' + (c.topics.has(v.topic) ? ' on' : ''), 'aria-pressed': c.topics.has(v.topic) ? 'true' : 'false', onclick: () => { if (c.topics.has(v.topic)) { if (c.topics.size > 1) c.topics.delete(v.topic); else { toast('Deja al menos un tema.', 'warn'); return; } } else c.topics.add(v.topic); sfx('click'); drawChips(); } }, v.tema))); };
     drawChips();
+    return h('div', null,
+      h('div', { class: 'set-block' }, h('div', { class: 'set col' }, h('div', null, h('b', { text: 'Preguntas por jugador' }), h('small', { text: 'Cada jugador responde todas; 8 dura unos 4 minutos.' })), seg([[5, '5'], [8, '8'], [10, '10'], [15, '15']], () => c.n, (v) => { c.n = v; })),
+        h('div', { class: 'set col' }, h('div', null, h('b', { text: 'Dificultad' }), h('small', { text: '“Creciente” empieza fácil y termina difícil.' })), seg([[1, 'Fácil'], [2, 'Media'], [3, 'Difícil'], [0, 'Creciente']], () => c.level, (v) => { c.level = v; }))),
+      h('div', { class: 'set-block' }, h('h3', { text: 'Temas' }), h('div', { class: 'row' }, h('button', { type: 'button', class: 'btn small ghost', onclick: () => { TOPICS.forEach((v) => c.topics.add(v.topic)); sfx('click'); drawChips(); } }, 'Todos')), chips,
+        h('small', { class: 'hint', text: 'Con un solo tema pelean contra su villano; con varios, contra El Indeterminado.' })),
+      h('div', { class: 'set-block' }, secsRow(c),
+        switchRow('Yo también juego', 'Apágalo si solo vas a proyectar el ranking', () => c.hostPlays, (v) => { c.hostPlays = v; })));
+  }
+  function secsRow(c) {
+    const out = h('b', { class: 'secsval', text: (c.secs || 30) + ' s' });
+    const rng = h('input', { type: 'range', min: '15', max: '60', step: '5', value: String(c.secs || 30), 'aria-label': 'Segundos por pregunta', class: 'secsrng', oninput: (e) => { c.secs = +e.target.value; out.textContent = c.secs + ' s'; } });
+    return h('div', { class: 'set col' }, h('div', null, h('b', { text: 'Tiempo por pregunta' }), h('small', { text: 'Segundos que tarda la respuesta en llegar al héroe (15 s a 1 min). Vale para todos.' })), h('div', { class: 'secsrow' }, h('span', { text: '15' }), rng, h('span', { text: '60' }), out));
+  }
+  SCREENS.roomCreate = (_, sc) => {
+    const c = { n: 8, level: 0, topics: new Set(TOPICS.map((v) => v.topic)), secs: 30, hostPlays: true };
+    const blocks = configBlocks(c);
     const msg = h('p', { class: 'hint err', role: 'alert' }), btn = h('button', { class: 'btn big', type: 'button' }, 'Crear sala');
     btn.addEventListener('click', async () => {
       btn.disabled = true; btn.textContent = 'Creando…'; msg.textContent = '';
       try { await createRoom(c); } catch (e) { msg.textContent = netErr(e); sfx('deny'); btn.disabled = false; btn.textContent = 'Crear sala'; }
     });
     sc.appendChild(h('div', { class: 'rooms' }, K.topbar(), h('h1', { class: 'h1', text: 'Nueva sala' }),
-      h('div', { class: 'set-block' }, h('div', { class: 'set col' }, h('div', null, h('b', { text: 'Preguntas por jugador' }), h('small', { text: 'Cada jugador responde todas; 8 dura unos 4 minutos.' })), seg([[5, '5'], [8, '8'], [10, '10'], [15, '15']], () => c.n, (v) => { c.n = v; })),
-        h('div', { class: 'set col' }, h('div', null, h('b', { text: 'Dificultad' }), h('small', { text: '“Creciente” empieza fácil y termina difícil.' })), seg([[1, 'Fácil'], [2, 'Media'], [3, 'Difícil'], [0, 'Creciente']], () => c.level, (v) => { c.level = v; }))),
-      h('div', { class: 'set-block' }, h('h3', { text: 'Temas' }), h('div', { class: 'row' }, h('button', { type: 'button', class: 'btn small ghost', onclick: () => { TOPICS.forEach((v) => c.topics.add(v.topic)); sfx('click'); drawChips(); } }, 'Todos')), chips,
-        h('small', { class: 'hint', text: 'Con un solo tema pelean contra su villano; con varios, contra El Indeterminado.' })),
-      h('div', { class: 'set-block' }, switchRow('Más tiempo para leer', 'Las preguntas dan más tiempo antes de que caigan las respuestas (para todos)', () => c.more, (v) => { c.more = v; }),
-        switchRow('Yo también juego', 'Apágalo si solo vas a proyectar el ranking', () => c.hostPlays, (v) => { c.hostPlays = v; })),
+      blocks,
       msg, btn, h('button', { class: 'btn ghost', type: 'button', onclick: () => { sfx('back'); go('rooms'); } }, 'Volver')));
   };
   async function createRoom(c) {
     const p = St.profile();
     await N.ready();
-    const cfg = { n: c.n, level: c.level, topics: Array.from(c.topics), more: !!c.more, hostPlays: !!c.hostPlays, seed: Math.floor(Math.random() * 4294967295), v: 3 };
+    const cfg = { n: c.n, level: c.level, topics: Array.from(c.topics), secs: Math.max(15, Math.min(60, c.secs || 30)), hostPlays: !!c.hostPlays, seed: Math.floor(Math.random() * 4294967295), v: 3 };
     let code = '', ok = false;
     for (let i = 0; i < 10 && !ok; i++) { code = newCode(); ok = (await N.get('rooms/' + code + '/state')) === null; }
     if (!ok) throw new Error('No se pudo crear un código libre. Inténtalo otra vez.');
@@ -259,10 +269,10 @@
     function startBattle() {
       if (battle || my.finished || left || !R.cfg) return;
       killPlaza(); questions = buildRoomQuestions(R.cfg);
-      K.setAmbient(false); sc.classList.add('s-battle'); box.hidden = true; holder.hidden = false; setBanner('');
+      if (innerWidth / Math.max(1, innerHeight) > 1.05) K.setAmbient(true, 'roombattle', { hue: 200 }); else K.setAmbient(false); sc.classList.add('s-battle'); box.hidden = true; holder.hidden = false; setBanner('');
       A.play('battle'); updateRank();
       battle = B.start({
-        container: holder, villain: roomVillain(R.cfg), tier: R.cfg.level || 2, look: p.look, perks: {}, lockSettings: true, moreTime: !!R.cfg.more, extraTop: rankEl,
+        container: holder, villain: roomVillain(R.cfg), tier: R.cfg.level || 2, look: p.look, perks: {}, lockSettings: true, fallSecs: R.cfg.secs || (R.cfg.more ? 40 : 30), extraTop: rankEl,
         room: { total: R.cfg.n, getQuestion: (i) => questions[i], hp: sharedHp, noHearts: true },
         onProgress: (snap) => pushProgress(snap, snap.over),
         onEnd: (rep) => { setTimeout(() => finishMine(rep), 0); },
@@ -319,6 +329,22 @@
       };
       draw(); modal({ title: 'Cámbiate de ropa', body: h('div', { class: 'outfit' }, h('div', { class: 'oprevbox' }, prev), tabs, grid), buttons: [{ label: 'Listo' }] });
     }
+    function openSound() {
+      const mp = h('div', { class: 'seg' });
+      const now = () => { const q = St.settings(); return !q.music ? 'off' : q.musicStyle === 'calma' ? 'calma' : 'arcade'; };
+      const draw = () => { mp.innerHTML = ''; [['arcade', 'Arcade'], ['calma', 'Calmada'], ['off', 'Sin música']].forEach(([id, label]) => mp.appendChild(h('button', { type: 'button', class: 'segb' + (now() === id ? ' on' : ''), onclick: () => { A.unlock(); if (id === 'off') St.setSetting('music', false); else { St.setSetting('musicStyle', id); St.setSetting('music', true); } draw(); } }, label))); };
+      draw();
+      modal({ title: 'Ajustes', body: h('div', { class: 'set-block' }, h('b', { text: 'Música' }), mp, switchRow('Efectos de sonido', '', () => St.settings().sfx, (v) => St.setSetting('sfx', v)), switchRow('Pantalla retro (CRT)', '', () => St.settings().crt, (v) => St.setSetting('crt', v))), buttons: [{ label: 'Listo' }] });
+    }
+    function openHostConfig() {
+      const cfg0 = R.cfg || {}; const c = { n: cfg0.n || 8, level: cfg0.level || 0, topics: new Set(cfg0.topics || TOPICS.map((v) => v.topic)), secs: cfg0.secs || 30, hostPlays: cfg0.hostPlays !== false };
+      modal({ title: 'Configurar la sala', cls: 'hostcfg', body: h('div', { class: 'hostcfgbody' }, configBlocks(c), h('small', { class: 'hint', text: 'Solo tú ves esta configuración. Los cambios valen para la próxima partida.' })),
+        buttons: [{ label: 'Cancelar', cls: 'ghost' }, { label: 'Guardar', cls: 'gold', onClick: () => {
+          const upd = { n: c.n, level: c.level, topics: Array.from(c.topics), secs: Math.max(15, Math.min(60, c.secs || 30)), hostPlays: !!c.hostPlays };
+          N.update(P + '/cfg', upd).then(() => { toast('Configuración guardada', ''); sfx('buy'); }).catch((e) => toast(netErr(e), 'warn'));
+          if (!!c.hostPlays !== (cfg0.hostPlays !== false)) { if (c.hostPlays) N.set(P + '/players/' + pid, { name: p.name, look: p.look, score: 0, correct: 0, qi: 0, done: false, online: true, joined: N.TS }).catch(() => {}); else N.remove(P + '/players/' + pid).catch(() => {}); }
+        } }] });
+    }
     function refreshPlaza() {
       if (!refs.plist) return; const pls = ranking().sort((a, b) => (a.joined || 0) - (b.joined || 0));
       refs.plist.innerHTML = ''; pls.forEach((x) => refs.plist.appendChild(h('div', { class: 'pchip' + (x.id === pid ? ' me' : '') + (x.online === false ? ' off' : '') }, K.headThumb(x.look || {}, 'rh'), h('b', { text: x.name }), x.done ? h('i', { text: '✔' }) : null)));
@@ -329,7 +355,7 @@
     // plaza: lobby (antes de jugar), live (ya terminé y espero) o after (terminó la partida y volví)
     function viewPlaza(mode) {
       const cfg = R.cfg || {}, link = linkFor(code), v = roomVillain(cfg.topics ? cfg : { topics: [] });
-      const lines = [`${cfg.n || '?'} preguntas`, cfg.level ? ['', 'fáciles', 'medias', 'difíciles'][cfg.level] : 'dificultad creciente'].concat(cfg.more ? ['más tiempo para leer'] : []);
+      const lines = [`${cfg.n || '?'} preguntas`, cfg.level ? ['', 'fáciles', 'medias', 'difíciles'][cfg.level] : 'dificultad creciente'].concat([(cfg.secs || 30) + ' s por pregunta']);
       const plazaBox = h('div', { class: 'plazabox' });
       const emo = h('div', { class: 'emotes' }, root.DuiXPlaza.EMOTES.map((e) => h('button', { type: 'button', class: 'emo', 'aria-label': 'Emote ' + e, onclick: () => { sfx('click'); N.update(P + '/pos/' + pid, { e, et: N.TS }).catch(() => {}); if (e === '💃') sfx('levelup'); } }, e)));
       const plist = h('div', { class: 'plist' }), count = h('b', { class: 'pc', text: '0' });
@@ -337,7 +363,7 @@
       const title = mode === 'lobby' ? (isHost ? 'Sala lista' : 'Estás dentro') : mode === 'live' ? (my.finished ? '¡Terminaste!' : 'Partida en curso') : '¡Fin de la partida!';
       const sub = mode === 'lobby' ? (isHost ? 'Los demás entran en DuiX → Salas con este código. ¡Mientras tanto, camina, baila y cámbiate de ropa!' : 'Espera a que el anfitrión empiece. ¡Camina por la plaza, haz emotes y cámbiate de ropa!') : mode === 'live' ? 'Espera a que terminen los demás mientras paseas por la plaza.' : (isHost ? 'Cuando todos estén en la plaza, abre una nueva partida.' : 'Espera a que el anfitrión abra una nueva partida.');
       const parts = [
-        h('div', { class: 'rtop' }, h('button', { class: 'btn small ghost', type: 'button', onclick: () => confirmLeave() }, isHost ? 'Cerrar sala' : 'Salir'), mode === 'live' && isHost ? h('button', { class: 'btn small', type: 'button', onclick: () => { sfx('click'); hostEnd(); } }, 'Terminar ya ⏹') : null),
+        h('div', { class: 'rtop' }, h('button', { class: 'btn small ghost', type: 'button', onclick: () => confirmLeave() }, isHost ? 'Cerrar sala' : 'Salir'), mode === 'live' && isHost ? h('button', { class: 'btn small', type: 'button', onclick: () => { sfx('click'); hostEnd(); } }, 'Terminar ya ⏹') : null, h('button', { class: 'gear', type: 'button', 'aria-label': isHost ? 'Configurar la sala' : 'Ajustes de sonido', onclick: () => { sfx('select'); if (isHost && mode !== 'live') openHostConfig(); else openSound(); } }, '⚙')),
         h('h2', { class: 'rtitle', text: title }),
         h('div', { class: 'bigcode small', 'aria-label': 'Código de la sala ' + code.split('').join(' ') }, code.split('').map((c) => h('span', { text: c }))),
         h('p', { class: 'hint', text: sub }),

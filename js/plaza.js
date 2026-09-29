@@ -6,7 +6,7 @@
   'use strict';
   const S = root.DuiXSprites, A = root.DuiXAudio;
   const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "DejaVu Sans", Arial, sans-serif';
-  const LW = 360, LH = 280, FLOOR_Y = 96;
+  let LW = 360; const LH = 280, FLOOR_Y = 96, NW = 360; // NW: ancho de referencia para la red
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const EMOTES = ['👋', '😂', '😎', '🔥', '💃', '❤️', '⭐', '🎉'];
 
@@ -23,9 +23,10 @@
     const keys = {};
     const clampP = () => { me.tx = clamp(me.tx, 20, LW - 20); me.ty = clamp(me.ty, FLOOR_Y + 14, LH - 8); };
 
-    function resize() { const r = cv.getBoundingClientRect(); if (r.width < 10) return; dpr = Math.min(2.5, root.devicePixelRatio || 1); W = r.width; H = r.width * LH / LW; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.height = H + 'px'; }
+    function resize() { const r = container.getBoundingClientRect(); if (r.width < 10 || r.height < 10) return; dpr = Math.min(2.5, root.devicePixelRatio || 1); W = r.width; H = r.height; LW = clamp(LH * W / H, 300, 900); cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.height = H + 'px'; clampP(); }
     const toL = (e) => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * LW, y: (e.clientY - r.top) / r.height * LH }; };
-    const JUKE = { x: 40, y: FLOOR_Y - 6, w: 34, h: 50 }, CHEST = { x: LW - 62, y: FLOOR_Y + 2, w: 40, h: 30 };
+    const sxOf = (x) => x / LW * NW, fromNet = (x) => x / NW * LW;
+    const JUKE = { x: 40, y: FLOOR_Y - 6, w: 34, h: 50 }, CHEST = { get x() { return LW - 62; }, y: FLOOR_Y + 2, w: 40, h: 30 };
     let down = false;
     cv.addEventListener('pointerdown', (e) => {
       e.preventDefault(); A.unlock(); const p = toL(e); down = true;
@@ -94,9 +95,9 @@
       for (let i = coins.length - 1; i >= 0; i--) if (Math.hypot(coins[i].x - me.x, coins[i].y - me.y) < 18) { const c = coins.splice(i, 1)[0]; coinsGot++; A.sfx('coin'); floats.push({ x: c.x, y: c.y - 8, text: '+1', c: '#ffd23f', t: 0, life: 0.9, size: 15 }); o.onCoin && o.onCoin(1); }
       // red
       const now = Date.now();
-      if (now - lastSent > 220 && (Math.abs(me.x - sx) > 1.5 || Math.abs(me.y - sy) > 1.5 || me.f !== sf)) { lastSent = now; sx = me.x; sy = me.y; sf = me.f; o.setPos(Math.round(me.x * 10) / 10, Math.round(me.y * 10) / 10, me.f); }
+      if (now - lastSent > 220 && (Math.abs(me.x - sx) > 1.5 || Math.abs(me.y - sy) > 1.5 || me.f !== sf)) { lastSent = now; sx = me.x; sy = me.y; sf = me.f; o.setPos(Math.round(sxOf(me.x) * 10) / 10, Math.round(me.y * 10) / 10, me.f); }
       const players = o.getPlayers() || {}, pos = o.getPos() || {};
-      Object.keys(players).forEach((id) => { if (id === o.pid) return; const q = pos[id]; if (!others[id]) others[id] = { x: q ? q.x : LW / 2, y: q ? q.y : FLOOR_Y + 90, f: 1, moving: false }; const c = others[id]; if (q && typeof q.x === 'number') { const ddx = q.x - c.x, ddy = q.y - c.y, dd = Math.hypot(ddx, ddy); c.moving = dd > 2; const k = Math.min(1, dt * 7); c.x += ddx * k; c.y += ddy * k; if (q.f) c.f = q.f; } });
+      Object.keys(players).forEach((id) => { if (id === o.pid) return; const q0 = pos[id], q = q0 && typeof q0.x === 'number' ? { x: fromNet(q0.x), y: q0.y, f: q0.f, e: q0.e, et: q0.et } : q0; if (!others[id]) others[id] = { x: q ? q.x : LW / 2, y: q ? q.y : FLOOR_Y + 90, f: 1, moving: false }; const c = others[id]; if (q && typeof q.x === 'number') { const ddx = q.x - c.x, ddy = q.y - c.y, dd = Math.hypot(ddx, ddy); c.moving = dd > 2; const k = Math.min(1, dt * 7); c.x += ddx * k; c.y += ddy * k; if (q.f) c.f = q.f; } });
       Object.keys(others).forEach((id) => { if (!players[id]) delete others[id]; });
       parts.forEach((p) => { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 220 * dt; }); for (let i = parts.length - 1; i >= 0; i--) if (parts[i].t >= parts[i].life) parts.splice(i, 1);
       floats.forEach((f) => { f.t += dt; f.y -= 24 * dt; }); for (let i = floats.length - 1; i >= 0; i--) if (floats[i].t >= floats[i].life) floats.splice(i, 1);
