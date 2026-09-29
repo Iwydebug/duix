@@ -18,10 +18,11 @@
   const today = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
   const uid = () => 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const xpNeed = (lv) => 80 + 40 * (lv - 1);
-  const LEVEL_ITEMS = { 3: 'emb-inf', 5: 'suit-verde', 7: 'mask-gafas', 10: 'cape-larga-azul', 12: 'am-lupa', 15: 'suit-cian', 20: 'wp-arcoiris' };
-  const STARTERS = ['suit-rojo', 'suit-azul', 'mask-none', 'mask-antifaz', 'cape-none', 'cape-corta', 'emb-star', 'emb-bolt', 'wp-rayo', 'am-none'];
+  const LEVEL_ITEMS = { 3: 'emb-inf', 5: 'suit-lima', 7: 'mask-gafas', 8: 'pet-slime', 10: 'cape-larga-azul', 12: 'am-lupa', 15: 'wing-hada', 20: 'wp-arcoiris' };
+  const STARTERS = D.ITEMS.filter((i) => i.price === 0 && !i.unlock).map((i) => i.id);
+  const DEFAULT_LOOK = { gender: 'm', skin: 1, hair: 'hair-corto', hairColor: 0, suit: 'suit-rojo', mask: 'mask-antifaz', wings: 'wing-none', cape: 'cape-corta', pet: 'pet-none', emblem: 'emb-star', weapon: 'wp-rayo', amulet: 'am-none' };
 
-  const DEFAULT_SETTINGS = { sfx: true, music: true, volume: 0.7, crt: false, reduceMotion: false, big: false };
+  const DEFAULT_SETTINGS = { sfx: true, music: true, musicStyle: 'arcade', moreTime: false, volume: 0.7, crt: false, reduceMotion: false, big: false };
 
   let db = { list: [], active: null };
   let settings = Object.assign({}, DEFAULT_SETTINGS);
@@ -35,6 +36,12 @@
     if (db.active && !db.list.find((p) => p.id === db.active)) db.active = null;
   }
   function migrate(p) {
+    // compatibilidad con guardados anteriores
+    const L = p.look = Object.assign({}, DEFAULT_LOOK, p.look || {});
+    if (L.hairStyle) { if (D.ITEM_BY_ID['hair-' + L.hairStyle]) L.hair = 'hair-' + L.hairStyle; delete L.hairStyle; }
+    if (L.cape === 'cape-alas') { L.cape = 'cape-corta'; L.wings = 'wing-murcielago'; if (p.owned && !p.owned.includes('wing-murcielago')) p.owned.push('wing-murcielago'); }
+    if (p.owned) p.owned = p.owned.map((id) => (id === 'cape-alas' ? 'wing-murcielago' : id)).filter((id, i, a) => D.ITEM_BY_ID[id] && a.indexOf(id) === i);
+    Object.keys(L).forEach((k) => { if (k !== 'skin' && k !== 'hairColor' && k !== 'gender' && typeof L[k] === 'string' && !D.ITEM_BY_ID[L[k]]) L[k] = DEFAULT_LOOK[k]; });
     p.stats = Object.assign({ correct: 0, answered: 0, bestStreak: 0, wins: 0, perfect: 0, hardWins: 0, purchases: 0, boss: 0, duinityBest: 0, battles: 0 }, p.stats || {});
     p.progress = p.progress || {}; p.owned = p.owned || STARTERS.slice(); p.achDone = p.achDone || {};
     p.mistakes = p.mistakes || []; p.daily = p.daily || { date: '', missions: [], prog: {}, done: {}, ids: [] };
@@ -48,7 +55,7 @@
 
   function newProfile(name, look) {
     if (db.list.length >= MAX_PROFILES) return null;
-    const p = { v: 1, id: uid(), name: (name || 'Héroe').trim().slice(0, 12) || 'Héroe', created: Date.now(), look: Object.assign({ skin: 0, hairStyle: 'corto', hairColor: 0, suit: 'suit-rojo', mask: 'mask-antifaz', cape: 'cape-corta', emblem: 'emb-star', weapon: 'wp-rayo', amulet: 'am-none' }, look || {}) };
+    const p = { v: 1, id: uid(), name: (name || 'Héroe').trim().slice(0, 12) || 'Héroe', created: Date.now(), look: Object.assign({}, DEFAULT_LOOK, look || {}) };
     migrate(p); p.coins = 30;
     db.list.push(p); db.active = p.id; save(); notify('profile');
     return p;
@@ -224,7 +231,7 @@
 
   load();
   const S = {
-    persistent, MAX_PROFILES, xpNeed, CHEST_COST, today, settings: () => settings, setSetting(k, v) { settings[k] = v; saveSettings(); notify('settings'); },
+    persistent, MAX_PROFILES, DEFAULT_LOOK, xpNeed, CHEST_COST, today, settings: () => settings, setSetting(k, v) { settings[k] = v; saveSettings(); notify('settings'); },
     list: () => db.list, profile, newProfile, switchTo, removeProfile, logout, save,
     has, buy, equip, setLook, openChest, grantItem, perks, addCoins, spend, addXp,
     prog, isCleared, unlocked, recordBattle, stats, checkAch, ensureDaily, trackDaily, exportCode, importCode, resetAll,

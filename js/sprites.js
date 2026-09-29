@@ -16,9 +16,9 @@
   const lum = (h) => { const [r, g, b] = hexToRgb(h); return (0.299 * r + 0.587 * g + 0.114 * b) / 255; };
 
   /* ---------- búfer de píxeles ---------- */
-  function Buf(w, h) { this.w = w; this.h = h; this.d = new Uint32Array(w * h); }
-  Buf.prototype.px = function (x, y, c) { x |= 0; y |= 0; if (x >= 0 && y >= 0 && x < this.w && y < this.h) this.d[y * this.w + x] = typeof c === 'string' ? col(c) : c; };
-  Buf.prototype.get = function (x, y) { return x >= 0 && y >= 0 && x < this.w && y < this.h ? this.d[y * this.w + x] : 0; };
+  function Buf(w, h) { this.w = w; this.h = h; this.ox = 0; this.oy = 0; this.d = new Uint32Array(w * h); }
+  Buf.prototype.px = function (x, y, c) { x = (x + this.ox) | 0; y = (y + this.oy) | 0; if (x >= 0 && y >= 0 && x < this.w && y < this.h) this.d[y * this.w + x] = typeof c === 'string' ? col(c) : c; };
+  Buf.prototype.get = function (x, y) { x += this.ox; y += this.oy; return x >= 0 && y >= 0 && x < this.w && y < this.h ? this.d[y * this.w + x] : 0; };
   Buf.prototype.rect = function (x, y, w, h, c) { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) this.px(x + i, y + j, c); };
   Buf.prototype.ell = function (cx, cy, rx, ry, c) {
     for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
@@ -77,99 +77,6 @@
     deriv: ['..###.#', '..#...#', '.####..', '..#....', '..#....', '..#....', '.#.....'],
     zero: ['###..#.###', '#.#.#..#.#', '#.#.#..#.#', '###.#..###'],
   };
-
-  /* ---------- HÉROE ---------- */
-  const heroCache = {};
-  function suitOf(look) { return D.ITEM_BY_ID[look.suit] || D.ITEM_BY_ID['suit-rojo']; }
-  function drawHero(look, pose, frame) {
-    const b = new Buf(40, 46), S = suitOf(look), skin = D.SKINS[look.skin] || D.SKINS[0], skinSh = darken(skin, 0.14);
-    const hair = D.HAIR_COLORS[look.hairColor] || D.HAIR_COLORS[0];
-    const cape = D.ITEM_BY_ID[look.cape], mask = look.mask, emb = D.ITEM_BY_ID[look.emblem];
-    const cx = 20, fr = frame || 0, sway = [0, 1, 2, 1][fr % 4];
-    // ---- capa (detrás)
-    if (cape && cape.style) {
-      const c1 = cape.c1, c2 = cape.c2;
-      if (cape.style === 'short') { b.poly([[12, 19], [28, 19], [32 + sway, 32], [8 - sway, 32]], c1); b.poly([[24, 19], [28, 19], [32 + sway, 32], [26, 32]], c2); }
-      else if (cape.style === 'long') { b.poly([[12, 19], [28, 19], [33 + sway, 42], [7 - sway, 42]], c1); b.poly([[24, 19], [28, 19], [33 + sway, 42], [26, 42]], c2); }
-      else if (cape.style === 'wings') {
-        [[1, 1], [-1, 1]].forEach(([s]) => { const X = (x) => cx + s * x; b.poly([[X(6), 17], [X(19 + sway), 5], [X(17 + sway), 15], [X(20 + sway), 22], [X(14), 24], [X(15), 32], [X(9), 27], [X(6), 32]], c1); b.poly([[X(6), 22], [X(15), 20], [X(13), 27], [X(6), 27]], c2); });
-      } else if (cape.style === 'flame') {
-        const flick = fr % 2;
-        b.poly([[12, 19], [28, 19], [33 + sway, 32], [30, 38 + flick], [26, 33], [22, 41 - flick], [18, 34], [14, 40 + flick], [10, 33], [7 - sway, 37]], c1);
-        b.poly([[15, 21], [25, 21], [29, 32], [24, 36], [20, 30], [16, 37], [12, 31]], '#ffd23f');
-      }
-    }
-    // ---- piernas y botas
-    const boots = darken(S.accent === '#ffffff' ? S.shade : S.accent, S.accent === '#ffffff' ? 0.2 : 0.15);
-    b.rect(13, 31, 6, 9, S.main); b.rect(21, 31, 6, 9, S.main); b.rect(17, 31, 2, 9, S.shade); b.rect(25, 31, 2, 9, S.shade);
-    b.rect(12, 39, 7, 5, boots); b.rect(21, 39, 7, 5, boots); b.rect(12, 39, 7, 1, lighten(boots, 0.25)); b.rect(21, 39, 7, 1, lighten(boots, 0.25));
-    // ---- torso
-    b.rect(12, 19, 16, 13, S.main); b.rect(25, 19, 3, 13, S.shade); b.rect(12, 19, 16, 2, lighten(S.main, 0.2));
-    b.rect(12, 29, 16, 2, S.accent); b.rect(19, 29, 2, 2, lighten(S.accent, 0.4));
-    // ---- brazos
-    const glove = S.accent === '#ffffff' ? '#e6ecff' : S.accent;
-    b.rect(8, 20, 4, 9, S.main); b.rect(8, 20, 1, 9, lighten(S.main, 0.15)); b.rect(8, 28, 4, 4, glove);
-    if (pose === 'shoot') { b.rect(28, 10, 4, 12, S.main); b.rect(28, 7, 4, 4, glove); b.rect(31, 20, 1, 2, S.shade); }
-    else { b.rect(28, 20, 4, 9, S.main); b.rect(31, 20, 1, 9, S.shade); b.rect(28, 28, 4, 4, glove); }
-    // ---- emblema
-    if (emb && EMB[emb.shape]) {
-      const rows = EMB[emb.shape], w = rows[0].length, ex = cx - Math.floor(w / 2), ey = 21;
-      b.bmp(ex + 1, ey + 1, rows, { '#': darken(S.main, 0.45) });
-      b.bmp(ex, ey, rows, { '#': S.accent === '#ffffff' ? '#ffffff' : lighten(S.accent, 0.25) });
-    }
-    // ---- cabeza
-    b.rect(18, 17, 4, 3, skinSh);
-    b.ell(cx, 10.5, 8.5, 8.5, skin); b.ell(cx + 2.5, 12, 6, 6.5, skin);
-    b.rect(cx + 4, 9, 4, 6, skin);
-    // sombra suave en un lado del rostro
-    for (let y = 6; y < 18; y++) for (let x = cx + 5; x < cx + 9; x++) if (b.get(x, y) === col(skin) && x > cx + 6 + (y > 14 ? -1 : 0)) b.px(x, y, skinSh);
-    // ---- pelo
-    const st = look.hairStyle;
-    if (st === 'corto') { b.ell(cx, 7, 9, 6, hair); b.rect(cx - 9, 8, 3, 4, hair); b.rect(cx + 6, 8, 3, 4, hair); b.rect(cx - 6, 8, 12, 1, skin); b.rect(cx - 6, 7, 4, 2, hair); }
-    else if (st === 'pinchos') { b.ell(cx, 7, 9, 6, hair); [[-8, 3], [-4, 0], [0, -2], [4, 0], [8, 3]].forEach(([dx, dy]) => b.poly([[cx + dx - 2, 6], [cx + dx, 1 + dy], [cx + dx + 2, 6]], hair)); b.rect(cx - 9, 8, 3, 3, hair); b.rect(cx + 6, 8, 3, 3, hair); }
-    else if (st === 'largo') { b.ell(cx, 7, 9.5, 6.5, hair); b.rect(cx - 10, 8, 4, 14, hair); b.rect(cx + 6, 8, 4, 14, hair); b.rect(cx - 7, 7, 14, 2, hair); }
-    else if (st === 'afro') { b.ell(cx, 7, 12, 9, hair); }
-    else if (st === 'cresta') { b.ell(cx, 8, 8, 4, hair); b.rect(cx - 2, 0, 5, 9, hair); b.rect(cx - 1, -1, 3, 1, hair); b.rect(cx - 9, 9, 2, 2, hair); b.rect(cx + 7, 9, 2, 2, hair); }
-    // cara: si es afro/largo redibujar cara encima
-    if (st === 'afro' || st === 'largo') { b.ell(cx, 12, 7, 7, skin); b.rect(cx + 3, 9, 4, 6, skinSh); b.ell(cx, 12, 6, 6.5, skin); }
-    // ---- ojos y boca
-    const eyeY = 11;
-    const maskColor = lum(S.accent) > 0.8 ? S.main : S.accent;
-    const hasEyeMask = ['mask-antifaz', 'mask-gato', 'mask-visor', 'mask-gafas', 'mask-robot'].includes(mask);
-    if (!hasEyeMask) { b.rect(cx - 5, eyeY, 3, 3, '#ffffff'); b.rect(cx + 2, eyeY, 3, 3, '#ffffff'); b.rect(cx - 4, eyeY + 1, 2, 2, INK); b.rect(cx + 3, eyeY + 1, 2, 2, INK); }
-    b.rect(cx - 2, 16, 5, 1, '#8a2b3a'); b.px(cx - 3, 15, '#8a2b3a'); b.px(cx + 3, 15, '#8a2b3a');
-    // ---- máscaras
-    if (mask === 'mask-antifaz') { b.rect(cx - 9, 9, 18, 5, maskColor); b.poly([[cx - 9, 9], [cx - 7, 8], [cx + 7, 8], [cx + 9, 9]], maskColor); b.rect(cx - 6, 10, 4, 2, '#fff'); b.rect(cx + 2, 10, 4, 2, '#fff'); b.rect(cx - 5, 10, 2, 2, INK); b.rect(cx + 3, 10, 2, 2, INK); }
-    if (mask === 'mask-gafas') { b.ring(cx - 4, 11.5, 4.2, 3.6, 1.2, '#ffffff'); b.ring(cx + 4, 11.5, 4.2, 3.6, 1.2, '#ffffff'); b.ell(cx - 4, 11.5, 3, 2.5, '#9fe8ff'); b.ell(cx + 4, 11.5, 3, 2.5, '#9fe8ff'); b.rect(cx - 1, 11, 2, 1, '#fff'); b.rect(cx - 5, 11, 2, 2, INK); b.rect(cx + 3, 11, 2, 2, INK); b.px(cx - 6, 10, '#fff'); b.px(cx + 2, 10, '#fff'); }
-    if (mask === 'mask-visor') { b.rect(cx - 10, 8, 20, 6, '#232a45'); b.rect(cx - 9, 9, 18, 4, '#5ce1e6'); b.rect(cx - 9, 9, 18, 1, '#b8fbff'); b.rect(cx - 10, 8, 20, 1, '#3a4470'); b.rect(cx - 1, 9, 2, 4, '#232a45'); }
-    if (mask === 'mask-gato') {
-      b.rect(cx - 9, 9, 18, 5, maskColor); b.rect(cx - 6, 10, 4, 3, '#ffe14a'); b.rect(cx + 2, 10, 4, 3, '#ffe14a'); b.rect(cx - 5, 10, 2, 3, INK); b.rect(cx + 3, 10, 2, 3, INK);
-      b.poly([[cx - 9, 8], [cx - 8, -1], [cx - 3, 3]], maskColor); b.poly([[cx + 9, 8], [cx + 8, -1], [cx + 3, 3]], maskColor);
-      b.poly([[cx - 8, 6], [cx - 8, 2], [cx - 5, 4]], '#ff9db5'); b.poly([[cx + 8, 6], [cx + 8, 2], [cx + 5, 4]], '#ff9db5');
-      b.line(cx - 9, 15, cx - 14, 14, '#fff'); b.line(cx - 9, 16, cx - 14, 17, '#fff'); b.line(cx + 9, 15, cx + 14, 14, '#fff'); b.line(cx + 9, 16, cx + 14, 17, '#fff');
-    }
-    if (mask === 'mask-ninja') {
-      const nc = darken(S.shade, 0.25);
-      b.ell(cx, 9, 9.5, 9.5, nc); b.rect(cx - 9, 10, 18, 9, nc); b.rect(cx - 8, 9, 16, 5, skin);
-      b.rect(cx - 6, 10, 4, 2, '#fff'); b.rect(cx + 2, 10, 4, 2, '#fff'); b.rect(cx - 5, 10, 2, 2, INK); b.rect(cx + 3, 10, 2, 2, INK);
-      b.rect(cx - 9, 8, 18, 1, S.accent); b.rect(cx + 8, 8, 5, 2, S.accent); b.rect(cx + 12, 10, 3, 4, S.accent);
-    }
-    if (mask === 'mask-robot') {
-      b.ell(cx, 10, 10, 10, '#b8c4d6'); b.rect(cx - 10, 10, 20, 8, '#b8c4d6'); b.rect(cx + 5, 6, 5, 12, '#8a97ad');
-      b.rect(cx - 8, 8, 16, 6, '#1d2438'); b.rect(cx - 7, 9, 14, 4, '#ff3b3b'); b.rect(cx - 7, 9, 14, 1, '#ff9a9a'); b.rect(cx - 8, 16, 16, 1, '#6f7f99');
-      b.rect(cx - 1, -3, 2, 5, '#8a97ad'); b.rect(cx - 2, -4, 4, 2, '#ff3b3b'); b.rect(cx - 6, 17, 12, 2, '#8a97ad'); [-4, 0, 3].forEach((dx) => b.rect(cx + dx, 17, 1, 2, '#1d2438'));
-    }
-    if (mask === 'mask-corona') {
-      b.poly([[cx - 9, 6], [cx - 9, -1], [cx - 5, 3], [cx - 2, -3], [cx + 2, -3], [cx + 5, 3], [cx + 9, -1], [cx + 9, 6]], '#ffc933');
-      b.rect(cx - 9, 5, 18, 2, '#c98900'); b.px(cx - 9, -1, '#fff'); b.px(cx + 8, -1, '#fff'); b.rect(cx - 1, -1, 2, 2, '#ff3b6b'); b.rect(cx - 7, 4, 2, 2, '#4da3ff'); b.rect(cx + 5, 4, 2, 2, '#4da3ff');
-    }
-    b.outline(INK);
-    return b;
-  }
-  function heroCanvas(look, pose, frame) {
-    const k = [look.skin, look.hairStyle, look.hairColor, look.suit, look.mask, look.cape, look.emblem, pose || 'idle', frame || 0].join('|');
-    return heroCache[k] || (heroCache[k] = drawHero(look, pose || 'idle', frame || 0).toCanvas());
-  }
 
   /* ---------- VILLANOS ---------- */
   function P(v) { const p = v.pal; return { m: p.main, s: p.shade, l: p.light, a: p.accent, e: p.eye }; }
@@ -483,8 +390,8 @@
     const cv = b.toCanvas(); bgCache[k] = cv; return cv;
   }
 
-  function clearCaches() { Object.keys(heroCache).forEach((k) => delete heroCache[k]); }
+  function clearCaches() { if (API.clearHero) API.clearHero(); }
 
-  const API = { Buf, heroCanvas, villainCanvas, icon, cityBg, EMB, col, mix, lighten, darken, lum, hexToRgb, INK, clearCaches, rng };
+  const API = { Buf, villainCanvas, icon, cityBg, EMB, col, mix, lighten, darken, lum, hexToRgb, INK, clearCaches, rng };
   root.DuiXSprites = API;
 })(typeof window !== 'undefined' ? window : globalThis);

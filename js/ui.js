@@ -29,7 +29,7 @@
 
   /* ---------- héroe animado ---------- */
   function liveHero(cv, getLook, o) {
-    o = o || {}; const sc = o.scale || 4, w = 40, hh = 46;
+    o = o || {}; const sc = o.scale || 4, w = S.HERO_W, hh = S.HERO_H;
     cv.width = w * sc; cv.height = hh * sc; const ctx = cv.getContext('2d'); ctx.imageSmoothingEnabled = false;
     const entry = { draw(t) { const look = getLook(); const fr = Math.floor(t / 150) % 4; ctx.clearRect(0, 0, cv.width, cv.height); ctx.drawImage(S.heroCanvas(look, o.pose ? o.pose() : 'idle', fr), 0, Math.round(Math.sin(t / 220) * sc * 0.6), cv.width, cv.height); } };
     entry.draw(0); liveList.push(entry);
@@ -38,8 +38,13 @@
   }
   function stopLive() { liveList = []; if (liveTimer) { clearInterval(liveTimer); liveTimer = 0; } }
   function avatarEl(look, size) {
-    const cv = h('canvas', { class: 'avatar px', width: 36, height: 34 }); cv.style.width = cv.style.height = (size || 44) + 'px';
-    const ctx = cv.getContext('2d'); ctx.imageSmoothingEnabled = false; ctx.drawImage(S.heroCanvas(look, 'idle', 0), 2, 0, 36, 34, 0, 0, 36, 34); return cv;
+    const src = S.avatarCanvas(look), cv = h('canvas', { class: 'avatar px', width: src.width, height: src.height }); cv.style.width = cv.style.height = (size || 44) + 'px';
+    cv.getContext('2d').drawImage(src, 0, 0); return cv;
+  }
+  // recorte de la cabeza (para ver bien peinados y cascos)
+  function headThumb(L, cls) {
+    const c = h('canvas', { class: 'px hthumb ' + (cls || ''), width: 30, height: 30 }), x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+    x.drawImage(S.heroCanvas(Object.assign({}, L, { mask: 'mask-none' }), 'idle', 0, { nopet: true }), 21, 3, 30, 30, 0, 0, 30, 30); return c;
   }
   function villainEl(v, size, dark) {
     const src = S.villainCanvas(v), cv = h('canvas', { class: 'vsprite px', width: src.width, height: src.height });
@@ -85,7 +90,7 @@
   St.on((ev) => { if (ev === 'coins') refreshCoins(); if (ev === 'settings') applySettings(); });
   function applySettings() {
     const s = St.settings(); document.body.classList.toggle('crt-on', !!s.crt); document.body.classList.toggle('reduce', !!s.reduceMotion); document.body.classList.toggle('big', !!s.big);
-    A.configure({ sfx: s.sfx, music: s.music, volume: s.volume });
+    A.configure({ sfx: s.sfx, music: s.music, volume: s.volume, musicStyle: s.musicStyle });
   }
 
   /* ---------- navegación ---------- */
@@ -111,7 +116,7 @@
    * ============================================================ */
   SCREENS.title = (_, sc) => {
     const p = St.profile() || St.list()[0];
-    const look = p ? p.look : { skin: 1, hairStyle: 'corto', hairColor: 0, suit: 'suit-rojo', mask: 'mask-antifaz', cape: 'cape-corta', emblem: 'emb-star', weapon: 'wp-rayo' };
+    const look = p ? p.look : Object.assign({}, St.DEFAULT_LOOK, { wings: 'wing-angel', pet: 'pet-dragon', suit: 'suit-caballero', weapon: 'wp-espada' });
     const bg = h('canvas', { class: 'title-bg px' }); const bgc = S.cityBg(Vby('polinomios'), 90, 160); bg.width = 90; bg.height = 160; bg.getContext('2d').drawImage(bgc, 0, 0);
     const marquee = h('div', { class: 'marquee', 'aria-hidden': 'true' }, h('div', { class: 'mtrack' }, [0, 1].map(() => V.map((v) => villainEl(v, 72)))));
     const hero = h('canvas', { class: 'title-hero px' }); liveHero(hero, () => look, { scale: 6 });
@@ -151,34 +156,60 @@
    * ============================================================ */
   SCREENS.creator = (_, sc) => {
     const first = !St.list().length;
-    const look = { skin: 1, hairStyle: 'corto', hairColor: 0, suit: 'suit-rojo', mask: 'mask-antifaz', cape: 'cape-corta', emblem: 'emb-star', weapon: 'wp-rayo', amulet: 'am-none' };
+    const look = Object.assign({}, St.DEFAULT_LOOK, { gender: 'm', hair: 'hair-corto', suit: 'suit-rojo' });
     const cv = h('canvas', { class: 'px cprev' }); liveHero(cv, () => look, { scale: 6 });
     const nameIn = h('input', { class: 'input', maxlength: '12', placeholder: 'Nombre del héroe', autocomplete: 'off', 'aria-label': 'Nombre del héroe' });
+    const genderRow = h('div', { class: 'gender' });
     const groups = h('div', { class: 'cgroups' });
-    const refs = [];
-    function group(title, opts, key, render) {
+    const DEF_HAIR = { m: 'hair-corto', f: 'hair-largo' };
+    function renderGender() {
+      genderRow.innerHTML = '';
+      [['m', 'Hombre'], ['f', 'Mujer']].forEach(([g, label]) => {
+        genderRow.appendChild(h('button', { class: 'gbtn' + (look.gender === g ? ' on' : ''), 'aria-pressed': look.gender === g ? 'true' : 'false', onclick: () => {
+          if (look.gender === g) return; sfx('select');
+          const oldG = look.gender; look.gender = g;
+          if (look.hair === DEF_HAIR[oldG]) look.hair = DEF_HAIR[g];
+          if (!D.BASE_SUITS[g].includes(look.suit)) look.suit = D.BASE_SUITS[g][0];
+          renderGender(); buildGroups();
+        } }, headThumb(Object.assign({}, look, { gender: g, hair: DEF_HAIR[g] })), h('b', { text: label })));
+      });
+    }
+    function group(title, opts, key, render, rebuild) {
       const row = h('div', { class: 'copts' });
       const upd = () => $$('button', row).forEach((b, i) => b.classList.toggle('on', opts[i].v === look[key]));
-      opts.forEach((o) => row.appendChild(h('button', { class: 'copt', 'aria-label': o.label, title: o.label, onclick: () => { look[key] = o.v; sfx('click'); upd(); } }, render(o))));
-      groups.appendChild(h('div', { class: 'cgroup' }, h('h3', { text: title }), row)); refs.push(upd); upd();
+      opts.forEach((o) => row.appendChild(h('button', { class: 'copt', 'aria-label': o.label, title: o.label, onclick: () => { look[key] = o.v; sfx('click'); if (rebuild) buildGroups(); else upd(); } }, render(o), o.label && o.show ? h('small', { text: o.label }) : null)));
+      groups.appendChild(h('div', { class: 'cgroup' }, h('h3', { text: title }), row)); upd();
     }
-    group('Piel', D.SKINS.map((c, i) => ({ v: i, label: 'Tono ' + (i + 1), c })), 'skin', (o) => h('i', { class: 'sw', style: 'background:' + o.c }));
-    group('Peinado', D.HAIR_STYLES.map((s) => ({ v: s.id, label: s.name })), 'hairStyle', (o) => h('span', { text: o.label }));
-    group('Color de pelo', D.HAIR_COLORS.map((c, i) => ({ v: i, label: 'Color ' + (i + 1), c })), 'hairColor', (o) => h('i', { class: 'sw', style: 'background:' + o.c }));
-    group('Traje', ['suit-rojo', 'suit-azul'].map((id) => ({ v: id, label: D.ITEM_BY_ID[id].name, c: D.ITEM_BY_ID[id].main })), 'suit', (o) => h('i', { class: 'sw', style: 'background:' + o.c }));
-    group('Máscara', ['mask-antifaz', 'mask-none'].map((id) => ({ v: id, label: D.ITEM_BY_ID[id].name })), 'mask', (o) => h('span', { text: o.label }));
-    group('Capa', ['cape-corta', 'cape-none'].map((id) => ({ v: id, label: D.ITEM_BY_ID[id].name })), 'cape', (o) => h('span', { text: o.label }));
-    group('Emblema', ['emb-star', 'emb-bolt'].map((id) => ({ v: id, label: D.ITEM_BY_ID[id].name })), 'emblem', (o) => h('span', { text: o.label }));
-    const rand = () => { const r = (a) => a[Math.floor(Math.random() * a.length)]; look.skin = Math.floor(Math.random() * 6); look.hairStyle = r(D.HAIR_STYLES).id; look.hairColor = Math.floor(Math.random() * 8); look.suit = r(['suit-rojo', 'suit-azul']); look.mask = r(['mask-antifaz', 'mask-none']); look.cape = r(['cape-corta', 'cape-none']); look.emblem = r(['emb-star', 'emb-bolt']); refs.forEach((f) => f()); sfx('select'); };
+    const swatch = (o) => h('i', { class: 'sw', style: 'background:' + o.c });
+    function buildGroups() {
+      groups.innerHTML = '';
+      group('Piel', D.SKINS.map((c, i) => ({ v: i, label: 'Tono ' + (i + 1), c })), 'skin', swatch, true);
+      group('Peinado', D.FREE_HAIR.map((id) => ({ v: id, label: D.ITEM_BY_ID[id].name })), 'hair', (o) => headThumb(Object.assign({}, look, { hair: o.v })), false);
+      group('Color de pelo', D.HAIR_COLORS.map((c, i) => ({ v: i, label: 'Color ' + (i + 1), c })), 'hairColor', swatch, true);
+      group('Color del traje', D.BASE_SUITS[look.gender].map((id) => ({ v: id, label: D.ITEM_BY_ID[id].name, c: D.ITEM_BY_ID[id].main })), 'suit', swatch, false);
+      group('Cabeza', ['mask-antifaz', 'mask-none'].map((id) => ({ v: id, label: D.ITEM_BY_ID[id].name })), 'mask', (o) => h('span', { text: o.label }), false);
+      group('Capa', ['cape-corta', 'cape-none'].map((id) => ({ v: id, label: D.ITEM_BY_ID[id].name })), 'cape', (o) => h('span', { text: o.label }), false);
+      group('Emblema', ['emb-star', 'emb-bolt'].map((id) => ({ v: id, label: D.ITEM_BY_ID[id].name })), 'emblem', (o) => h('span', { text: o.label }), false);
+    }
+    const rand = () => {
+      const r = (a) => a[Math.floor(Math.random() * a.length)];
+      look.gender = r(['m', 'f']); look.skin = Math.floor(Math.random() * 6); look.hair = r(D.FREE_HAIR); look.hairColor = Math.floor(Math.random() * 8);
+      look.suit = r(D.BASE_SUITS[look.gender]); look.mask = r(['mask-antifaz', 'mask-none']); look.cape = r(['cape-corta', 'cape-none']); look.emblem = r(['emb-star', 'emb-bolt']);
+      renderGender(); buildGroups(); sfx('select');
+    };
     const ready = () => {
       A.unlock(); const p = St.newProfile(nameIn.value || 'Héroe', look); if (!p) return toast('Ya tienes 4 héroes. Borra uno para crear otro.', 'warn');
       sfx('levelup'); go('hub', { welcome: true });
     };
+    const fantasy = Object.assign({}, look, { gender: 'f', hair: 'hair-dobles', hairColor: 6, suit: 'suit-mago', wings: 'wing-hada', pet: 'pet-dragon', weapon: 'wp-mago', mask: 'mask-halo', cape: 'cape-none' });
+    const fantasy2 = Object.assign({}, look, { gender: 'm', hair: 'hair-cresta', hairColor: 4, suit: 'suit-dragon', wings: 'wing-dragon', pet: 'pet-fenix', weapon: 'wp-espada', mask: 'mask-cuernos', cape: 'cape-none' });
+    const t1 = h('canvas', { class: 'px tease' }), t2 = h('canvas', { class: 'px tease' }); liveHero(t1, () => fantasy, { scale: 2 }); liveHero(t2, () => fantasy2, { scale: 2 });
+    renderGender(); buildGroups();
     sc.appendChild(h('div', { class: 'creator' },
       h('h1', { class: 'h1', text: first ? 'Crea tu héroe' : 'Nuevo héroe' }),
       h('div', { class: 'cstage' }, cv, h('button', { class: 'btn small ghost dice', onclick: rand }, '🎲 Sorpréndeme')),
-      nameIn, groups,
-      h('p', { class: 'hint', text: 'Más trajes, máscaras, capas y armas se desbloquean jugando: encuéntralos en el Vestidor.' }),
+      nameIn, genderRow, groups,
+      h('div', { class: 'teaser' }, t1, h('p', {}, h('b', { text: '¡Y hay mucho más!' }), h('br'), 'Alas, mascotas dragón, armaduras, túnicas, cascos y armas mágicas. Se compran con las monedas que ganas en el Vestidor.'), t2),
       h('div', { class: 'row' }, !first || St.list().length ? h('button', { class: 'btn ghost', onclick: () => go(St.list().length ? 'profiles' : 'title') }, 'Atrás') : null, h('button', { class: 'btn big', onclick: ready }, '¡Listo para luchar!'))));
     nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') ready(); });
   };
@@ -225,7 +256,7 @@
     let tier = params.tier || Math.min(3, Math.max(1, pr.tier + (pr.tier >= 1 && pr.tier < 3 ? 1 : pr.tier === 3 ? 0 : 0) || 1));
     if (pr.tier === 0) tier = 1;
     const tierUnlocked = (t) => t === 1 || pr.tier >= t - 1;
-    const repaso = h('div', { class: 'repaso', hidden: true }, h('h3', { text: 'Repaso rápido: ' + v.tema }), h('ul', null, (D.REPASO[v.topic] || []).map((t) => h('li', { text: t }))));
+    const repaso = h('div', { class: 'repaso', hidden: true }, h('h3', { text: 'Repaso rápido: ' + v.tema }), repasoList(v.topic));
     const tiers = h('div', { class: 'tiers' });
     const NAMES = ['Fácil', 'Normal', 'Difícil'], MUL = ['×1', '×1,5', '×2'];
     function renderTiers() {
@@ -315,10 +346,17 @@
     announceAch(P.ach);
     if (P.first) later(() => toast(`¡Nuevo distrito desbloqueado!`, 'ach'), 2200);
   };
+  function repasoList(topic) {
+    return h('ul', { class: 'rlist' }, (D.REPASO[topic] || []).map((t) => h('li', { class: t.startsWith('Ejemplo') ? 'rex' : t.startsWith('📖') ? 'rref' : '', text: t })));
+  }
   function mistakeCard(m) {
     const q = h('div', { class: 'mcard' }, h('div', { class: 'mq', text: m.text }));
     if (m.table) q.appendChild(h('div', { class: 'mtable', html: '<table><tr>' + m.table.head.map((c, i) => (i ? '<td>' : '<th>') + esc(c) + (i ? '</td>' : '</th>')).join('') + '</tr>' + m.table.rows.map((r) => '<tr>' + r.map((c, i) => (i ? '<td>' : '<th>') + esc(c) + (i ? '</td>' : '</th>')).join('') + '</tr>').join('') + '</table>' }));
-    q.appendChild(h('div', { class: 'mans' }, h('span', { class: 'ok', text: '✔ ' + m.options[m.correct] })));
+    const mans = h('div', { class: 'mans' });
+    if (typeof m.chosen === 'number' && m.chosen >= 0 && m.options[m.chosen] !== undefined) mans.appendChild(h('span', { class: 'bad', text: '✖ Elegiste: ' + m.options[m.chosen] }));
+    else if (m.chosen === -1) mans.appendChild(h('span', { class: 'bad', text: '⏱ No alcanzaste a responder' }));
+    mans.appendChild(h('span', { class: 'ok', text: '✔ Correcta: ' + m.options[m.correct] }));
+    q.appendChild(mans);
     q.appendChild(h('p', { class: 'mexp', text: m.explain }));
     return q;
   }
@@ -331,19 +369,10 @@
     const cv = h('canvas', { class: 'px iprev' });
     const ctx = cv.getContext('2d'); ctx.imageSmoothingEnabled = false;
     const L = Object.assign({}, look, { [it.cat]: it.id });
-    if (it.cat === 'suit' || it.cat === 'cape') { cv.width = 80; cv.height = 92; ctx.drawImage(S.heroCanvas(L, 'idle', 0), 0, 0, 80, 92); }
-    else if (it.cat === 'mask') { cv.width = 84; cv.height = 78; ctx.drawImage(S.heroCanvas(L, 'idle', 0), 4, 0, 28, 26, 0, 0, 84, 78); }
-    else if (it.cat === 'emblem') { cv.width = 84; cv.height = 84; const suit = D.ITEM_BY_ID[look.suit]; ctx.fillStyle = suit.main; ctx.fillRect(0, 0, 84, 84); const rows = S.EMB[it.shape]; const sc = Math.floor(60 / Math.max(rows[0].length, rows.length)), ox = Math.round((84 - rows[0].length * sc) / 2), oy = Math.round((84 - rows.length * sc) / 2); ctx.fillStyle = suit.accent === '#ffffff' ? '#fff' : S.lighten(suit.accent, 0.25); rows.forEach((r, j) => { for (let i = 0; i < r.length; i++) if (r[i] === '#') ctx.fillRect(ox + i * sc, oy + j * sc, sc, sc); }); }
-    else if (it.cat === 'weapon') {
-      cv.width = 84; cv.height = 84; ctx.fillStyle = '#1a1033'; ctx.fillRect(0, 0, 84, 84); ctx.translate(42, 42); ctx.rotate(-0.6);
-      const c1 = it.c1, c2 = it.c2, fx = it.fx;
-      if (fx === 'bolt' || fx === 'wave') { ctx.fillStyle = c2; ctx.fillRect(-7, -26, 14, 52); ctx.fillStyle = c1; ctx.fillRect(-4, -30, 8, 56); ctx.fillStyle = '#fff'; ctx.fillRect(-2, -24, 4, 30); }
-      else if (fx === 'orb') { ctx.fillStyle = c2; ctx.fillRect(-18, -12, 36, 24); ctx.fillRect(-12, -18, 24, 36); ctx.fillStyle = c1; ctx.fillRect(-12, -12, 24, 24); ctx.fillStyle = '#fff'; ctx.fillRect(-6, -6, 12, 12); }
-      else if (fx === 'fire') { ctx.fillStyle = c2; ctx.fillRect(-16, -16, 32, 32); ctx.fillStyle = c1; ctx.fillRect(-11, -24, 22, 40); ctx.fillStyle = '#fff2a8'; ctx.fillRect(-5, -10, 10, 16); }
-      else if (fx === 'ice') { ctx.fillStyle = c2; ctx.beginPath(); ctx.moveTo(0, -32); ctx.lineTo(16, 0); ctx.lineTo(0, 28); ctx.lineTo(-16, 0); ctx.closePath(); ctx.fill(); ctx.fillStyle = c1; ctx.beginPath(); ctx.moveTo(0, -24); ctx.lineTo(8, 0); ctx.lineTo(0, 16); ctx.lineTo(-8, 0); ctx.closePath(); ctx.fill(); }
-      else if (fx === 'double') { ctx.fillStyle = c2; ctx.fillRect(-20, -28, 10, 56); ctx.fillRect(10, -28, 10, 56); ctx.fillStyle = c1; ctx.fillRect(-18, -32, 6, 58); ctx.fillRect(12, -32, 6, 58); ctx.fillStyle = '#fff'; ctx.fillRect(-18, -20, 6, 20); ctx.fillRect(12, -20, 6, 20); }
-      else { const g = ctx.createLinearGradient(0, -30, 0, 30); ['#ff4d6d', '#ffd23f', '#3ddc97', '#4da3ff', '#c58bff'].forEach((c, i) => g.addColorStop(i / 4, c)); ctx.fillStyle = g; ctx.fillRect(-9, -30, 18, 60); ctx.fillStyle = '#fff'; ctx.fillRect(-2, -24, 4, 30); }
-    } else { cv.width = 84; cv.height = 84; ctx.fillStyle = '#1a1033'; ctx.fillRect(0, 0, 84, 84); ctx.font = '44px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(AMULET_ICON[it.id] || '✨', 42, 46); }
+    if (it.cat === 'hair' || it.cat === 'mask') { cv.width = 30; cv.height = 30; ctx.drawImage(S.heroCanvas(it.cat === 'hair' ? Object.assign({}, L, { mask: 'mask-none' }) : L, 'idle', 0, { nopet: true }), 21, 3, 30, 30, 0, 0, 30, 30); }
+    else if (it.cat === 'emblem') { cv.width = 84; cv.height = 84; const suit = D.ITEM_BY_ID[look.suit] || D.ITEM_BY_ID['suit-rojo']; ctx.fillStyle = suit.main; ctx.fillRect(0, 0, 84, 84); const rows = S.EMB[it.shape]; const sc = Math.floor(60 / Math.max(rows[0].length, rows.length)), ox = Math.round((84 - rows[0].length * sc) / 2), oy = Math.round((84 - rows.length * sc) / 2); ctx.fillStyle = suit.accent === '#ffffff' ? '#fff' : S.lighten(suit.accent, 0.25); rows.forEach((r, j) => { for (let i = 0; i < r.length; i++) if (r[i] === '#') ctx.fillRect(ox + i * sc, oy + j * sc, sc, sc); }); }
+    else if (it.cat === 'amulet') { cv.width = 84; cv.height = 84; ctx.fillStyle = '#1a1033'; ctx.fillRect(0, 0, 84, 84); ctx.font = '44px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(AMULET_ICON[it.id] || '✨', 42, 46); }
+    else { cv.width = S.HERO_W; cv.height = S.HERO_H; ctx.drawImage(S.heroCanvas(L, it.cat === 'weapon' ? 'shoot' : 'idle', 0), 0, 0); }
     return cv;
   }
   SCREENS.wardrobe = (params, sc) => {
@@ -351,7 +380,7 @@
     const pv = {}; // vista previa (no guardada)
     const stage = h('canvas', { class: 'px wprev' });
     const lookNow = () => Object.assign({}, p.look, pv);
-    liveHero(stage, lookNow, { scale: 6, pose: () => (Math.floor(Date.now() / 1600) % 4 === 0 ? 'shoot' : 'idle') });
+    liveHero(stage, lookNow, { scale: 6, pose: () => (cat === 'weapon' || Math.floor(Date.now() / 1600) % 4 === 0 ? 'shoot' : 'idle') });
     const tabs = h('div', { class: 'ctabs', role: 'tablist' });
     const grid = h('div', { class: 'igrid' });
     const bar = h('div', { class: 'ibar' });
@@ -359,16 +388,17 @@
     function owned(id) { return p.owned.includes(id); }
     function renderTabs() {
       tabs.innerHTML = '';
-      D.CATS.forEach((c) => { const n = D.ITEMS.filter((i) => i.cat === c.id).length, o = D.ITEMS.filter((i) => i.cat === c.id && owned(i.id)).length; tabs.appendChild(h('button', { class: 'ctab' + (c.id === cat ? ' on' : ''), role: 'tab', 'aria-selected': c.id === cat ? 'true' : 'false', onclick: () => { cat = c.id; sel = null; sfx('click'); renderAll(); } }, h('span', { text: c.icon }), h('b', { text: c.name }), h('small', { text: `${o}/${n}` }))); });
+      const all = [{ id: 'body', name: 'Aspecto', icon: '🙂' }].concat(D.CATS);
+      all.forEach((c) => { const n = D.ITEMS.filter((i) => i.cat === c.id).length, o = D.ITEMS.filter((i) => i.cat === c.id && owned(i.id)).length; tabs.appendChild(h('button', { class: 'ctab' + (c.id === cat ? ' on' : ''), role: 'tab', 'aria-selected': c.id === cat ? 'true' : 'false', onclick: () => { cat = c.id; sel = null; sfx('click'); renderAll(); } }, h('span', { text: c.icon }), h('b', { text: c.name }), h('small', { text: c.id === 'body' ? 'libre' : `${o}/${n}` }))); });
     }
     function itemCard(it) {
       const eq = p.look[it.cat] === it.id, own = owned(it.id), rar = D.RARITY[it.rarity];
-      const lockAch = it.unlock && !own;
+      const lockAch = it.unlock && !own, trying = pv[it.cat] === it.id;
       return h('button', { class: `icard r-${it.rarity}${eq ? ' eq' : ''}${own ? '' : ' lock'}${sel === it.id ? ' sel' : ''}`, 'aria-label': `${it.name}, ${rar.name}${eq ? ', puesto' : own ? '' : lockAch ? ', se consigue con un logro' : ', ' + it.price + ' monedas'}`, style: `--rc:${rar.color}`, onclick: () => choose(it) },
         itemPreview(it, lookNow()),
         h('b', { class: 'iname', text: it.name }),
         h('span', { class: 'irar', text: rar.name }),
-        eq ? h('span', { class: 'ibadge on', text: 'Puesto' }) : own ? h('span', { class: 'ibadge', text: 'Tuyo' }) : lockAch ? h('span', { class: 'ibadge ach', text: '🏆 Logro' }) : h('span', { class: 'ibadge price' }, img('coin', 2), h('b', { text: String(it.price) })));
+        eq ? h('span', { class: 'ibadge on', text: 'Puesto' }) : own ? h('span', { class: 'ibadge', text: 'Tuyo' }) : trying ? h('span', { class: 'ibadge on', text: 'Probando' }) : lockAch ? h('span', { class: 'ibadge ach', text: '🏆 Logro' }) : h('span', { class: 'ibadge price' }, img('coin', 2), h('b', { text: String(it.price) })));
     }
     function choose(it) {
       sel = it.id;
@@ -378,9 +408,10 @@
     }
     function renderBar() {
       bar.innerHTML = ''; const it = sel && D.ITEM_BY_ID[sel];
-      if (!it) { bar.appendChild(h('p', { class: 'hint', text: 'Toca un objeto para probártelo. Los que ya tienes se equipan al instante.' })); return; }
+      if (cat === 'body') { bar.appendChild(h('p', { class: 'hint', text: 'Cambia tu cuerpo, piel y color de pelo cuando quieras. Es gratis.' })); return; }
+      if (!it) { bar.appendChild(h('p', { class: 'hint', text: 'Toca cualquier objeto para probártelo, aunque aún no lo tengas. Los tuyos se equipan al instante.' })); return; }
       const own = owned(it.id), rar = D.RARITY[it.rarity];
-      bar.appendChild(h('div', { class: 'binfo' }, h('b', { text: it.name }), h('small', { class: 'brar', style: 'color:' + rar.color, text: rar.name }), it.perk ? h('p', { class: 'perk', text: it.perk }) : null));
+      bar.appendChild(h('div', { class: 'binfo' }, h('b', { text: it.name }), h('small', { class: 'brar', style: 'color:' + rar.color, text: rar.name }), it.perk || it.desc ? h('p', { class: 'perk', text: it.perk || it.desc }) : null, !own && !it.unlock ? h('p', { class: 'perk', text: 'Te lo estás probando. Cómpralo para quedártelo.' }) : null));
       if (own) bar.appendChild(h('span', { class: 'ibadge on big', text: p.look[it.cat] === it.id ? 'Puesto ✓' : 'Tuyo' }));
       else if (it.unlock) bar.appendChild(h('span', { class: 'ibadge ach big', text: '🏆 Se gana con el logro “' + (D.ACH.find((a) => a.id === it.unlock.ach) || {}).name + '”' }));
       else bar.appendChild(h('button', { class: 'btn buy' + (p.coins >= it.price ? '' : ' cant'), onclick: () => {
@@ -388,10 +419,18 @@
         sfx('buy'); St.equip(it.id); delete pv[it.cat]; toast(`¡Compraste <b>${esc(it.name)}</b> y te lo pusiste!`, ''); announceAch(r.ach); renderAll();
       } }, img('coin', 3), h('span', { text: ` Comprar · ${it.price}` })));
     }
+    function renderBody() {
+      const sw = (c, i, key) => h('button', { class: 'copt' + (p.look[key] === i ? ' on' : ''), 'aria-label': (key === 'skin' ? 'Piel ' : 'Pelo ') + (i + 1), onclick: () => { St.setLook({ [key]: i }); sfx('click'); renderAll(); } }, h('i', { class: 'sw', style: 'background:' + c }));
+      const gbtn = (g, label) => h('button', { class: 'gbtn' + (p.look.gender === g ? ' on' : ''), onclick: () => { if (p.look.gender === g) return; St.setLook({ gender: g }); sfx('select'); renderAll(); } }, headThumb(Object.assign({}, p.look, { gender: g }), ''), h('b', { text: label }));
+      grid.className = 'bodypanel';
+      grid.appendChild(h('div', { class: 'cgroup' }, h('h3', { text: 'Cuerpo' }), h('div', { class: 'gender' }, gbtn('m', 'Hombre'), gbtn('f', 'Mujer'))));
+      grid.appendChild(h('div', { class: 'cgroup' }, h('h3', { text: 'Piel' }), h('div', { class: 'copts' }, D.SKINS.map((c, i) => sw(c, i, 'skin')))));
+      grid.appendChild(h('div', { class: 'cgroup' }, h('h3', { text: 'Color de pelo' }), h('div', { class: 'copts' }, D.HAIR_COLORS.map((c, i) => sw(c, i, 'hairColor')))));
+    }
     function renderAll() {
-      renderTabs(); grid.innerHTML = '';
-      const items = D.ITEMS.filter((i) => i.cat === cat).sort((a, b) => (owned(b.id) - owned(a.id)) || a.price - b.price);
-      items.forEach((it) => grid.appendChild(itemCard(it)));
+      renderTabs(); grid.innerHTML = ''; grid.className = 'igrid';
+      if (cat === 'body') renderBody();
+      else { const items = D.ITEMS.filter((i) => i.cat === cat).sort((a, b) => (owned(b.id) - owned(a.id)) || a.price - b.price); items.forEach((it) => grid.appendChild(itemCard(it))); }
       renderBar(); refreshCoins();
       summary.textContent = `Colección: ${p.owned.length}/${D.ITEMS.length} objetos`;
     }
@@ -427,7 +466,7 @@
     if (!p.mistakes.length) wrap.appendChild(h('p', { class: 'hint', text: 'Aquí aparecerán las preguntas que falles, con su explicación, para que las repases. ¡Todavía no tienes ninguna!' }));
     else { wrap.appendChild(h('p', { class: 'hint', text: 'Tus últimos errores, con la respuesta correcta y por qué.' })); p.mistakes.slice(0, 20).forEach((m) => { const t = (V.find((x) => x.topic === m.topic) || {}).tema; wrap.appendChild(h('div', null, t ? h('small', { class: 'mt', text: t }) : null, mistakeCard(m))); }); }
     wrap.appendChild(h('h1', { class: 'h1', text: 'Repaso por tema' }));
-    V.filter((v) => v.n <= 14).forEach((v) => { const det = h('details', { class: 'acc' }, h('summary', null, villainEl(v, 34), h('b', { text: v.tema })), h('ul', null, (D.REPASO[v.topic] || []).map((t) => h('li', { text: t })))); wrap.appendChild(det); });
+    V.filter((v) => v.n <= 14).forEach((v) => { const det = h('details', { class: 'acc' }, h('summary', null, villainEl(v, 34), h('b', { text: v.tema })), repasoList(v.topic)); wrap.appendChild(det); });
     sc.appendChild(wrap);
   };
 
@@ -438,13 +477,18 @@
     const s = St.settings(), p = St.profile();
     const tog = (key, label, desc) => h('label', { class: 'set' }, h('div', null, h('b', { text: label }), desc ? h('small', { text: desc }) : null), h('input', { type: 'checkbox', checked: s[key] ? true : null, onchange: (e) => { St.setSetting(key, e.target.checked); if (key === 'music') { if (e.target.checked) { A.unlock(); A.play(MUSIC.settings); } } sfx('click'); } }), h('span', { class: 'sw2' }));
     const vol = h('input', { type: 'range', min: '0', max: '1', step: '0.05', value: String(s.volume), 'aria-label': 'Volumen', oninput: (e) => { St.setSetting('volume', +e.target.value); }, onchange: () => sfx('coin') });
+    const styleNow = () => (!s.music ? 'off' : s.musicStyle === 'calma' ? 'calma' : 'arcade');
+    const musicPick = h('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Estilo de música' });
+    const renderMusicPick = () => { musicPick.innerHTML = ''; [['arcade', 'Arcade'], ['calma', 'Calmada'], ['off', 'Sin música']].forEach(([id, label]) => musicPick.appendChild(h('button', { class: 'segb' + (styleNow() === id ? ' on' : ''), role: 'radio', 'aria-checked': styleNow() === id ? 'true' : 'false', onclick: () => { A.unlock(); if (id === 'off') St.setSetting('music', false); else { St.setSetting('musicStyle', id); St.setSetting('music', true); A.play(MUSIC.settings); } sfx('click'); renderMusicPick(); } }, label))); };
+    renderMusicPick();
     const code = h('textarea', { class: 'input code', rows: '3', placeholder: 'Pega aquí un código de guardado…', 'aria-label': 'Código de guardado' });
     const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent), standalone = root.matchMedia && root.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
     const inst = h('div', { class: 'set-block' }, h('h3', { text: 'Instalar como app' }),
       standalone ? h('p', { class: 'hint', text: '¡Ya estás jugando como app!' }) : root.__installPrompt ? h('button', { class: 'btn', onclick: async () => { const ev = root.__installPrompt; ev.prompt(); await ev.userChoice; root.__installPrompt = null; go('settings'); } }, 'Instalar DuiX') :
         h('p', { class: 'hint', text: isIOS ? 'En iPhone/iPad: toca el botón Compartir y elige “Añadir a pantalla de inicio”.' : 'En el menú del navegador (⋮ o el ícono de instalar) elige “Instalar app” o “Añadir a pantalla de inicio”. En Mac/Windows aparece un ícono de instalar en la barra de direcciones.' }));
     sc.appendChild(h('div', { class: 'settings' }, topbar(), h('h1', { class: 'h1', text: 'Ajustes' }),
-      h('div', { class: 'set-block' }, tog('sfx', 'Efectos de sonido'), tog('music', 'Música'), h('div', { class: 'set' }, h('div', null, h('b', { text: 'Volumen' })), vol)),
+      h('div', { class: 'set-block' }, tog('sfx', 'Efectos de sonido'), h('div', { class: 'set col' }, h('div', null, h('b', { text: 'Música' }), h('small', { text: 'Elige el estilo que no te distraiga' })), musicPick), h('div', { class: 'set' }, h('div', null, h('b', { text: 'Volumen' })), vol)),
+      h('div', { class: 'set-block' }, tog('moreTime', 'Más tiempo para leer', 'Las respuestas tardan más en empezar a caer')),
       h('div', { class: 'set-block' }, tog('crt', 'Pantalla retro (CRT)', 'Líneas de barrido y bordes suaves'), tog('reduceMotion', 'Reducir movimiento', 'Menos animaciones'), tog('big', 'Texto grande')),
       inst,
       h('div', { class: 'set-block' }, h('h3', { text: 'Progreso de ' + p.name }),

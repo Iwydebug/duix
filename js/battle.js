@@ -114,7 +114,9 @@
         const lay = wrapText(t, LANE_W - 20), h = Math.max(36, lay.lines.length * lay.fs * 1.22 + 14);
         caps.push({ lane: i, x: LANE_W * (i + 0.5), y: 126 - h - i * 12, h, w: LANE_W - 8, lines: lay.lines, fs: lay.fs, ok: i === q.correct, state: 'fall', vy: speed * (0.94 + ((i * 7 + st.qIndex * 3) % 5) * 0.03), wob: Math.random() * 6, t: 0, text: t, targeted: false });
       });
-      st.state = 'play'; st.stateT = 0; st.spawnT = 0;
+      st.state = 'read'; st.stateT = 0; st.spawnT = 0; st.cdShown = 4;
+      const more = St.settings().moreTime ? 1.7 : 1, len = q.text.length + (q.table ? 30 : 0) + q.options.reduce((a, o) => a + o.length, 0) * 0.4;
+      st.readFor = Math.min(6, Math.max(1.3, 0.8 + len * 0.04)) * more; st.cdStep = 0.6;
       renderHud();
     }
 
@@ -130,7 +132,7 @@
       if (st.state !== 'play' || st.paused || st.over) return;
       const c = caps[lane]; if (!c || c.state !== 'fall' || c.targeted) return;
       c.targeted = true; st.lane = lane; hero.tx = c.x; hero.shootT = 0.2;
-      const sx = hero.x + 10, sy = LH - 96;
+      const sx = hero.x + 26, sy = LH - 114;
       bolts.push({ x: sx, y: sy, sx, sy, cap: c, t: 0, fx: weapon.fx, c1: weapon.c1, c2: weapon.c2, q: st.qIndex, hue: 0 });
       A.sfx('shoot');
     }
@@ -163,18 +165,18 @@
       if (Math.random() < 0.5) say(TAUNTS[Math.floor(Math.random() * TAUNTS.length)], 1100);
       return true;
     }
-    function logMistake() { const q = st.q; if (!st.qLogged) { st.qLogged = true; st.mistakes.push({ topic: q.topic, text: q.text, options: q.options, correct: q.correct, explain: q.explain, table: q.table || null }); } }
+    function logMistake(chosen) { const q = st.q; if (!st.qLogged) { st.qLogged = true; st.mistakes.push({ topic: q.topic, text: q.text, options: q.options, correct: q.correct, chosen: typeof chosen === 'number' ? chosen : -1, explain: q.explain, table: q.table || null }); } }
     function onWrong(c) {
-      c.state = 'dead'; st.qWrong = true; st.streak = 0; st.power = Math.floor(st.power * 0.5); st.qLogged = false; logMistake();
+      c.state = 'dead'; st.qWrong = true; st.streak = 0; st.power = Math.floor(st.power * 0.5); st.qLogged = false; logMistake(c.lane);
       A.sfx('wrong'); float(c.x, c.y, '✖', '#ff4d4d', 30);
       damageHero(); renderHud();
-      if (st.hearts <= 0) return defeat();
+      if (st.hearts <= 0) { explain('Elegiste «' + st.q.options[c.lane] + '». La correcta era «' + st.q.options[st.q.correct] + '». ' + st.q.explain); return defeat(); }
     }
     function onMiss(c) {
       // la respuesta correcta tocó el suelo
-      st.qMiss = true; st.streak = 0; st.answered++; st.qLogged = false; logMistake(); c.state = 'good'; c.goldT = 0;
+      st.qMiss = true; st.streak = 0; st.answered++; st.qLogged = false; logMistake(-1); c.state = 'good'; c.goldT = 0;
       caps.forEach((o) => { if (o !== c && o.state === 'fall') { o.state = 'dead'; burst(o.x, o.y + o.h / 2, '#7a6aa8', 8, 80, 0.4); } });
-      A.sfx('wrong'); damageHero(); explain('Respuesta: ' + st.q.options[st.q.correct] + '.  ' + st.q.explain); renderHud();
+      A.sfx('wrong'); damageHero(); explain('Se acabó el tiempo. La respuesta era «' + st.q.options[st.q.correct] + '». ' + st.q.explain); renderHud();
       if (st.hearts <= 0) return defeat();
       st.state = 'between'; st.stateT = 0; st.wait = 2.6;
     }
@@ -185,7 +187,7 @@
       const wrong = caps.filter((c) => c.state === 'fall' && !c.ok);
       if (wrong.length < 2) { A.sfx('deny'); return; }
       const cost = hintCost(); if (!St.spend(cost)) { A.sfx('deny'); const b = $('.bt-hint'); b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); float(hero.x, LH - 140, '¡Faltan monedas!', '#ff9a9a', 14); return; }
-      const c = wrong[Math.floor(Math.random() * wrong.length)]; c.state = 'dead'; burst(c.x, c.y + c.h / 2, ['#ffe14a', '#fff'], 18, 120, 0.5); st.hintsUsed++; A.sfx('hint'); float(c.x, c.y, 'Descartada', '#ffe14a', 13); renderHud();
+      const c = wrong[Math.floor(Math.random() * wrong.length)]; c.state = 'dead'; burst(c.x, c.y + c.h / 2, ['#ffe14a', '#fff'], 18, 120, 0.5); st.hintsUsed++; A.sfx('hint'); float(c.x, c.y, 'Descartada', '#ffe14a', 13); if (st.q.hint) explain('💡 Pista: ' + st.q.hint); renderHud();
       persistCoinsHint(-cost);
     }
     function persistCoinsHint() { /* las monedas ya se descuentan en Store.spend */ }
@@ -217,6 +219,10 @@
       if (st.state === 'intro') {
         if (st.stateT > 0.1 && !st.said) { st.said = true; say(v.intro.length > 60 ? v.intro.slice(0, v.intro.lastIndexOf(' ', 60)) + '…' : v.intro, 2600); banner('¡A LUCHAR!', 'go', 1300); }
         if (st.stateT > 1.5) nextQuestion();
+      } else if (st.state === 'read') {
+        const left = st.readFor + st.cdStep * 3 - st.stateT, n = left > 0 ? Math.min(3, Math.ceil(left / st.cdStep)) : 0;
+        if (left > st.cdStep * 3) st.cdShown = 4; else if (n !== st.cdShown) { st.cdShown = n; if (n > 0) A.sfx('tick'); }
+        if (left <= 0) { st.state = 'play'; st.stateT = 0; A.sfx('go'); banner('¡YA!', 'go', 550); renderHud(); }
       } else if (st.state === 'play') {
         caps.forEach((c) => {
           if (c.state !== 'fall') return; c.t += dt; c.y += c.vy * dt; c.x = LANE_W * (c.lane + 0.5) + Math.sin(c.t * 1.6 + c.wob) * 3;
@@ -299,6 +305,7 @@
       ctx.fillStyle = 'rgba(255,60,80,.18)'; ctx.fillRect(0, FLOOR(), LW, 3); ctx.fillStyle = 'rgba(255,60,80,.35)'; for (let x = 0; x < LW; x += 16) ctx.fillRect(x, FLOOR(), 8, 3);
       // villano
       const vs = v.boss ? 2.3 : 2.0, vw = 64 * vs, vy = 0 + Math.sin(t * 2) * 3 + (vil.dead ? Math.min(60, vil.deadT * 40) : 0);
+      if (!vil.dead) { const gc = v.glow || v.pal.accent, cy = vy + vw * 0.42, g = ctx.createRadialGradient(vil.x, cy, 8, vil.x, cy, vw * 0.78); g.addColorStop(0, gc + '55'); g.addColorStop(1, gc + '00'); ctx.fillStyle = g; ctx.fillRect(vil.x - vw, cy - vw, vw * 2, vw * 2); ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(vil.x, vy + vw * 0.86 + 6, vw * 0.3, 7, 0, 0, 6.283); ctx.fill(); }
       if (!(vil.dead && vil.deadT > 0.9 && Math.floor(vil.deadT * 20) % 2)) {
         ctx.save(); ctx.globalAlpha = vil.dead ? Math.max(0, 1 - vil.deadT / 2.2) : 1;
         const shx = vil.shake > 0 ? (Math.random() - 0.5) * 8 : 0;
@@ -307,12 +314,19 @@
       }
       // insignia orbitando (símbolo del tema)
       { const a = t * 1.1, ox = vil.x + Math.cos(a) * (vw * 0.62), oy = vw * 0.42 + Math.sin(a) * 14 + vy; ctx.save(); ctx.globalAlpha = vil.dead ? 0 : 1; ctx.fillStyle = '#1a1033'; ctx.beginPath(); ctx.arc(ox, oy, 19, 0, 6.283); ctx.fill(); ctx.fillStyle = v.pal.accent; ctx.beginPath(); ctx.arc(ox, oy, 16, 0, 6.283); ctx.fill(); ctx.fillStyle = '#1a1033'; ctx.font = `700 ${v.glyph.length > 3 ? 11 : v.glyph.length > 2 ? 13 : 17}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(v.glyph, ox, oy + 1, 30); ctx.restore(); }
+      // lectura + cuenta regresiva
+      if (st.state === 'read') {
+        ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        if (st.cdShown >= 1 && st.cdShown <= 3) { const ph = (st.stateT - st.readFor) % st.cdStep / st.cdStep, sz = 96 - ph * 26; ctx.globalAlpha = 1 - ph * 0.5; ctx.font = `${sz}px Bangers, ${FONT}`; ctx.lineWidth = 8; ctx.strokeStyle = '#1a1033'; ctx.strokeText(String(st.cdShown), LW / 2, LH * 0.5); ctx.fillStyle = '#ffd23f'; ctx.fillText(String(st.cdShown), LW / 2, LH * 0.5); }
+        else { ctx.font = `700 15px ${FONT}`; const t = '¡Lee la pregunta!'; const w = ctx.measureText(t).width + 26; rr(LW / 2 - w / 2, LH * 0.5 - 18, w, 36, 10, 'rgba(26,16,51,.88)', '#ffd23f', 2); ctx.fillStyle = '#fff'; ctx.fillText(t, LW / 2, LH * 0.5 + 1); }
+        ctx.restore();
+      }
       // disparos del villano (visual)
       eshots.forEach((e) => { const x = e.x + (e.tx - e.x) * e.t, y = e.y + (e.ty - e.y) * e.t; ctx.fillStyle = '#ff3b3b'; ctx.fillRect(x - 5, y - 5, 10, 10); ctx.fillStyle = '#fff'; ctx.fillRect(x - 2, y - 2, 4, 4); });
       // cápsulas
       caps.forEach((c) => drawCap(c, t));
       // héroe
-      { const pose = hero.shootT > 0 ? 'shoot' : 'idle', frame = Math.floor(t * 6) % 4, hc = S.heroCanvas(look, pose, frame), hs = 2, hw = 40 * hs, hh = 46 * hs;
+      { const pose = hero.shootT > 0 ? 'shoot' : 'idle', frame = Math.floor(t * 6) % 4, hc = S.heroCanvas(look, pose, frame), hs = 2, hw = S.HERO_W * hs, hh = S.HERO_H * hs;
         const bob = Math.sin(t * 5) * 1.5, hurt = hero.hurtT > 0 && Math.floor(hero.hurtT * 20) % 2 === 0;
         ctx.save(); if (hurt) ctx.globalAlpha = 0.35; ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(hero.x, LH - 8, 26, 6, 0, 0, 6.283); ctx.fill();
         ctx.drawImage(hc, Math.round(hero.x - hw / 2), Math.round(LH - hh - 6 + bob), hw, hh); ctx.restore(); }

@@ -22,3 +22,15 @@ Juego PWA (funciona en Mac, Windows, iPhone y Android desde el navegador, e inst
 
 ## Actualizar
 Sube los archivos nuevos al mismo repo (Add file → Upload files, sobrescribe). Vercel republica solo.
+
+## Novedades de la versión 1.1
+- Héroe hombre o mujer, con 4 colores base gratis por género y muchos más objetos para comprar.
+- Alas, mascotas (dragón bebé, fénix…), armaduras, túnicas, cascos y armas que se ven en la mano.
+- En el Vestidor puedes probarte todo aunque aún no lo tengas.
+- Cada pregunta da tiempo para leer y una cuenta regresiva 3-2-1.
+- Música Arcade o Calmada (Ajustes) y opción de más tiempo para leer.
+- Al fallar se ve qué elegiste y cuál era la correcta.
+- Pistas y repasos más claros, con referencia a Stewart (Precálculo).
+
+### Cómo actualizar en GitHub
+Entra a tu repositorio → **Add file → Upload files** → arrastra los archivos y carpetas nuevos (sobrescriben a los anteriores) → **Commit changes**. Vercel publica solo en ~30 segundos. Si en el celular ves lo viejo, cierra y abre la app dos veces.
