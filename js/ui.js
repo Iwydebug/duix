@@ -68,6 +68,7 @@
   const NAV = [
     { id: 'hub', label: 'Ciudad', icon: 'city' },
     { id: 'wardrobe', label: 'Vestidor', icon: 'shirt' },
+    { id: 'rooms', label: 'Salas', icon: 'people' },
     { id: 'goals', label: 'Metas', icon: 'trophy' },
     { id: 'notebook', label: 'Cuaderno', icon: 'book' },
     { id: 'settings', label: 'Ajustes', icon: 'gear' },
@@ -94,10 +95,11 @@
   }
 
   /* ---------- navegación ---------- */
-  const SCREENS = {}, NAVSCREENS = ['hub', 'wardrobe', 'goals', 'notebook', 'settings'];
-  const MUSIC = { title: 'menu', profiles: 'menu', creator: 'menu', hub: 'map', district: 'map', wardrobe: 'menu', goals: 'menu', notebook: 'menu', settings: 'menu', results: 'menu' };
+  const SCREENS = {}, NAVSCREENS = ['hub', 'wardrobe', 'rooms', 'goals', 'notebook', 'settings'];
+  const MUSIC = { title: 'menu', profiles: 'menu', creator: 'menu', hub: 'map', district: 'map', wardrobe: 'menu', rooms: 'menu', goals: 'menu', notebook: 'menu', settings: 'menu', results: 'menu' };
   function teardown() { stopLive(); cleanups.forEach((f) => { try { f(); } catch (e) { /* ok */ } }); cleanups = []; if (battle) { battle.destroy(); battle = null; } $('#modal').hidden = true; $('#modal').innerHTML = ''; $('#toasts').innerHTML = ''; }
   function go(name, params) {
+    if (name === 'hub' && root.__pendingRoom && St.profile()) { params = { code: root.__pendingRoom }; root.__pendingRoom = null; name = 'rooms'; }
     teardown(); cur = { name, params };
     const p = St.profile();
     if (!p && !['title', 'creator', 'profiles'].includes(name)) name = cur.name = 'title';
@@ -506,8 +508,10 @@
     ['pointerdown', 'keydown', 'touchstart'].forEach((ev) => document.addEventListener(ev, unlockOnce, { once: true, passive: true }));
     document.addEventListener('visibilitychange', () => A.suspend(document.hidden));
     document.addEventListener('contextmenu', (e) => { if (!e.target.closest('input,textarea')) e.preventDefault(); });
+    try { const m = /[?&]sala=([A-Za-z0-9]{3,8})/.exec(location.search); if (m) root.__pendingRoom = m[1].toUpperCase(); } catch (e) { /* ok */ }
     go('title');
   }
 
-  root.DuiXUI = { boot, go, toast, _cur: () => cur, _battle: () => battle, SCREENS };
+  const kit = { h, add, esc, img, sfx, modal, toast, topbar, avatarEl, headThumb, liveHero, villainEl, go, later, refreshCoins, announceAch, plural, $, $$, onLeave: (f) => cleanups.push(f), SCREENS, MUSIC };
+  root.DuiXUI = { boot, go, toast, kit, _cur: () => cur, _battle: () => battle, SCREENS };
 })(typeof window !== 'undefined' ? window : globalThis);

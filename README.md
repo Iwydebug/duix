@@ -41,3 +41,27 @@ Entra a tu repositorio → **Add file → Upload files** → arrastra los archiv
 - Vestidor: el avatar y el botón de comprar quedan siempre a la vista; solo se desliza la ropa.
 - En modo solo, el menú de pausa permite cambiar la música y los efectos.
 - "Más tiempo para leer" ya no está en Ajustes: será una opción al crear salas (Parte 3).
+
+## Novedades 1.3 — Salas multijugador (Firebase)
+Archivos nuevos: `js/net.js`, `js/rooms.js`, `js/firebase-config.js` y la carpeta `js/vendor/` (Firebase y generador de QR, para que todo cargue rápido).
+
+**Reglas de seguridad de Firebase** (importante, hacerlo una sola vez):
+1. Firebase → Realtime Database → pestaña **Reglas**.
+2. Borra todo y pega esto, luego pulsa **Publicar**:
+
+```json
+{
+  "rules": {
+    "rooms": {
+      "$code": {
+        ".read": true,
+        ".write": true,
+        ".validate": "newData.hasChildren(['host', 'cfg', 'state'])"
+      }
+    }
+  }
+}
+```
+Así nadie puede listar todas las salas: solo entra quien conoce el código. Las reglas del "modo de prueba" vencen a los 30 días, por eso hay que reemplazarlas.
+
+**Cómo se juega:** Salas → Crear sala (el anfitrión elige preguntas, dificultad, tiempo, temas y "más tiempo para leer") → comparte el código de 4 letras o el QR → todos entran → Empezar partida.

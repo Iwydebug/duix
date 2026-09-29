@@ -348,6 +348,7 @@
     trophy: { rows: ['aaaaaaaaa', 'abbbbbbba', 'abbbbbbba', '.abbbbba.', '..abbba..', '...aba...', '..abbba..', '.aaaaaaa.'], map: { a: '#1a1033', b: '#9fb3c8' } },
     gear: { rows: ['...aaa...', '.a.abba.a', '.abbbbba.', 'aabbcbbaa', 'abbcccbba', 'aabbcbbaa', '.abbbbba.', '.a.abba.a', '...aaa...'], map: { a: '#1a1033', b: '#9fb3c8', c: '#1a1033' } },
     book: { rows: ['.aaaaaaa.', 'abbbabbba', 'abcbabcba', 'abbbabbba', 'abcbabcba', 'abbbabbba', '.aaaaaaa.'], map: { a: '#1a1033', b: '#9fb3c8', c: '#ffffff' } },
+    people: { rows: ['.aaa...aaa.', 'abbba.abbba', 'abbba.abbba', '.aaa...aaa.', 'abbba.abbba', 'abbba.abbba', 'aaaaa.aaaaa'], map: { a: '#1a1033', b: '#9fb3c8' } },
     play: { rows: ['aa.....', 'abaa...', 'abbbaa.', 'abbbbba', 'abbbaa.', 'abaa...', 'aa.....'], map: { a: '#1a1033', b: '#ffffff' } },
     bulb: { rows: ['..aaa..', '.abbba.', 'abbcbba', 'abbcbba', '.abbba.', '..aba..', '..aaa..', '...a...'], map: { a: '#1a1033', b: '#ffe14a', c: '#fff' } },
   };

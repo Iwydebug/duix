@@ -157,6 +157,20 @@
     trackDaily({ correct: res.correct, streak: res.bestStreak, wins: res.win ? 1 : 0, perfect: res.win && res.stars === 3 ? 1 : 0, district: v.id });
     return { firstClear };
   }
+  /* ---------- salas multijugador ---------- */
+  function recordRoom(res) {
+    const p = profile(); if (!p) return null;
+    const st = p.stats; st.correct += res.correct; st.answered += res.answered; st.rooms = (st.rooms || 0) + 1;
+    st.bestStreak = Math.max(st.bestStreak, res.bestStreak || 0);
+    if (res.rank === 1 && res.total >= 2) st.roomWins = (st.roomWins || 0) + 1;
+    { const seen = {}; p.mistakes = (res.mistakes || []).concat(p.mistakes).filter((m) => (seen[m.text] ? false : (seen[m.text] = true))).slice(0, 40); }
+    const bonus = res.total >= 2 ? ({ 1: 60, 2: 40, 3: 25 }[res.rank] || 0) : 0;
+    const coins = 10 + 8 * res.correct + bonus, xp = 20 + 6 * res.correct;
+    addCoins(coins); const ups = addXp(xp);
+    trackDaily({ correct: res.correct, streak: res.bestStreak || 0 });
+    save(); notify('coins');
+    return { coins, xp, bonus, ups, ach: checkAch() };
+  }
   function stats() {
     const p = profile(); if (!p) return {};
     const s = p.stats;
@@ -234,7 +248,7 @@
     persistent, MAX_PROFILES, DEFAULT_LOOK, xpNeed, CHEST_COST, today, settings: () => settings, setSetting(k, v) { settings[k] = v; saveSettings(); notify('settings'); },
     list: () => db.list, profile, newProfile, switchTo, removeProfile, logout, save,
     has, buy, equip, setLook, openChest, grantItem, perks, addCoins, spend, addXp,
-    prog, isCleared, unlocked, recordBattle, stats, checkAch, ensureDaily, trackDaily, exportCode, importCode, resetAll,
+    prog, isCleared, unlocked, recordBattle, recordRoom, stats, checkAch, ensureDaily, trackDaily, exportCode, importCode, resetAll,
     on(f) { listeners.push(f); },
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = S; else root.DuiXStore = S;
