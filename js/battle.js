@@ -14,8 +14,9 @@
   function start(cfg) {
     const v = cfg.villain, tier = cfg.tier, look = cfg.look, perks = cfg.perks || {}, endless = !!v.endless;
     const root_ = cfg.container;
-    const level = () => (endless ? Math.min(3, 1 + Math.floor(st.correct / 8)) : v.topic === 'mix' ? Math.max(2, tier) : tier);
-    const maxHp = endless ? Infinity : v.boss ? [14, 18, 22][tier - 1] : [8, 10, 12][tier - 1];
+    const level = () => (endless ? Math.min(3, 1 + Math.floor(st.correct / 5)) : v.topic === 'mix' ? Math.max(2, tier) : tier);
+    const QUESTIONS_PER_FIGHT = 5;
+    const maxHp = endless ? Infinity : QUESTIONS_PER_FIGHT;
     const weapon = D.ITEM_BY_ID[look.weapon] || D.ITEM_BY_ID['wp-rayo'];
     const startHearts = 3 + (perks.hearts || 0);
     const baseSpeed = [30, 38, 47][tier - 1];
@@ -45,7 +46,7 @@
         <div class="bt-keys">Toca una respuesta para dispararle<br><small>Teclado: 1-4 · H pista · Espacio poder</small></div>
         <button class="bt-btn bt-super" disabled><img alt="" src="${S.icon('bolt', 3)}"><span>Poder</span><i class="bt-pw"><b></b></i></button>
       </div>
-      <div class="bt-pausemenu" hidden><div class="bt-pbox"><h2>Pausa</h2><button class="btn big" data-a="resume">Seguir luchando</button><button class="btn ghost" data-a="quit">Salir del combate</button></div></div>`;
+      <div class="bt-pausemenu" hidden><div class="bt-pbox"><h2>Pausa</h2><button class="btn big" data-a="resume">Seguir luchando</button>${cfg.lockSettings ? '' : '<div class="bt-pset"><b>Música</b><div class="seg bt-mpick"></div><label class="set bt-sfxrow"><span>Efectos de sonido</span><input type="checkbox" class="bt-sfxchk"><span class="sw2"></span></label></div>'}<button class="btn ghost" data-a="quit">Salir del combate</button></div></div>`;
     root_.appendChild(wrap);
     const $ = (s) => wrap.querySelector(s);
     const cv = $('canvas'), ctx = cv.getContext('2d');
@@ -115,7 +116,7 @@
         caps.push({ lane: i, x: LANE_W * (i + 0.5), y: 126 - h - i * 12, h, w: LANE_W - 8, lines: lay.lines, fs: lay.fs, ok: i === q.correct, state: 'fall', vy: speed * (0.94 + ((i * 7 + st.qIndex * 3) % 5) * 0.03), wob: Math.random() * 6, t: 0, text: t, targeted: false });
       });
       st.state = 'read'; st.stateT = 0; st.spawnT = 0; st.cdShown = 4;
-      const more = St.settings().moreTime ? 1.7 : 1, len = q.text.length + (q.table ? 30 : 0) + q.options.reduce((a, o) => a + o.length, 0) * 0.4;
+      const more = cfg.moreTime ? 1.7 : 1, len = q.text.length + (q.table ? 30 : 0) + q.options.reduce((a, o) => a + o.length, 0) * 0.4;
       st.readFor = Math.min(6, Math.max(1.3, 0.8 + len * 0.04)) * more; st.cdStep = 0.6;
       renderHud();
     }
@@ -367,6 +368,12 @@
     $('.bt-super').addEventListener('click', () => { A.unlock(); usePower(); });
     function togglePause(force) {
       if (st.over) return; const p = force === undefined ? !st.paused : force; st.paused = p; $('.bt-pausemenu').hidden = !p; A.sfx('pause'); if (!p) last = 0;
+    }
+    if (!cfg.lockSettings) {
+      const mp = $('.bt-mpick'), chk = $('.bt-sfxchk');
+      const now = () => { const q = St.settings(); return !q.music ? 'off' : q.musicStyle === 'calma' ? 'calma' : 'arcade'; };
+      const draw = () => { mp.innerHTML = ''; [['arcade', 'Arcade'], ['calma', 'Calmada'], ['off', 'Sin música']].forEach(([id, label]) => { const b = el('button', 'segb' + (now() === id ? ' on' : ''), label); b.type = 'button'; b.addEventListener('click', () => { A.unlock(); if (id === 'off') St.setSetting('music', false); else { St.setSetting('musicStyle', id); St.setSetting('music', true); } draw(); }); mp.appendChild(b); }); };
+      draw(); chk.checked = !!St.settings().sfx; chk.addEventListener('change', () => St.setSetting('sfx', chk.checked));
     }
     $('.bt-pause').addEventListener('click', () => togglePause(true));
     $('.bt-pausemenu').addEventListener('click', (e) => { const a = e.target.dataset && e.target.dataset.a; if (a === 'resume') togglePause(false); if (a === 'quit') { destroy(); cfg.onQuit && cfg.onQuit(); } });

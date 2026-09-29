@@ -34,3 +34,10 @@ Sube los archivos nuevos al mismo repo (Add file → Upload files, sobrescribe).
 
 ### Cómo actualizar en GitHub
 Entra a tu repositorio → **Add file → Upload files** → arrastra los archivos y carpetas nuevos (sobrescriben a los anteriores) → **Commit changes**. Vercel publica solo en ~30 segundos. Si en el celular ves lo viejo, cierra y abre la app dos veces.
+
+
+## Novedades 1.2
+- Cada pelea tiene 5 preguntas en todos los niveles; lo que cambia es la dificultad y la velocidad.
+- Vestidor: el avatar y el botón de comprar quedan siempre a la vista; solo se desliza la ropa.
+- En modo solo, el menú de pausa permite cambiar la música y los efectos.
+- "Más tiempo para leer" ya no está en Ajustes: será una opción al crear salas (Parte 3).

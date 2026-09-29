@@ -1,5 +1,5 @@
 /* DuiX — service worker: guarda el juego para usarlo sin internet */
-const VERSION = 'duix-v1.1.0';
+const VERSION = 'duix-v1.2.0';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './css/style.css',
   './js/data.js', './js/questions.js', './js/store.js', './js/audio.js', './js/sprites.js', './js/hero.js', './js/battle.js', './js/ui.js', './js/app.js',

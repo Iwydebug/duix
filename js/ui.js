@@ -441,7 +441,7 @@
       modal({ title: '¡Cofre abierto!', body, cls: 'chestm', buttons: r.item ? [{ label: 'Equipar', onClick: () => { St.equip(r.item.id); cat = r.item.cat; sel = r.item.id; renderAll(); } }, { label: 'Guardar', cls: 'ghost', onClick: () => { cat = r.item.cat; renderAll(); } }] : [{ label: 'Genial' }] });
       if (r.item) sfx('levelup'); announceAch(r.ach); renderAll();
     } }, img('chest', 4), h('div', null, h('b', { text: 'Cofre misterioso' }), h('small', { text: 'Un objeto al azar que aún no tengas' })), h('span', { class: 'ibadge price' }, img('coin', 2), h('b', { text: String(St.CHEST_COST) })));
-    sc.appendChild(h('div', { class: 'wardrobe' }, topbar(), h('div', { class: 'wstage' }, stage, h('div', { class: 'wname', text: p.name })), chest, tabs, grid, bar, summary));
+    sc.appendChild(h('div', { class: 'wardrobe' }, topbar(), h('div', { class: 'wstage' }, stage, h('div', { class: 'wname', text: p.name })), tabs, h('div', { class: 'wscroll' }, chest, grid, summary), bar));
     renderAll();
   };
 
@@ -488,7 +488,6 @@
         h('p', { class: 'hint', text: isIOS ? 'En iPhone/iPad: toca el botón Compartir y elige “Añadir a pantalla de inicio”.' : 'En el menú del navegador (⋮ o el ícono de instalar) elige “Instalar app” o “Añadir a pantalla de inicio”. En Mac/Windows aparece un ícono de instalar en la barra de direcciones.' }));
     sc.appendChild(h('div', { class: 'settings' }, topbar(), h('h1', { class: 'h1', text: 'Ajustes' }),
       h('div', { class: 'set-block' }, tog('sfx', 'Efectos de sonido'), h('div', { class: 'set col' }, h('div', null, h('b', { text: 'Música' }), h('small', { text: 'Elige el estilo que no te distraiga' })), musicPick), h('div', { class: 'set' }, h('div', null, h('b', { text: 'Volumen' })), vol)),
-      h('div', { class: 'set-block' }, tog('moreTime', 'Más tiempo para leer', 'Las respuestas tardan más en empezar a caer')),
       h('div', { class: 'set-block' }, tog('crt', 'Pantalla retro (CRT)', 'Líneas de barrido y bordes suaves'), tog('reduceMotion', 'Reducir movimiento', 'Menos animaciones'), tog('big', 'Texto grande')),
       inst,
       h('div', { class: 'set-block' }, h('h3', { text: 'Progreso de ' + p.name }),

@@ -317,3 +317,20 @@ body.reduce *, body.reduce *::before, body.reduce *::after { animation-duration:
 .rlist li.rref { border-left-color: var(--sun); background: rgba(255,210,63,.1); font-size: 13px; color: var(--muted); }
 .repaso ul.rlist, .acc ul.rlist { padding-left: 0; margin: 4px 0; }
 .repaso .rlist li, .acc .rlist li { margin: 0; font-weight: 600; }
+.bt-pset { width: min(320px, 86vw); margin-top: 10px; padding: 12px; border: 2px solid var(--line, #3a3f6b); border-radius: 12px; background: rgba(0,0,0,.25); display: flex; flex-direction: column; gap: 8px; }
+.bt-pset > b { color: var(--sun); font-size: 14px; }
+.bt-pset .seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.bt-sfxrow { display: flex; justify-content: space-between; align-items: center; font-size: 14px; cursor: pointer; position: relative; }
+/* Vestidor: avatar y barra de compra siempre visibles; solo la ropa se desliza */
+.screen.s-wardrobe { overflow: hidden; display: flex; flex-direction: column; padding-bottom: calc(76px + var(--safe-b)); }
+.s-wardrobe .wardrobe { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; max-width: 640px; margin: 0 auto; }
+.s-wardrobe .wstage { flex: none; margin: 4px 0 8px; padding: 6px 0; }
+.s-wardrobe .wprev { width: auto; height: clamp(110px, 20vh, 190px); }
+.s-wardrobe .ctabs { flex: none; padding-bottom: 6px; }
+.s-wardrobe .wscroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding: 2px 2px 8px; overscroll-behavior: contain; }
+.s-wardrobe .ibar { position: static; flex: none; margin-top: 6px; }
+.s-wardrobe .chestbtn { padding: 6px 10px; }
+@media (max-height: 640px) { .s-wardrobe .wprev { height: 17vh; } }
+.s-wardrobe .ibar { min-height: 0; padding: 6px 10px; } .s-wardrobe .binfo .perk { font-size: 12px; margin: 2px 0 0; } .s-wardrobe .ibar .btn { font-size: 17px; min-height: 38px; }
+.s-wardrobe .igrid { grid-template-columns: repeat(3, 1fr); } .s-wardrobe .wstage { margin: 2px 0 6px; }
+.bt-sfxrow input { position: absolute; opacity: 0; }
