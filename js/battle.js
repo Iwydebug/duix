@@ -15,8 +15,11 @@
     const v = cfg.villain, tier = cfg.tier, look = cfg.look, perks = cfg.perks || {}, endless = !!v.endless;
     const root_ = cfg.container;
     const level = () => (endless ? Math.min(3, 1 + Math.floor(st.correct / 5)) : v.topic === 'mix' ? Math.max(2, tier) : tier);
-    const QUESTIONS_PER_FIGHT = 5;
-    const maxHp = endless ? Infinity : QUESTIONS_PER_FIGHT;
+    // Preguntas por pelea: bajan al subir la dificultad (villano normal 4·3·2, jefe 5·4·3). En sala las fija el anfitrión.
+    const QUESTIONS_PER_FIGHT = (v.boss ? [5, 4, 3] : [4, 3, 2])[tier - 1] || 4, room = cfg.room || null;
+    const maxHp = endless ? Infinity : room ? room.total : QUESTIONS_PER_FIGHT;
+    const amb = root.DuiXAmbient ? root.DuiXAmbient.scene({ seed: v.id, topic: v.topic === 'mix' ? 'all' : v.topic, pal: v.pal, mode: 'battle' }) : null;
+    let lastSnap = '';
     const weapon = D.ITEM_BY_ID[look.weapon] || D.ITEM_BY_ID['wp-rayo'];
     const startHearts = 3 + (perks.hearts || 0);
     const baseSpeed = [30, 38, 47][tier - 1];
@@ -47,7 +50,9 @@
         <button class="bt-btn bt-super" disabled><img alt="" src="${S.icon('bolt', 3)}"><span>Poder</span><i class="bt-pw"><b></b></i></button>
       </div>
       <div class="bt-pausemenu" hidden><div class="bt-pbox"><h2>Pausa</h2><button class="btn big" data-a="resume">Seguir luchando</button>${cfg.lockSettings ? '' : '<div class="bt-pset"><b>Música</b><div class="seg bt-mpick"></div><label class="set bt-sfxrow"><span>Efectos de sonido</span><input type="checkbox" class="bt-sfxchk"><span class="sw2"></span></label></div>'}<button class="btn ghost" data-a="quit">Salir del combate</button></div></div>`;
+    if (room) wrap.classList.add('room');
     root_.appendChild(wrap);
+    if (cfg.extraTop) wrap.insertBefore(cfg.extraTop, wrap.querySelector('.bt-boss'));
     const $ = (s) => wrap.querySelector(s);
     const cv = $('canvas'), ctx = cv.getContext('2d');
     const hpBar = $('.bt-hpbar i');
@@ -63,10 +68,12 @@
       const mult = multOf();
       $('.bt-combo').textContent = st.streak >= 2 ? `Racha ${st.streak}${mult > 1 ? ' · x' + mult : ''}` : '';
       if (endless) { hpBar.style.width = '100%'; $('.bt-hptxt').textContent = st.correct + ' ✔'; }
+      else if (room && room.hp) { const r = room.hp(); hpBar.style.width = Math.max(0, Math.min(100, r.frac * 100)) + '%'; $('.bt-hptxt').textContent = r.text; }
       else { hpBar.style.width = Math.max(0, st.hp / maxHp * 100) + '%'; $('.bt-hptxt').textContent = Math.max(0, st.hp) + '/' + maxHp; }
       const sb = $('.bt-super'); sb.disabled = st.power < 100 || st.state !== 'play'; sb.classList.toggle('ready', st.power >= 100);
       $('.bt-pw b').style.width = clamp(st.power, 0, 100) + '%';
       const hc = hintCost(); $('.bt-hint em').textContent = hc;
+      if (cfg.onProgress) { const snap = [Math.round(st.score), st.correct, st.answered, st.hearts, st.over ? 1 : 0].join(); if (snap !== lastSnap) { lastSnap = snap; cfg.onProgress({ score: Math.round(st.score), correct: st.correct, qi: st.answered, hearts: st.hearts, over: !!st.over }); } }
     }
     const multOf = () => 1 + Math.min(2, Math.floor(Math.max(0, st.streak - 1) / 3) * 0.5);
     const hintCost = () => Math.max(1, Math.round(20 * (perks.hintCost || 1)));
@@ -102,7 +109,7 @@
       out.push(l); return { lines: out, fs: 9 };
     }
     function nextQuestion() {
-      let q; try { q = Q.generate(v.topic, level()); } catch (e) { q = Q.generate('fracciones', 1); }
+      let q; try { q = room ? room.getQuestion(st.qIndex) : Q.generate(v.topic, level()); } catch (e) { q = Q.generate('fracciones', 1); }
       st.q = q; st.qWrong = false; st.qMiss = false; st.goldQ = false; st.qIndex++; st.qHint = 0;
       $('.bt-qtag').textContent = v.topic === 'mix' ? (D.VILLAINS.find((x) => x.topic === q.topic) || { tema: '' }).tema : v.tema;
       const qt = $('.bt-qtext'); qt.textContent = q.text; qt.className = 'bt-qtext' + (q.text.length > 70 ? ' long' : q.text.length > 46 ? ' mid' : '');
@@ -231,7 +238,7 @@
         });
         // si solo queda la correcta y ninguna otra, sigue igual
       } else if (st.state === 'between') {
-        if (st.stateT >= st.wait && !st.over) { nextQuestion(); }
+        if (st.stateT >= st.wait && !st.over) { if (room && st.qIndex >= room.total) { if (st.hearts > 0) victory(); else defeat(); } else nextQuestion(); }
       } else if (st.state === 'end') {
         if (st.stateT > (st.win ? 2.6 : 2.0) && !st.reported) { st.reported = true; cfg.onEnd(report()); }
       }
@@ -299,6 +306,7 @@
       // fondo
       const bw = 90, bh = Math.ceil(LH / 4 / 8) * 8, key = bw + 'x' + bh; if (key !== bgKey) { bgKey = key; bgCv = S.cityBg(v, bw, bh); }
       ctx.drawImage(bgCv, -6, -6, LW + 12, bh * 4 + 12);
+      if (amb && !St.settings().reduceMotion) amb.overlay(ctx, LW, LH, t, 2); else if (amb) amb.overlay(ctx, LW, LH, 3, 2);
       // columnas de carril
       for (let i = 0; i < LANES; i++) { ctx.fillStyle = i % 2 ? 'rgba(255,255,255,.035)' : 'rgba(0,0,0,.07)'; ctx.fillRect(i * LANE_W, 0, LANE_W, LH); }
       if (st.state === 'play') { ctx.fillStyle = 'rgba(255,255,255,.06)'; ctx.fillRect(st.lane * LANE_W, 0, LANE_W, LH); }
@@ -367,7 +375,7 @@
     $('.bt-hint').addEventListener('click', () => { A.unlock(); useHint(); });
     $('.bt-super').addEventListener('click', () => { A.unlock(); usePower(); });
     function togglePause(force) {
-      if (st.over) return; const p = force === undefined ? !st.paused : force; st.paused = p; $('.bt-pausemenu').hidden = !p; A.sfx('pause'); if (!p) last = 0;
+      if (st.over) return; const p = force === undefined ? !(room ? !$('.bt-pausemenu').hidden : st.paused) : force; if (room) { $('.bt-pausemenu').hidden = !p; return; } st.paused = p; $('.bt-pausemenu').hidden = !p; A.sfx('pause'); if (!p) last = 0;
     }
     if (!cfg.lockSettings) {
       const mp = $('.bt-mpick'), chk = $('.bt-sfxchk');
@@ -377,13 +385,13 @@
     }
     $('.bt-pause').addEventListener('click', () => togglePause(true));
     $('.bt-pausemenu').addEventListener('click', (e) => { const a = e.target.dataset && e.target.dataset.a; if (a === 'resume') togglePause(false); if (a === 'quit') { destroy(); cfg.onQuit && cfg.onQuit(); } });
-    const onVis = () => { if (document.hidden) togglePause(true); };
+    const onVis = () => { if (document.hidden && !room) togglePause(true); };
     document.addEventListener('visibilitychange', onVis);
 
     function destroy() { destroyed = true; cancelAnimationFrame(raf); root.removeEventListener('keydown', onKey); root.removeEventListener('resize', resize); document.removeEventListener('visibilitychange', onVis); if (ro) ro.disconnect(); if (wrap.parentNode) wrap.parentNode.removeChild(wrap); }
 
     renderHearts(); renderHud(); resize(); raf = requestAnimationFrame(loop);
-    return { destroy, pause: () => togglePause(true), state: st, _fire: fire, _hint: useHint, _power: usePower, _caps: caps };
+    return { destroy, refresh: renderHud, pause: () => togglePause(true), state: st, _fire: fire, _hint: useHint, _power: usePower, _caps: caps };
   }
 
   root.DuiXBattle = { start };

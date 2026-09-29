@@ -341,7 +341,7 @@ body.reduce *, body.reduce *::before, body.reduce *::after { animation-duration:
 .rooms { max-width: 640px; margin: 0 auto; }
 .roomcard h3, .rpanel .rsub { font-family: var(--disp); font-weight: 400; letter-spacing: 1px; font-size: 22px; color: var(--sun); margin: 0 0 6px; }
 .joinrow { display: flex; gap: 8px; align-items: stretch; margin: 8px 0; } .joinrow .btn { flex: none; margin: 0; }
-.input.code4 { flex: 1; min-width: 0; text-align: center; font-family: var(--disp); font-size: 30px; letter-spacing: 8px; text-transform: uppercase; }
+.input.code4 { flex: 1; min-width: 0; text-align: center; font-family: var(--disp); font-size: 28px; letter-spacing: 6px; text-transform: uppercase; }
 .hint.err { color: #ff8a80; min-height: 1.2em; font-weight: 700; }
 .tchips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .tchip { padding: 7px 10px; border-radius: 999px; border: 2px solid var(--line, #3a3f6b); background: rgba(0,0,0,.25); color: var(--muted); font-size: 13px; font-weight: 800; }
@@ -381,3 +381,22 @@ body.reduce *, body.reduce *::before, body.reduce *::after { animation-duration:
 .p1 .pstep { height: 90px; background: #ffd23f; } .p2 .pstep { height: 64px; background: #cfd8dc; } .p3 .pstep { height: 46px; background: #d08a4b; }
 .rreward { display: flex; flex-direction: column; gap: 4px; align-items: center; padding: 12px; background: var(--night2); border: 3px solid var(--ink); border-radius: 14px; } .rreward b { font-family: var(--disp); font-weight: 400; font-size: 28px; color: var(--sun); } .rreward img { width: 22px; height: 22px; vertical-align: -5px; }
 @media (max-width: 380px) { .ropt { font-size: 16px; min-height: 68px; } .bigcode span { width: 50px; height: 64px; font-size: 46px; } .rq-text { font-size: 19px; } }
+
+/* ===== Fondos animados ===== */
+.ambient { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; z-index: 0; pointer-events: none; }
+.screen.amb { position: relative; z-index: 1; background-image: none; background-color: transparent; }
+.app > .nav { z-index: 20; }
+.bt.room .bt-hint { visibility: hidden; }
+.bt-rank { display: flex; gap: 6px; align-items: center; padding: 0 10px 4px; overflow-x: auto; scrollbar-width: none; font-size: 12px; font-weight: 800; }
+.bt-rank::-webkit-scrollbar { display: none; }
+.bt-rank .rk { display: flex; align-items: center; gap: 4px; flex: none; padding: 2px 8px 2px 3px; border-radius: 999px; background: rgba(0,0,0,.4); border: 2px solid var(--line); }
+.bt-rank .rk.me { border-color: var(--sun); background: rgba(255,210,63,.18); }
+.bt-rank .rk b { color: var(--sun); font-family: var(--disp); font-weight: 400; font-size: 15px; }
+.bt-rank .rk img, .bt-rank .rk canvas { width: 22px; height: 22px; border-radius: 50%; background: #2a2058; image-rendering: pixelated; }
+.rmid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; text-align: left; }
+.rprog { height: 7px; border-radius: 4px; background: rgba(255,255,255,.12); overflow: hidden; } .rprog i { display: block; height: 100%; background: linear-gradient(90deg, #5ce1e6, #ffd23f); transition: width .4s; }
+.rst { font-size: 12px; min-width: 40px; text-align: right; }
+.rboss { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: rgba(0,0,0,.3); border-radius: 12px; } .rboss b { font-family: var(--disp); font-weight: 400; font-size: 18px; letter-spacing: 1px; } .rbar { flex: 1; height: 14px; border-radius: 8px; background: rgba(255,255,255,.12); border: 2px solid var(--ink); overflow: hidden; } .rbar i { display: block; height: 100%; background: repeating-linear-gradient(90deg, #ff4d6d 0 8px, #d63a58 8px 10px); transition: width .5s; }
+.rvil { display: flex; align-items: center; gap: 10px; justify-content: center; text-align: left; } .rvil small { display: block; color: var(--muted); font-size: 12px; }
+.rmine { font-size: 15px; } .rmine b { font-family: var(--disp); font-weight: 400; font-size: 34px; color: var(--sun); }
+.cdnum { font-family: var(--disp); font-size: 120px; line-height: 1; color: var(--sun); text-shadow: 4px 4px 0 var(--ink); } .cdvil { display: grid; place-items: center; min-height: 130px; }

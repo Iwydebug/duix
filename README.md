@@ -65,3 +65,10 @@ Archivos nuevos: `js/net.js`, `js/rooms.js`, `js/firebase-config.js` y la carpet
 Así nadie puede listar todas las salas: solo entra quien conoce el código. Las reglas del "modo de prueba" vencen a los 30 días, por eso hay que reemplazarlas.
 
 **Cómo se juega:** Salas → Crear sala (el anfitrión elige preguntas, dificultad, tiempo, temas y "más tiempo para leer") → comparte el código de 4 letras o el QR → todos entran → Empezar partida.
+
+## Novedades 1.4
+- **Salas en modo arcade:** todos pelean a la vez contra el mismo villano con las mismas preguntas; ranking en vivo arriba y el villano pierde vida con los aciertos de toda la sala. Podio al final.
+- **Fondos animados** (dragones, símbolos de cada tema, estrellas, ondas, ciudad y rejilla retro) en el mapa, los distritos, las salas y dentro de las peleas.
+- **Preguntas por pelea:** bajan al subir la dificultad. Villanos: 4 · 3 · 2. Jefes (Indeterminado): 5 · 4 · 3.
+- Arreglo del cuadro del código de sala (no dejaba escribir en algunos celulares).
+- Las reglas de Firebase son las mismas de la versión 1.3 (no hay que cambiarlas).

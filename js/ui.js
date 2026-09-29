@@ -25,7 +25,7 @@
   const plural = (n, a, b) => (n === 1 ? a : b);
 
   const app = () => $('#app'), screenEl = () => $('#screen');
-  let cur = { name: null, params: null }, cleanups = [], liveList = [], liveTimer = 0, battle = null;
+  let cur = { name: null, params: null }, cleanups = [], liveList = [], liveTimer = 0, battle = null, amb = null;
 
   /* ---------- héroe animado ---------- */
   function liveHero(cv, getLook, o) {
@@ -97,7 +97,13 @@
   /* ---------- navegación ---------- */
   const SCREENS = {}, NAVSCREENS = ['hub', 'wardrobe', 'rooms', 'goals', 'notebook', 'settings'];
   const MUSIC = { title: 'menu', profiles: 'menu', creator: 'menu', hub: 'map', district: 'map', wardrobe: 'menu', rooms: 'menu', goals: 'menu', notebook: 'menu', settings: 'menu', results: 'menu' };
-  function teardown() { stopLive(); cleanups.forEach((f) => { try { f(); } catch (e) { /* ok */ } }); cleanups = []; if (battle) { battle.destroy(); battle = null; } $('#modal').hidden = true; $('#modal').innerHTML = ''; $('#toasts').innerHTML = ''; }
+  function teardown() { stopLive(); cleanups.forEach((f) => { try { f(); } catch (e) { /* ok */ } }); cleanups = []; if (battle) { battle.destroy(); battle = null; } setAmbient(false); $('#modal').hidden = true; $('#modal').innerHTML = ''; $('#toasts').innerHTML = ''; }
+  const AMB_SCREENS = ['hub', 'district', 'rooms', 'roomCreate', 'room'];
+  function setAmbient(on, seed) {
+    if (amb) { amb.destroy(); amb = null; }
+    const sc = screenEl(); if (sc) sc.classList.toggle('amb', !!on);
+    if (on && root.DuiXAmbient) amb = root.DuiXAmbient.mount(app(), { seed: seed || 'hub', still: !!St.settings().reduceMotion });
+  }
   function go(name, params) {
     if (name === 'hub' && root.__pendingRoom && St.profile()) { params = { code: root.__pendingRoom }; root.__pendingRoom = null; name = 'rooms'; }
     teardown(); cur = { name, params };
@@ -108,6 +114,7 @@
     app().dataset.screen = name;
     if (NAVSCREENS.includes(name)) buildNav(name); else $('#nav').hidden = true;
     if (MUSIC[name]) A.play(MUSIC[name]);
+    if (AMB_SCREENS.includes(name)) setAmbient(true, name === 'district' && params && params.id ? params.id : 'hub');
     SCREENS[name](params || {}, sc);
     sc.classList.remove('enter'); void sc.offsetWidth; sc.classList.add('enter');
   }
@@ -512,6 +519,6 @@
     go('title');
   }
 
-  const kit = { h, add, esc, img, sfx, modal, toast, topbar, avatarEl, headThumb, liveHero, villainEl, go, later, refreshCoins, announceAch, plural, $, $$, onLeave: (f) => cleanups.push(f), SCREENS, MUSIC };
+  const kit = { h, add, esc, img, sfx, modal, toast, topbar, avatarEl, headThumb, liveHero, villainEl, go, later, refreshCoins, announceAch, plural, $, $$, onLeave: (f) => cleanups.push(f), setAmbient, SCREENS, MUSIC };
   root.DuiXUI = { boot, go, toast, kit, _cur: () => cur, _battle: () => battle, SCREENS };
 })(typeof window !== 'undefined' ? window : globalThis);
