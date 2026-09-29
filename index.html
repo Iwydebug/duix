@@ -18,7 +18,22 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<script>(function(){function f(){var v=window.visualViewport,hh=Math.max(window.innerHeight||0,(v&&v.height)||0,document.documentElement.clientHeight||0);document.documentElement.style.setProperty('--app-h',hh+'px');}f();['resize','orientationchange'].forEach(function(e){window.addEventListener(e,f);});if(window.visualViewport)window.visualViewport.addEventListener('resize',f);})();</script>
+<script>(function(){
+  var de=document.documentElement;
+  function f(){
+    var ua=navigator.userAgent||'',ios=/iP(hone|ad|od)/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+    var st=navigator.standalone===true||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
+    var v=window.visualViewport,hh=Math.max(window.innerHeight||0,(v&&v.height)||0,de.clientHeight||0);
+    if(ios&&st){var s1=window.screen.height||0,s2=window.screen.width||0,por=(window.innerHeight||0)>=(window.innerWidth||0);hh=Math.max(hh,por?Math.max(s1,s2):Math.min(s1,s2));}
+    de.style.setProperty('--app-h',hh+'px');
+    de.classList.toggle('is-ios',ios);de.classList.toggle('is-standalone',!!st);
+    de.classList.toggle('wide',(window.innerWidth||0)>760);
+    if(window.scrollY)window.scrollTo(0,0);
+  }
+  f();['resize','orientationchange','pageshow'].forEach(function(e){window.addEventListener(e,function(){f();setTimeout(f,120);setTimeout(f,500);});});
+  if(window.visualViewport)window.visualViewport.addEventListener('resize',f);
+  setTimeout(f,150);setTimeout(f,700);
+})();</script>
 <div id="stage">
   <div id="app" class="app">
     <div id="screen" class="screen" role="main"></div>
@@ -42,6 +57,7 @@
 <script src="js/firebase-config.js"></script>
 <script src="js/net.js"></script>
 <script src="js/vendor/qrcode.js"></script>
+<script src="js/plaza.js"></script>
 <script src="js/rooms.js"></script>
 <script src="js/app.js"></script>
 </body>

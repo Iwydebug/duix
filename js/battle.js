@@ -59,7 +59,7 @@
     const hpBar = $('.bt-hpbar i');
 
     function renderHearts() {
-      const h = $('.bt-hearts'); h.innerHTML = '';
+      const h = $('.bt-hearts'); h.innerHTML = ''; if (room && room.noHearts) { h.textContent = '⚔ Sala'; h.className = 'bt-hearts room'; return; }
       for (let i = 0; i < st.maxHearts; i++) { const im = new Image(); im.alt = ''; im.src = S.icon(i < st.hearts ? 'heart' : 'heartEmpty', 3); h.appendChild(im); }
       if (st.shield > 0) { const b = el('span', 'bt-shield', '🛡'); h.appendChild(b); }
     }
@@ -139,12 +139,17 @@
       caps.length = 0;
       q.options.forEach((t, i) => {
         const lay = wrapText(t, LANE_W - 20), h = Math.max(36, lay.lines.length * lay.fs * 1.22 + 14);
-        caps.push({ lane: i, x: LANE_W * (i + 0.5), y: 126 - h - i * 12, h, w: LANE_W - 8, lines: lay.lines, fs: lay.fs, ok: i === q.correct, state: 'fall', vy: speed * (0.94 + ((i * 7 + st.qIndex * 3) % 5) * 0.03), wob: Math.random() * 6, t: 0, text: t, targeted: false });
+        caps.push({ lane: i, x: LANE_W * (i + 0.5), y: (st.qIndex === 1 ? 126 - h - i * 12 : -h - 6 - i * 16), h, w: LANE_W - 8, lines: lay.lines, fs: lay.fs, ok: i === q.correct, state: 'fall', vy: speed * (0.94 + ((i * 7 + st.qIndex * 3) % 5) * 0.03), wob: Math.random() * 6, t: 0, text: t, targeted: false });
       });
-      st.state = 'read'; st.stateT = 0; st.spawnT = 0;
-      const more = cfg.moreTime ? 1.7 : 1, len = q.text.length + (q.table ? 30 : 0) + q.options.reduce((a, o) => a + o.length, 0) * 0.4;
-      st.readFor = Math.min(8, Math.max(3, 1.7 + len * 0.05)) * more;
-      showBig(q);
+      st.spawnT = 0;
+      if (st.qIndex === 1) {
+        st.state = 'read'; st.stateT = 0;
+        const more = cfg.moreTime ? 1.7 : 1, len = q.text.length + (q.table ? 30 : 0) + q.options.reduce((a, o) => a + o.length, 0) * 0.4;
+        st.readFor = Math.min(8, Math.max(2.6, 1.4 + len * 0.045)) * more;
+        showBig(q);
+      } else { // flujo continuo: la pregunta cambia con un golpe y las cápsulas ya vienen cayendo
+        st.state = 'play'; st.stateT = 0; const qb = $('.bt-q'); qb.classList.remove('flip'); void qb.offsetWidth; qb.classList.add('flip'); A.sfx('tick');
+      }
       renderHud();
     }
 
@@ -184,10 +189,11 @@
       setTimeout(() => A.sfx('coin'), 90);
       banner(PRAISE[Math.floor(Math.random() * PRAISE.length)], 'good', 700);
       if (!endless && st.hp <= 0) return victory();
-      st.state = 'between'; st.stateT = 0; st.wait = 0.95; renderHud();
+      st.state = 'between'; st.stateT = 0; st.wait = 0.22; renderHud();
     }
     function damageHero() {
       if (st.shield > 0) { st.shield--; float(hero.x, LH - 130, '¡ESCUDO!', '#8fe6ff', 16); A.sfx('power'); renderHearts(); return false; }
+      if (room && room.noHearts) { hero.hurtT = 0.4; shake = 6; flash = 0.2; A.sfx('hurt'); return true; }
       st.hearts--; st.heartsLost++; hero.hurtT = 0.4; shake = 9; flash = 0.35; A.sfx('hurt'); renderHearts();
       eshots.push({ x: vil.x, y: 90, tx: hero.x, ty: LH - 90, t: 0 });
       if (Math.random() < 0.5) say(TAUNTS[Math.floor(Math.random() * TAUNTS.length)], 1100);
@@ -206,7 +212,7 @@
       caps.forEach((o) => { if (o !== c && o.state === 'fall') { o.state = 'dead'; burst(o.x, o.y + o.h / 2, '#7a6aa8', 8, 80, 0.4); } });
       A.sfx('wrong'); damageHero(); explain('Se acabó el tiempo. La respuesta era «' + st.q.options[st.q.correct] + '». ' + st.q.explain); renderHud();
       if (st.hearts <= 0) return defeat();
-      st.state = 'between'; st.stateT = 0; st.wait = 2.6;
+      st.state = 'between'; st.stateT = 0; st.wait = 1.2;
     }
 
     /* ---------- ayudas ---------- */

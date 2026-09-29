@@ -137,10 +137,42 @@
       ctx.save(); ctx.globalAlpha = 1 - p; const x = sx + p * len * 2, y = sy + p * len; const g = ctx.createLinearGradient(x, y, x - len, y - len / 2); g.addColorStop(0, '#fff'); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.strokeStyle = g; ctx.lineWidth = px * 1.5; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - len, y - len / 2); ctx.stroke(); ctx.restore();
     }
 
+    /* ---------- mundo de fantasía (mapa de niveles): montañas con parallax, islas flotantes, cristales ---------- */
+    const ridge = (n, amp, seedOff) => { const r = mulberry(seed + seedOff), pts = []; for (let i = 0; i <= n; i++) pts.push(0.5 + (r() - 0.5) * amp); return pts; };
+    const RIDGES = [ridge(28, 0.9, 11), ridge(24, 1.0, 22), ridge(20, 1.1, 33)];
+    const islands = Array.from({ length: 7 }, (_, i) => { const r = mulberry(seed + 900 + i); return { x: r(), y: 0.12 + r() * 0.5, w: 12 + Math.floor(r() * 12), ph: r() * TAU, par: 0.25 + r() * 0.35, c: r() < 0.5 ? '#3fe0a0' : '#c58bff' }; });
+    const crystals = Array.from({ length: 16 }, (_, i) => { const r = mulberry(seed + 1300 + i); return { x: r(), h: 5 + Math.floor(r() * 8), c: ['#5ce1e6', '#ff7ac8', '#ffd23f', '#9dff8a'][Math.floor(r() * 4)], ph: r() * TAU }; });
+    function drawWorldSky(ctx, w, h, t) {
+      const g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#0a0430'); g.addColorStop(0.4, '#2a1170'); g.addColorStop(0.75, '#7a2a9a'); g.addColorStop(1, '#ff6fa8');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+      const ag = ctx.createLinearGradient(0, h * 0.2, w, h * 0.5); const a = 0.10 + 0.05 * Math.sin(t * 0.3); ag.addColorStop(0, 'rgba(92,225,230,0)'); ag.addColorStop(0.5, `rgba(92,225,230,${a})`); ag.addColorStop(1, 'rgba(255,122,200,0)'); ctx.fillStyle = ag; ctx.fillRect(0, h * 0.1, w, h * 0.5);
+    }
+    function drawIslands(ctx, w, h, t, px, scroll) {
+      islands.forEach((it, i) => {
+        const H2 = h * 1.1, x = Math.round(it.x * w), y = Math.round((((it.y * h - (scroll || 0) * it.par) % H2) + H2) % H2 - h * 0.05 + Math.sin(t * 0.7 + it.ph) * 3 * px), iw = it.w * px;
+        ctx.fillStyle = '#1a0f3d'; ctx.fillRect(x - iw / 2, y, iw, 3 * px); ctx.fillRect(x - iw / 2 + px * 2, y + 3 * px, iw - px * 4, 2 * px); ctx.fillRect(x - iw / 4, y + 5 * px, iw / 2, 2 * px);
+        ctx.fillStyle = it.c; ctx.fillRect(x - iw / 2, y - px, iw, px * 1.5);
+        ctx.fillStyle = '#ffd23f'; ctx.globalAlpha = 0.5 + 0.4 * Math.sin(t * 2 + i); ctx.fillRect(x + px, y - 5 * px, px * 2, px * 4); ctx.globalAlpha = 1;
+      });
+    }
+    function drawMountains(ctx, w, h, t, px, scroll) {
+      const cols = ['#2a1670', '#1d0f52', '#120839'], base = [0.72, 0.8, 0.9], sp = [0.10, 0.22, 0.4];
+      RIDGES.forEach((pts, L) => {
+        const off = -(scroll || 0) * sp[L]; ctx.fillStyle = cols[L]; ctx.beginPath(); ctx.moveTo(0, h);
+        const step = w / (pts.length - 3);
+        for (let i = 0; i < pts.length; i++) { const x = (i - 1) * step - ((off * 0.15) % step), y = h * base[L] - pts[i] * h * (0.12 + L * 0.03) - ((off * 0.05) % 6); ctx.lineTo(x, y); }
+        ctx.lineTo(w + step, h); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = L === 0 ? 'rgba(255,122,200,.35)' : 'rgba(92,225,230,.22)'; ctx.lineWidth = px; ctx.stroke();
+      });
+      crystals.forEach((c, i) => { const x = Math.round(c.x * w), y = Math.round(h * 0.94), ch = c.h * px; ctx.fillStyle = c.c; ctx.globalAlpha = 0.55 + 0.35 * Math.sin(t * 2 + c.ph); ctx.beginPath(); ctx.moveTo(x, y - ch); ctx.lineTo(x + 2 * px, y); ctx.lineTo(x - 2 * px, y); ctx.fill(); ctx.globalAlpha = 1; });
+    }
+    function drawFireflies(ctx, w, h, t, px) { for (let i = 0; i < 26; i++) { const r = mulberry(seed + 2000 + i), bx = r(), by = r(), ph = r() * TAU; const x = (bx * w + Math.sin(t * 0.6 + ph) * 14 * px) , y = (by * h + Math.cos(t * 0.5 + ph) * 10 * px); ctx.globalAlpha = 0.25 + 0.6 * Math.max(0, Math.sin(t * 2 + ph)); ctx.fillStyle = i % 2 ? '#ffe98a' : '#9dffef'; ctx.fillRect(Math.round(x), Math.round(y), px, px); } ctx.globalAlpha = 1; }
+
     return {
       /** Fondo completo (mapa) */
-      full(ctx, w, h, t, px) {
+      full(ctx, w, h, t, px, scroll) {
         ctx.imageSmoothingEnabled = false;
+        if (o.world) { drawWorldSky(ctx, w, h, t); drawStars(ctx, w, h, t, px); drawMoon(ctx, w, h, t, px); drawShooting(ctx, w, h, t, px); drawClouds(ctx, w, h, t, px); drawIslands(ctx, w, h, t, px, scroll); drawDragons(ctx, w, h, t, px, 0.95); drawMountains(ctx, w, h, t, px, scroll); drawSymbols(ctx, w, h, t, px, 0.3); drawFireflies(ctx, w, h, t, px); return; }
         drawSky(ctx, w, h, t); drawStars(ctx, w, h, t, px); drawMoon(ctx, w, h, t, px); drawShooting(ctx, w, h, t, px); drawClouds(ctx, w, h, t, px); drawWaves(ctx, w, h, t, px, true);
         drawDragons(ctx, w, h, t, px, 0.95); drawGrid(ctx, w, h, t, px); drawSkyline(ctx, w, h, t, px); drawSymbols(ctx, w, h, t, px, 0.34);
       },
@@ -282,7 +314,7 @@
     o = o || {};
     const cv = document.createElement('canvas'); cv.className = 'ambient'; cv.setAttribute('aria-hidden', 'true');
     container.insertBefore(cv, container.firstChild);
-    const sc = scene({ seed: o.seed || 'hub', mode: 'hub' }), ctx = cv.getContext('2d'), PIX = 3, scEl = container.querySelector('#screen');
+    const sc = scene({ seed: o.seed || 'hub', mode: 'hub', world: !!o.world, topic: o.topic }), TH = o.hue ? (cv.style.filter = 'hue-rotate(' + o.hue + 'deg)') : 0, ctx = cv.getContext('2d'), PIX = 3, scEl = container.querySelector('#screen');
     let W = 0, H = 0, raf = 0, dead = false, last = 0, t0 = performance.now(), scroll = 0, prog = 0;
     const still = !!o.still;
     const readScroll = () => { if (!scEl) return; scroll = scEl.scrollTop / PIX; const range = scEl.scrollHeight - scEl.clientHeight; prog = range > 40 ? Math.min(1, scEl.scrollTop / range) : 0; if (still) sc.full(ctx, W, H, 12, 1, scroll, prog); };

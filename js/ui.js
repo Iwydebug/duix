@@ -66,7 +66,7 @@
 
   /* ---------- barra superior y menú ---------- */
   const NAV = [
-    { id: 'hub', label: 'Ciudad', icon: 'city' },
+    { id: 'hub', label: 'Mapa', icon: 'city' },
     { id: 'wardrobe', label: 'Vestidor', icon: 'shirt' },
     { id: 'rooms', label: 'Salas', icon: 'people' },
     { id: 'goals', label: 'Metas', icon: 'trophy' },
@@ -85,9 +85,10 @@
       h('div', { class: 'top-info' },
         h('div', { class: 'top-name', text: p.name }),
         h('div', { class: 'xp' }, h('i', { style: 'width:' + Math.round(p.xp / need * 100) + '%' }), h('span', { text: 'Nivel ' + p.level }))),
-      h('div', { class: 'top-coins', 'aria-label': 'Monedas' }, img('coin', 3), h('b', { class: 'coinval', text: String(p.coins) })));
+      h('div', { class: 'top-coins', 'aria-label': 'Monedas' }, img('coin', 3), h('b', { class: 'coinval', text: String(p.coins) })),
+      h('button', { class: 'top-sig', 'aria-label': 'Sigmas y ruleta', onclick: () => { sfx('click'); go('wheel'); } }, h('span', { class: 'sigico', text: 'Σ' }), h('b', { class: 'sigval', text: String(p.sigma || 0) }), St.spinsLeft() ? h('i', { class: 'spinbadge', text: '🎡' }) : null));
   }
-  function refreshCoins() { const p = St.profile(); if (!p) return; $$('.coinval').forEach((e) => { e.textContent = String(p.coins); }); }
+  function refreshCoins() { const p = St.profile(); if (!p) return; $$('.coinval').forEach((e) => { e.textContent = String(p.coins); }); $$('.sigval').forEach((e) => { e.textContent = String(p.sigma || 0); }); }
   St.on((ev) => { if (ev === 'coins') refreshCoins(); if (ev === 'settings') applySettings(); });
   function applySettings() {
     const s = St.settings(); document.body.classList.toggle('crt-on', !!s.crt); document.body.classList.toggle('reduce', !!s.reduceMotion); document.body.classList.toggle('big', !!s.big);
@@ -96,13 +97,14 @@
 
   /* ---------- navegación ---------- */
   const SCREENS = {}, NAVSCREENS = ['hub', 'wardrobe', 'rooms', 'goals', 'notebook', 'settings'];
-  const MUSIC = { title: 'menu', profiles: 'menu', creator: 'menu', hub: 'map', district: 'map', wardrobe: 'menu', rooms: 'menu', goals: 'menu', notebook: 'menu', settings: 'menu', results: 'menu' };
+  const MUSIC = { title: 'menu', profiles: 'menu', creator: 'menu', hub: 'map', district: 'map', wardrobe: 'menu', rooms: 'menu', goals: 'menu', notebook: 'menu', settings: 'menu', results: 'menu', wheel: 'menu' };
   function teardown() { stopLive(); cleanups.forEach((f) => { try { f(); } catch (e) { /* ok */ } }); cleanups = []; if (battle) { battle.destroy(); battle = null; } setAmbient(false); $('#modal').hidden = true; $('#modal').innerHTML = ''; $('#toasts').innerHTML = ''; }
-  const AMB_SCREENS = ['hub', 'district', 'rooms', 'roomCreate', 'room'];
-  function setAmbient(on, seed) {
+  const AMB_SCREENS = ['hub', 'district', 'rooms', 'roomCreate', 'room', 'wardrobe', 'goals', 'notebook', 'settings', 'results', 'profiles', 'creator', 'wheel'];
+  const AMB_HUE = { hub: 0, district: 0, rooms: 40, roomCreate: 40, room: 40, wardrobe: 300, goals: 150, notebook: 190, settings: 260, results: 20, profiles: 330, creator: 300, wheel: 45 };
+  function setAmbient(on, seed, opts) {
     if (amb) { amb.destroy(); amb = null; }
     const sc = screenEl(); if (sc) sc.classList.toggle('amb', !!on);
-    if (on && root.DuiXAmbient) amb = root.DuiXAmbient.mount(app(), { seed: seed || 'hub', still: !!St.settings().reduceMotion });
+    if (on && root.DuiXAmbient) amb = root.DuiXAmbient.mount(app(), Object.assign({ seed: seed || 'hub', still: !!St.settings().reduceMotion }, opts || {}));
   }
   function go(name, params) {
     if (name === 'hub' && root.__pendingRoom && St.profile()) { params = { code: root.__pendingRoom }; root.__pendingRoom = null; name = 'rooms'; }
@@ -114,7 +116,8 @@
     app().dataset.screen = name;
     if (NAVSCREENS.includes(name)) buildNav(name); else $('#nav').hidden = true;
     if (MUSIC[name]) A.play(MUSIC[name]);
-    if (AMB_SCREENS.includes(name)) setAmbient(true, name === 'district' && params && params.id ? params.id : 'hub');
+    if (name === 'battle' && innerWidth / Math.max(1, innerHeight) > 1.05) setAmbient(true, (params && params.id) || 'battle', { hue: 200 });
+    else if (AMB_SCREENS.includes(name)) setAmbient(true, name === 'district' && params && params.id ? params.id : name, { world: name === 'hub', hue: AMB_HUE[name] || 0 });
     SCREENS[name](params || {}, sc);
     sc.classList.remove('enter'); void sc.offsetWidth; sc.classList.add('enter');
   }
@@ -126,7 +129,7 @@
   SCREENS.title = (_, sc) => {
     const p = St.profile() || St.list()[0];
     const look = p ? p.look : Object.assign({}, St.DEFAULT_LOOK, { wings: 'wing-angel', pet: 'pet-dragon', suit: 'suit-caballero', weapon: 'wp-espada' });
-    const bg = h('canvas', { class: 'title-bg px' }); const bgc = S.cityBg(Vby('polinomios'), 90, 160); bg.width = 90; bg.height = 160; bg.getContext('2d').drawImage(bgc, 0, 0);
+    const bg = h('canvas', { class: 'title-bg px' }); const bw = Math.max(90, Math.min(320, Math.round(160 * innerWidth / Math.max(1, innerHeight)))); const bgc = S.cityBg(Vby('polinomios'), bw, 160); bg.width = bw; bg.height = 160; bg.getContext('2d').drawImage(bgc, 0, 0);
     const marquee = h('div', { class: 'marquee', 'aria-hidden': 'true' }, h('div', { class: 'mtrack' }, [0, 1].map(() => V.map((v) => villainEl(v, 72)))));
     const hero = h('canvas', { class: 'title-hero px' }); liveHero(hero, () => look, { scale: 6 });
     const go1 = () => { A.unlock(); sfx('select'); go(St.list().length ? 'profiles' : 'creator'); };
@@ -139,6 +142,19 @@
       marquee,
       h('div', { class: 'credit', text: 'Hecho por Deiwy · Proyecto de Cálculo Diferencial' }));
     sc.appendChild(el);
+    // interacción: tocar al héroe salta y suelta símbolos; el fondo sigue al puntero
+    const SYM = ['Σ', '∫', 'π', '√', '∞', 'Δ', 'f(x)', 'lím', '≤', 'dx'];
+    hero.style.cursor = 'pointer';
+    hero.addEventListener('click', (e) => {
+      e.stopPropagation(); sfx('coin'); hero.classList.remove('jump'); void hero.offsetWidth; hero.classList.add('jump');
+      const r = hero.getBoundingClientRect(), er = el.getBoundingClientRect();
+      for (let i = 0; i < 6; i++) {
+        const sp = h('span', { class: 'tsym', text: SYM[Math.floor(Math.random() * SYM.length)], style: `left:${r.left - er.left + r.width / 2}px;top:${r.top - er.top + 20}px;--dx:${Math.round((Math.random() - 0.5) * 220)}px;--dy:${-Math.round(80 + Math.random() * 140)}px;color:${['#ffd23f', '#5ce1e6', '#ff3f9a', '#c58bff'][i % 4]}` });
+        el.appendChild(sp); setTimeout(() => sp.remove(), 1300);
+      }
+    });
+    const onMove = (e) => { const x = (e.clientX / innerWidth - 0.5), y = (e.clientY / innerHeight - 0.5); bg.style.transform = `translate(${-x * 26}px,${-y * 18}px) scale(1.12)`; marquee.style.transform = `translateX(${x * 30}px)`; };
+    window.addEventListener('pointermove', onMove); cleanups.push(() => window.removeEventListener('pointermove', onMove));
     if (!St.persistent) toast('Tu navegador no permite guardar. El progreso se perderá al cerrar.', 'warn', 6000);
   };
 
@@ -226,45 +242,80 @@
   /* ============================================================
    * CIUDAD (mapa)
    * ============================================================ */
+  let lastHeroIdx = null;
   SCREENS.hub = (params, sc) => {
     const p = St.profile(), stats = St.stats();
     const daily = St.ensureDaily(); const dn = daily.ids.filter((id) => daily.done[id]).length;
-    // siguiente distrito disponible
-    const next = V.find((v) => St.unlocked(v) && !St.isCleared(v.id) && !v.endless) || (St.unlocked(Vby('duinity')) ? Vby('duinity') : V[0]);
-    // Camino sinuoso estilo mapa de niveles: el nivel 1 abajo, se sube en zigzag hasta el jefe final
-    const ROW = 128, PADT = 90, PADB = 80, n = V.length, HT = PADT + PADB + (n - 1) * ROW;
-    const px = (i) => 50 + 25 * Math.sin(i * Math.PI / 2 + 0.0) * (i === 0 ? 0 : 1), py = (i) => HT - PADB - i * ROW;
+    const GI = ['🎯', '🏃', '👾'];
+    // lista de nodos: por cada tablero (villano) → banner + niveles 1, 2 y 3 (el jefe final también); Duinity es solo banner
+    const nodes = []; let lv = 0;
+    V.forEach((v) => {
+      const unl = St.unlocked(v), pr = St.prog(v.id);
+      nodes.push({ kind: 'board', v, unl, done: !v.endless && pr.tier >= 3 });
+      if (!v.endless) for (let t = 1; t <= 3; t++) nodes.push({ kind: 'lvl', v, t, n: ++lv, unl: unl && (t === 1 || pr.tier >= t - 1), done: pr.tier >= t });
+    });
+    let nextIdx = nodes.findIndex((n) => n.kind === 'lvl' && n.unl && !n.done);
+    if (nextIdx < 0) nextIdx = nodes.findIndex((n) => n.kind === 'board' && n.v.endless && n.unl);
+    if (nextIdx < 0) nextIdx = 0;
+    const nx = nodes[nextIdx], nextV = nx.v, nextT = nx.t || 1;
+    // camino sinuoso: el primer nivel abajo, se sube en serpiente
+    const ROW = 86, PADT = 130, PADB = 120, n = nodes.length, HT = PADT + PADB + (n - 1) * ROW;
+    const px = (i) => 50 + 26 * Math.sin(i * 0.62 + 0.4), py = (i) => HT - PADB - i * ROW;
     const map = h('div', { class: 'wmap', style: `height:${HT}px` });
     const NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'wpath'); svg.setAttribute('viewBox', `0 0 100 ${HT}`); svg.setAttribute('preserveAspectRatio', 'none');
     const seg = (i) => { const x0 = px(i), y0 = py(i), x1 = px(i + 1), y1 = py(i + 1), my = (y0 + y1) / 2; return `M${x0} ${y0} C${x0} ${my} ${x1} ${my} ${x1} ${y1}`; };
-    const mk = (d, cls) => { const p = document.createElementNS(NS, 'path'); p.setAttribute('d', d); p.setAttribute('class', cls); svg.appendChild(p); return p; };
-    for (let i = 0; i < n - 1; i++) mk(seg(i), 'wp-b');
-    for (let i = 0; i < n - 1; i++) mk(seg(i), 'wp-r');
-    for (let i = 0; i < n - 1; i++) mk(seg(i), 'wp-d');
-    for (let i = 0; i < n - 1; i++) { const pr = St.prog(V[i].id); if (pr.tier >= 1) mk(seg(i), 'wp-lit'); }
+    const mk = (d, cls) => { const q = document.createElementNS(NS, 'path'); q.setAttribute('d', d); q.setAttribute('class', cls); svg.appendChild(q); return q; };
+    let all = ''; for (let i = 0; i < n - 1; i++) all += seg(i) + ' ';
+    mk(all, 'wp-b'); mk(all, 'wp-r'); mk(all, 'wp-d');
+    let lit = ''; for (let i = 0; i < n - 1; i++) if (nodes[i + 1].unl) lit += seg(i) + ' ';
+    if (lit) mk(lit, 'wp-lit');
     map.appendChild(svg);
-    // adornos del camino (símbolos de cálculo y hitos)
-    ['∫', 'Σ', 'π', '∞', 'f(x)', 'lím', 'dx', '√', 'log', 'sen', 'Δ', '0/0'].forEach((s, k) => { const sy = PADT + k * (HT - PADT - PADB) / 12 + 40; map.appendChild(h('span', { class: 'wdeco ' + (k % 2 ? 'r' : 'l'), style: `top:${sy}px`, text: s })); });
-    V.forEach((v, i) => {
-      const unl = St.unlocked(v), pr = St.prog(v.id), cleared = pr.tier >= 1, secret = v.boss && !unl, isNext = v === next && unl;
-      const size = v.boss ? 96 : 78;
-      const stars = h('div', { class: 'stars', 'aria-label': pr.stars + ' de 3 estrellas' }, [0, 1, 2].map((k) => img(k < pr.stars ? 'star' : 'starEmpty', 2)));
-      const nd = h('button', { class: `lnode${unl ? '' : ' locked'}${cleared ? ' cleared' : ''}${v.boss ? ' boss' : ''}${isNext ? ' next' : ''}`, style: `left:${px(i)}%;top:${py(i)}px;--sz:${size}px;--glow:${v.glow || '#7b4dff'}`, 'aria-label': `Nivel ${v.n}: ${secret ? 'distrito secreto' : v.district}${unl ? '' : ', bloqueado'}`,
-        onclick: () => { if (!unl) { sfx('deny'); toast(secret ? 'Vence a todos los villanos anteriores para descubrir este distrito.' : 'Derrota primero al villano anterior.', 'warn'); return; } sfx('select'); go('district', { id: v.id }); } },
-        h('span', { class: 'lcircle' }, villainEl(v, size - 16, !unl), !unl ? img('lock', 3, null, 'nlock') : null),
-        h('span', { class: 'lnum', text: String(v.n) }),
-        h('span', { class: 'lrib' }, h('b', { text: secret ? '???' : v.district }), unl && !v.endless ? stars : null, v.endless && unl ? h('small', { text: 'Récord ' + p.stats.duinityBest }) : null),
-        isNext && !cleared ? h('span', { class: 'lnew', text: '¡NUEVO!' }) : null);
-      map.appendChild(nd);
-      if (isNext) map.appendChild(h('span', { class: 'lhero', style: `left:${px(i)}%;top:${py(i) - size / 2 - 18}px` }, headThumb(p.look, 'lhead')));
+    ['∫', 'Σ', 'π', '∞', 'f(x)', 'lím', 'dx', '√', 'log', 'sen', 'Δ', '0/0', 'x²', 'e', 'θ', '≤'].forEach((s, k) => { const sy = PADT + k * (HT - PADT - PADB) / 16 + 30; map.appendChild(h('span', { class: 'wdeco ' + (k % 2 ? 'r' : 'l'), style: `top:${sy}px`, text: s })); });
+    const els = [];
+    nodes.forEach((nd, i) => {
+      const v = nd.v, isNext = i === nextIdx;
+      let el;
+      if (nd.kind === 'board') {
+        const size = v.boss ? 104 : 88, secret = v.boss && !nd.unl;
+        el = h('button', { class: `lnode board${nd.unl ? '' : ' locked'}${nd.done ? ' cleared' : ''}${v.boss ? ' boss' : ''}${isNext ? ' next' : ''}`, style: `left:${px(i)}%;top:${py(i)}px;--sz:${size}px;--glow:${v.glow || '#7b4dff'}`, 'aria-label': `Tablero ${v.n}: ${secret ? 'secreto' : v.district}${nd.unl ? '' : ', bloqueado'}`,
+          onclick: () => { if (!nd.unl) { sfx('deny'); toast(secret ? 'Supera todos los tableros anteriores para descubrir este.' : 'Supera los 3 niveles del tablero anterior.', 'warn'); return; } sfx('select'); go('district', { id: v.id, tier: v.endless ? 2 : undefined }); } },
+          h('span', { class: 'lcircle' }, villainEl(v, size - 18, !nd.unl), !nd.unl ? img('lock', 3, null, 'nlock') : null),
+          v.endless ? null : h('span', { class: 'lnum', text: 'T' + v.n }),
+          h('span', { class: 'lrib' }, h('b', { text: secret ? '???' : v.district }), v.endless && nd.unl ? h('small', { text: 'Récord ' + p.stats.duinityBest }) : null));
+      } else {
+        el = h('button', { class: `lnode lvl g${nd.t}${nd.unl ? '' : ' locked'}${nd.done ? ' cleared' : ''}${isNext ? ' next' : ''}`, style: `left:${px(i)}%;top:${py(i)}px;--sz:54px`, 'aria-label': `Nivel ${nd.n}: ${v.district}, juego ${nd.t}${nd.unl ? '' : ', bloqueado'}`,
+          onclick: () => { if (!nd.unl) { sfx('deny'); toast(nd.t === 1 ? 'Supera los 3 niveles del tablero anterior.' : 'Supera primero el nivel anterior.', 'warn'); return; } sfx('select'); go('district', { id: v.id, tier: nd.t }); } },
+          h('span', { class: 'lcircle' }, nd.unl ? h('b', { class: 'lgi', text: nd.done ? '✔' : String(nd.n) }) : img('lock', 3, null, 'nlock2')),
+          h('span', { class: 'lico', text: GI[nd.t - 1] }));
+      }
+      el.dataset.y = py(i); map.appendChild(el); els.push(el);
     });
+    // héroe (avatar) parado en el nivel actual; si avanzaste, camina hasta él
+    const hcv = h('canvas', { class: 'px lhero-cv' }); liveHero(hcv, () => p.look, { scale: 2 });
+    const hero = h('div', { class: 'lhero' }, hcv, h('span', { class: 'lhero-sh' }));
+    const setHero = (x, y) => { hero.style.left = x + '%'; hero.style.top = y + 'px'; };
+    let fromIdx = -1;
+    if (lastHeroIdx !== null && lastHeroIdx !== nextIdx && lastHeroIdx < nextIdx) fromIdx = lastHeroIdx;
+    const targetY = () => py(nextIdx) - (nodes[nextIdx].kind === 'board' ? 44 : 24);
+    setHero(px(fromIdx >= 0 ? fromIdx : nextIdx), fromIdx >= 0 ? py(fromIdx) - (nodes[fromIdx].kind === 'board' ? 44 : 24) : targetY()); map.appendChild(hero);
+    if (fromIdx >= 0 && fromIdx < nextIdx) {
+      let t0 = 0; const dur = 300 + (nextIdx - fromIdx) * 380;
+      later(() => { A.sfx('coin'); const step = (ts) => { if (!t0) t0 = ts; const k = Math.min(1, (ts - t0) / dur), f = fromIdx + (nextIdx - fromIdx) * k, i0 = Math.floor(f), i1 = Math.min(n - 1, i0 + 1), fr = f - i0; setHero(px(i0) + (px(i1) - px(i0)) * fr, (py(i0) + (py(i1) - py(i0)) * fr) - 24 - Math.abs(Math.sin(f * Math.PI * 2)) * 14); if (k < 1 && cur && cur.name === 'hub') requestAnimationFrame(step); else { setHero(px(nextIdx), targetY()); A.sfx('levelup'); els[nextIdx].classList.add('popin'); } }; requestAnimationFrame(step); }, 700);
+    }
+    lastHeroIdx = nextIdx;
+    // zoom suave según qué tan cerca del centro de la pantalla está cada nodo
+    let raf = 0, mapTop = 0;
+    const zoom = () => { raf = 0; const mid = sc.scrollTop + sc.clientHeight / 2 - mapTop; for (let i = 0; i < els.length; i++) { const d = Math.abs(+els[i].dataset.y - mid), k = Math.max(0, 1 - d / (sc.clientHeight * 0.55)); els[i].style.setProperty('--zs', (0.78 + 0.42 * k * k).toFixed(3)); } };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(zoom); };
+    sc.addEventListener('scroll', onScroll, { passive: true }); cleanups.push(() => { sc.removeEventListener('scroll', onScroll); if (raf) cancelAnimationFrame(raf); });
+    const playNext = () => { sfx('select'); go('district', { id: nextV.id, tier: nx.v.endless ? 2 : nextT }); };
     sc.appendChild(h('div', { class: 'hubwrap' }, topbar(),
-      h('div', { class: 'cta' }, h('div', { class: 'cta-l' }, h('b', { text: 'Ciudad Límite' }), h('small', { text: `${stats.districts}/14 villanos · ${stats.stars}/42 ★` })),
-        h('button', { class: 'chip', onclick: () => { sfx('click'); go('goals'); } }, '📋 Misiones ', h('b', { text: dn + '/3' }))),
-      h('button', { class: 'btn big playnext', onclick: () => { sfx('select'); go('district', { id: next.id }); } }, img('play', 3), h('span', { text: 'Continuar: ' + (next.boss && !St.unlocked(next) ? 'Siguiente' : next.name) })),
+      h('div', { class: 'cta' }, h('div', { class: 'cta-l' }, h('b', { text: 'Mundo DuiX' }), h('small', { text: `${stats.districts}/14 tableros · ${stats.stars}/42 ★` })),
+        h('div', { class: 'ctabtns' }, h('button', { class: 'chip', onclick: () => { sfx('click'); go('goals'); } }, '📋 ', h('b', { text: dn + '/3' })))),
+      h('button', { class: 'btn big playnext', onclick: playNext }, img('play', 3), h('span', { text: 'Continuar: ' + nextV.name + (nx.v.endless ? '' : ' · Nivel ' + nextT) })),
       map));
-    if (params.welcome) later(() => toast(`¡Bienvenido, <b>${esc(p.name)}</b>! Ciudad Límite te necesita.`, '', 3800), 400);
-    later(() => { const n = $('.lnode.next', sc) || $('.lnode', sc); if (n) { const r = n.getBoundingClientRect(), s = sc.getBoundingClientRect(); sc.scrollTop += r.top - s.top - s.height / 2 + r.height / 2; } }, 60);
+    if (params.welcome) later(() => toast(`¡Bienvenido, <b>${esc(p.name)}</b>! El Mundo DuiX te necesita.`, '', 3800), 400);
+    later(() => { mapTop = map.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop; const y = py(fromIdx >= 0 ? fromIdx : nextIdx) + mapTop; sc.scrollTop = y - sc.clientHeight * 0.6; zoom(); if (fromIdx >= 0 && fromIdx < nextIdx) { const y2 = py(nextIdx) + mapTop; const s0 = sc.scrollTop, s1 = y2 - sc.clientHeight * 0.6, T0 = performance.now(); const sm = (ts) => { const k = Math.min(1, (ts - T0 - 700) / (300 + (nextIdx - fromIdx) * 380)); if (k > 0) sc.scrollTop = s0 + (s1 - s0) * k; if (k < 1 && cur && cur.name === 'hub') requestAnimationFrame(sm); }; requestAnimationFrame(sm); } }, 40);
   };
 
   /* ============================================================
@@ -279,7 +330,7 @@
     const repaso = h('div', { class: 'repaso', hidden: true }, h('h3', { text: 'Repaso rápido: ' + v.tema }), repasoList(v.topic));
     const tiers = h('div', { class: 'tiers' });
     const MUL = ['×1', '×1,5', '×2'];
-    const GM = [['🎯', 'Disparo', 'Dispara a la cápsula con la respuesta correcta antes de que caiga.'], ['🏃', 'Carrera', 'Corre por los carriles y cruza la puerta con la respuesta correcta.'], ['🧩', 'Pares', 'Une cada problema con su resultado antes de que se acabe el tiempo.']];
+    const GM = [['🎯', 'Disparo', 'Dispara a la cápsula con la respuesta correcta antes de que caiga.'], ['🏃', 'Carrera', 'Corre sin parar, esquiva minas, recoge monedas y poderes, y cruza la puerta con la respuesta.'], ['👾', 'Laberinto', 'Guía a tu héroe por el laberinto, come la respuesta correcta y huye de los secuaces.']];
     function renderTiers() {
       tiers.innerHTML = '';
       [1, 2, 3].forEach((t) => {
@@ -329,14 +380,15 @@
     if (res.win) { coins += Math.round((40 + v.n * 4) * mul) + (res.stars === 3 ? 30 : 0); xp += Math.round(70 * mul); }
     if (res.endless) { coins += Math.min(200, res.correct * 3); }
     const before = St.profile().level;
-    St.addCoins(coins);
+    const sigma = (res.win ? 1 + (res.stars === 3 ? 2 : 0) : 0) + (res.sigma || 0);
+    St.addCoins(coins); if (sigma) St.addSigma(sigma); if (res.win) St.grantSpin(1);
     const ups = St.addXp(xp);
     const rec = St.recordBattle(v, res);
     const ach = St.checkAch();
     let chest = null; if (res.win && res.stars === 3 && Math.random() < 0.6) chest = St.openChest(true);
     St.save();
     battle = null;
-    go('results', { id: v.id, tier, res, coins, xp, ups, ach, chest, first: rec && rec.firstClear, before });
+    go('results', { id: v.id, tier, res, coins, sigma, xp, ups, ach, chest, first: rec && rec.firstClear, before });
   }
 
   /* ============================================================
@@ -350,6 +402,7 @@
     const title = res.endless ? `¡Resististe ${res.correct} ${plural(res.correct, 'pregunta', 'preguntas')}!` : res.win ? '¡Victoria!' : 'Derrota';
     const rewards = h('div', { class: 'rewards' },
       h('div', { class: 'rw' }, img('coin', 3), h('b', { text: '+' + P.coins }), h('small', { text: 'monedas' })),
+      h('div', { class: 'rw sig' }, h('span', { class: 'sigico', text: 'Σ' }), h('b', { text: '+' + (P.sigma || 0) }), h('small', { text: 'sigmas' })),
       h('div', { class: 'rw' }, img('bolt', 3), h('b', { text: '+' + P.xp }), h('small', { text: 'experiencia' })),
       h('div', { class: 'rw' }, img('star', 3), h('b', { text: acc + '%' }), h('small', { text: 'precisión' })),
       h('div', { class: 'rw' }, img('heart', 3), h('b', { text: String(res.bestStreak) }), h('small', { text: 'mejor racha' })));
@@ -367,7 +420,8 @@
       h('div', { class: 'rbtns' },
         canNext ? h('button', { class: 'btn big', onclick: () => { sfx('select'); go('district', { id: nextV.id }); } }, 'Siguiente distrito') : null,
         h('button', { class: 'btn' + (canNext ? '' : ' big'), onclick: () => { sfx('select'); go('district', { id: v.id, tier: P.tier }); } }, res.win ? 'Volver a luchar' : 'Reintentar'),
-        h('button', { class: 'btn ghost', onclick: () => { sfx('back'); go('hub', { scrollTo: true }); } }, 'Volver a la ciudad'))));
+        res.win ? h('button', { class: 'btn gold', onclick: () => { sfx('select'); go('wheel'); } }, '🎡 ¡Girar ruleta!') : null,
+        h('button', { class: 'btn ghost', onclick: () => { sfx('back'); go('hub', { scrollTo: true }); } }, 'Volver al mapa'))));
     // sonidos y avisos
     if (res.win) { A.play('menu'); later(() => sfx('win'), 100); [0, 1, 2].forEach((k) => { if (k < res.stars) later(() => sfx('star', k), 500 + k * 450); }); } else later(() => sfx('lose'), 100);
     if (P.ups && P.ups.length) later(() => sfx('levelup'), 1900);
@@ -408,7 +462,11 @@
     const pv = {}; // vista previa (no guardada)
     const stage = h('canvas', { class: 'px wprev' });
     const lookNow = () => Object.assign({}, p.look, pv);
-    liveHero(stage, lookNow, { scale: 6, pose: () => (cat === 'weapon' || Math.floor(Date.now() / 1600) % 4 === 0 ? 'shoot' : 'idle') });
+    let forcePose = null, forceUntil = 0;
+    liveHero(stage, lookNow, { scale: 6, pose: () => (forcePose && Date.now() < forceUntil ? forcePose : (cat === 'weapon' || Math.floor(Date.now() / 1600) % 4 === 0 ? 'shoot' : 'idle')) });
+    const stageBox = h('div', { class: 'wstage' }, h('div', { class: 'wspot' }), h('div', { class: 'wring' }), [0, 1, 2, 3, 4, 5, 6, 7].map((i) => h('i', { class: 'wspark', style: `left:${8 + i * 11}%;animation-delay:${(i * 0.37).toFixed(2)}s;--sz:${6 + (i % 3) * 3}px` })), stage, h('div', { class: 'wname', text: p.name }));
+    stageBox.style.cursor = 'pointer';
+    stageBox.addEventListener('click', () => { forcePose = 'shoot'; forceUntil = Date.now() + 700; stage.classList.remove('jump'); void stage.offsetWidth; stage.classList.add('jump'); sfx('select'); });
     const tabs = h('div', { class: 'ctabs', role: 'tablist' });
     const grid = h('div', { class: 'igrid' });
     const bar = h('div', { class: 'ibar' });
@@ -429,7 +487,7 @@
         eq ? h('span', { class: 'ibadge on', text: 'Puesto' }) : own ? h('span', { class: 'ibadge', text: 'Tuyo' }) : trying ? h('span', { class: 'ibadge on', text: 'Probando' }) : lockAch ? h('span', { class: 'ibadge ach', text: '🏆 Logro' }) : h('span', { class: 'ibadge price' }, img('coin', 2), h('b', { text: String(it.price) })));
     }
     function choose(it) {
-      sel = it.id;
+      sel = it.id; stage.classList.remove('jump'); void stage.offsetWidth; stage.classList.add('jump');
       if (owned(it.id)) { St.equip(it.id); delete pv[it.cat]; sfx('select'); }
       else { pv[it.cat] = it.id; sfx('click'); }
       renderAll();
@@ -469,13 +527,96 @@
       modal({ title: '¡Cofre abierto!', body, cls: 'chestm', buttons: r.item ? [{ label: 'Equipar', onClick: () => { St.equip(r.item.id); cat = r.item.cat; sel = r.item.id; renderAll(); } }, { label: 'Guardar', cls: 'ghost', onClick: () => { cat = r.item.cat; renderAll(); } }] : [{ label: 'Genial' }] });
       if (r.item) sfx('levelup'); announceAch(r.ach); renderAll();
     } }, img('chest', 4), h('div', null, h('b', { text: 'Cofre misterioso' }), h('small', { text: 'Un objeto al azar que aún no tengas' })), h('span', { class: 'ibadge price' }, img('coin', 2), h('b', { text: String(St.CHEST_COST) })));
-    sc.appendChild(h('div', { class: 'wardrobe' }, topbar(), h('div', { class: 'wstage' }, stage, h('div', { class: 'wname', text: p.name })), tabs, h('div', { class: 'wscroll' }, chest, grid, summary), bar));
+    sc.appendChild(h('div', { class: 'wardrobe' }, topbar(), stageBox, tabs, h('div', { class: 'wscroll' }, chest, grid, summary), bar));
     renderAll();
   };
 
   /* ============================================================
    * METAS (misiones + logros)
    * ============================================================ */
+
+  /* ============================================================
+   * RULETA ARCADE + CANJE DE SIGMAS
+   * ============================================================ */
+  SCREENS.wheel = (P, sc) => {
+    const N = St.WHEEL.length, SEG = 360 / N; let rot = 0, spinning = false;
+    const status = h('div', { class: 'wh-status' });
+    const cv = h('canvas', { class: 'wh-cv', width: 320, height: 320 });
+    const ctx = cv.getContext('2d');
+    function draw() {
+      ctx.clearRect(0, 0, 320, 320); ctx.save(); ctx.translate(160, 160);
+      ctx.save(); ctx.rotate(rot * Math.PI / 180);
+      St.WHEEL.forEach((w, i) => {
+        const a0 = (i * SEG - 90 - SEG / 2) * Math.PI / 180, a1 = a0 + SEG * Math.PI / 180;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 148, a0, a1); ctx.closePath();
+        ctx.fillStyle = w.col; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = '#140a2e'; ctx.stroke();
+        ctx.save(); ctx.rotate((a0 + a1) / 2); ctx.textAlign = 'right'; ctx.fillStyle = '#140a2e';
+        ctx.font = '22px sans-serif'; ctx.fillText(w.icon, 132, -2);
+        ctx.font = 'bold 13px monospace'; ctx.fillText(w.label, 132, 16); ctx.restore();
+      });
+      ctx.restore();
+      const t = Date.now() / 200;
+      for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; ctx.beginPath(); ctx.arc(Math.cos(a) * 154, Math.sin(a) * 154, 4, 0, 7); ctx.fillStyle = (i + Math.floor(t)) % 2 ? '#ffd23f' : '#fff6c8'; ctx.fill(); }
+      ctx.beginPath(); ctx.arc(0, 0, 26, 0, 7); ctx.fillStyle = '#140a2e'; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = '#ffd23f'; ctx.stroke();
+      ctx.fillStyle = '#ffd23f'; ctx.font = 'bold 24px serif'; ctx.textAlign = 'center'; ctx.fillText('Σ', 0, 8);
+      ctx.restore();
+    }
+    let raf = 0; const loop = () => { draw(); raf = requestAnimationFrame(loop); }; loop(); cleanups.push(() => cancelAnimationFrame(raf));
+    const spinBtn = h('button', { class: 'btn big gold', onclick: spin }, '🎡 ¡GIRAR!');
+    const qBox = h('div', { class: 'wh-q' });
+    const shop = h('div', { class: 'wh-shop' });
+    function refresh() {
+      const w = St.wheelState(), n = St.spinsLeft();
+      status.innerHTML = ''; status.appendChild(h('span', { html: n ? `Giros disponibles: <b>${n}</b>${w.free ? ' (incluye el gratis de hoy)' : ''}` : 'Sin giros ahora. ¡Responde una pregunta o gana batallas!' }));
+      spinBtn.disabled = spinning || !n;
+      qBox.innerHTML = '';
+      if (w.qLeft > 0) qBox.appendChild(h('button', { class: 'btn', onclick: askQ }, `🧠 Responde y gana 1 giro (${w.qLeft} hoy)`));
+      else qBox.appendChild(h('small', { class: 'hint', text: 'Hoy ya usaste tus 3 preguntas de giro. ¡Vuelve mañana!' }));
+      const p = St.profile(); shop.innerHTML = '';
+      shop.appendChild(h('h3', { class: 'h3', text: 'Canjear sigmas  Σ ' + (p.sigma || 0) }));
+      St.EXCHANGE.forEach((e) => shop.appendChild(h('button', { class: 'wh-item', disabled: (p.sigma || 0) < e.cost, onclick: () => {
+        const r = St.exchange(e.id); if (!r.ok) { toast(r.err); return; } sfx('buy');
+        toast(`¡Canjeaste ${esc(e.name)}!` + (r.chest ? (r.chest.item ? ' Te tocó: ' + esc(r.chest.item.name) : ' +' + r.chest.coins + ' monedas') : ''), 'ach'); refresh(); refreshCoins();
+      } }, h('span', { class: 'wi-ico', text: e.icon }), h('span', { class: 'wi-n', text: e.name }), h('b', { text: e.cost + ' Σ' }))));
+    }
+    function askQ() {
+      let q; try { q = root.DuiXQ.generateAny(2); } catch (e) { return; }
+      const body = h('div', { class: 'wh-qb' }, h('p', { class: 'wh-qt', text: q.text }));
+      let closeM;
+      const fb = h('p', { class: 'hint' });
+      let done = false;
+      q.options.forEach((o, i) => body.appendChild(h('button', { class: 'btn opt', onclick: (ev) => {
+        if (done) return; done = true; const ok = i === q.correct; St.wheelQuestionDone();
+        ev.target.classList.add(ok ? 'good' : 'bad'); if (ok) { St.grantSpin(1); sfx('win'); fb.textContent = '¡Correcto! +1 giro 🎡'; } else { sfx('lose'); fb.textContent = 'Casi. Era: ' + q.options[q.correct] + '. ' + (q.explain || ''); }
+      } }, o)));
+      body.appendChild(fb);
+      closeM = modal({ title: 'Pregunta relámpago', body, cls: 'wh-modal', buttons: [{ label: 'Listo', onClick: refresh }] });
+    }
+    function spin() {
+      if (spinning || !St.useSpin()) return; spinning = true; spinBtn.disabled = true; A.unlock(); sfx('select');
+      const idx = St.rollWheel(); const target = 360 * 6 + (360 - idx * SEG); const start = rot % 360, t0 = performance.now(), dur = 4200; const from = rot;
+      const end = from + (target - start) + 0; let lastTick = -1;
+      const step = (now) => {
+        const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3); rot = from + (end - from) * e;
+        const seg = Math.floor(rot / SEG); if (seg !== lastTick) { lastTick = seg; sfx('click'); }
+        if (k < 1) requestAnimationFrame(step); else finish(idx);
+      };
+      requestAnimationFrame(step);
+    }
+    function finish(idx) {
+      const r = St.applyPrize(idx); spinning = false; sfx('win'); refreshCoins();
+      const pz = r.prize; let extra = '';
+      if (r.chest) extra = r.chest.item ? ` Conseguiste: ${esc(r.chest.item.name)}` : ` +${r.chest.coins} monedas`;
+      modal({ title: '¡Premio!', body: h('div', { class: 'wh-prize' }, h('div', { class: 'wp-ico', text: pz.icon }), h('b', { text: pz.label }), h('small', { html: extra })), buttons: [{ label: '¡Genial!', cls: 'gold', onClick: refresh }] });
+      refresh();
+    }
+    sc.appendChild(h('div', { class: 'wheelscr' },
+      h('h1', { class: 'h1', text: '🎡 Ruleta de la Fortuna' }), status,
+      h('div', { class: 'wh-stage' }, h('div', { class: 'wh-pointer', text: '▼' }), cv), spinBtn, qBox, shop,
+      h('button', { class: 'btn ghost', onclick: () => { sfx('back'); go('hub'); } }, 'Volver al mapa')));
+    refresh();
+  };
+
   SCREENS.goals = (_, sc) => {
     const p = St.profile(), daily = St.ensureDaily(), stats = St.stats();
     const bar = (v, g) => h('div', { class: 'pbar' }, h('i', { style: 'width:' + Math.min(100, Math.round(v / g * 100)) + '%' }));

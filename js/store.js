@@ -45,7 +45,8 @@
     p.stats = Object.assign({ correct: 0, answered: 0, bestStreak: 0, wins: 0, perfect: 0, hardWins: 0, purchases: 0, boss: 0, duinityBest: 0, battles: 0 }, p.stats || {});
     p.progress = p.progress || {}; p.owned = p.owned || STARTERS.slice(); p.achDone = p.achDone || {};
     p.mistakes = p.mistakes || []; p.daily = p.daily || { date: '', missions: [], prog: {}, done: {}, ids: [] };
-    p.coins = p.coins || 0; p.xp = p.xp || 0; p.level = p.level || 1;
+    p.coins = p.coins || 0; p.xp = p.xp || 0; p.level = p.level || 1; p.sigma = p.sigma || 0;
+    p.wheel = Object.assign({ day: '', freeUsed: false, extra: 0, qDay: '', qCount: 0 }, p.wheel || {});
     STARTERS.forEach((s) => { if (!p.owned.includes(s)) p.owned.push(s); });
   }
   function save() { ls.set(KEY_P, JSON.stringify(db)); }
@@ -107,6 +108,33 @@
   /* ---------- economía / XP ---------- */
   function addCoins(n) { const p = profile(); if (!p) return; p.coins = Math.max(0, p.coins + Math.round(n)); notify('coins'); }
   function spend(n) { const p = profile(); if (!p || p.coins < n) return false; p.coins -= n; notify('coins'); return true; }
+  /* ---------- Σ (símbolos matemáticos) y ruleta ---------- */
+  function addSigma(n) { const p = profile(); if (!p || !n) return; p.sigma = Math.max(0, (p.sigma || 0) + Math.round(n)); notify('coins'); }
+  function spendSigma(n) { const p = profile(); if (!p || (p.sigma || 0) < n) return false; p.sigma -= n; notify('coins'); return true; }
+  function wheelState() { const p = profile(); if (!p) return { free: false, extra: 0, qLeft: 0 }; const t = today(); if (p.wheel.day !== t) { p.wheel.day = t; p.wheel.freeUsed = false; } if (p.wheel.qDay !== t) { p.wheel.qDay = t; p.wheel.qCount = 0; } return { free: !p.wheel.freeUsed, extra: p.wheel.extra || 0, qLeft: Math.max(0, 3 - p.wheel.qCount) }; }
+  function spinsLeft() { const w = wheelState(); return (w.free ? 1 : 0) + w.extra; }
+  function useSpin() { const p = profile(); if (!p) return false; const w = wheelState(); if (w.free) p.wheel.freeUsed = true; else if (w.extra > 0) p.wheel.extra--; else return false; save(); return true; }
+  function grantSpin(n) { const p = profile(); if (!p) return; wheelState(); p.wheel.extra = (p.wheel.extra || 0) + (n || 1); save(); }
+  function wheelQuestionDone() { const p = profile(); if (!p) return; wheelState(); p.wheel.qCount++; save(); }
+  const WHEEL = [
+    { id: 'c30', label: '30', icon: '🪙', col: '#ffb020', w: 22, coins: 30 }, { id: 's2', label: '+2 Σ', icon: 'Σ', col: '#c58bff', w: 20, sigma: 2 },
+    { id: 'c80', label: '80', icon: '🪙', col: '#22d47e', w: 14, coins: 80 }, { id: 's5', label: '+5 Σ', icon: 'Σ', col: '#5ce1e6', w: 10, sigma: 5 },
+    { id: 'chest', label: 'Cofre', icon: '🎁', col: '#ff3f9a', w: 6, chest: true }, { id: 'c150', label: '150', icon: '🪙', col: '#ff5a3c', w: 4, coins: 150 },
+    { id: 'xp', label: '50 XP', icon: '⚡', col: '#4da3ff', w: 16, xp: 50 }, { id: 'spin', label: '+1 giro', icon: '🎡', col: '#ffd23f', w: 8, spin: 1 },
+  ];
+  function rollWheel() { let tot = 0; WHEEL.forEach((x) => { tot += x.w; }); let r = Math.random() * tot; for (let i = 0; i < WHEEL.length; i++) { r -= WHEEL[i].w; if (r <= 0) return i; } return 0; }
+  function applyPrize(i) {
+    const pz = WHEEL[i]; const out = { prize: pz };
+    if (pz.coins) addCoins(pz.coins); if (pz.sigma) addSigma(pz.sigma); if (pz.xp) out.ups = addXp(pz.xp); if (pz.spin) grantSpin(pz.spin);
+    if (pz.chest) out.chest = openChest(true); save(); return out;
+  }
+  const EXCHANGE = [
+    { id: 'coins', icon: '🪙', name: '60 monedas', cost: 8 }, { id: 'spin', icon: '🎡', name: '1 giro de ruleta', cost: 5 }, { id: 'chest', icon: '🎁', name: 'Cofre misterioso', cost: 25 },
+  ];
+  function exchange(id) {
+    const e = EXCHANGE.find((x) => x.id === id); if (!e || !spendSigma(e.cost)) return { ok: false, err: 'Te faltan símbolos Σ' };
+    let r = { ok: true, e }; if (id === 'coins') addCoins(60); else if (id === 'spin') grantSpin(1); else r.chest = openChest(true); save(); return r;
+  }
   function addXp(n) {
     const p = profile(); const ups = [];
     if (!p) return ups;
@@ -124,7 +152,7 @@
   /* ---------- mapa / progreso ---------- */
   const FIRST14 = D.VILLAINS.slice(0, 14);
   function prog(id) { const p = profile(); return (p && p.progress[id]) || { stars: 0, tier: 0, plays: 0, wins: 0 }; }
-  function isCleared(id) { return prog(id).tier >= 1; }
+  function isCleared(id) { return prog(id).tier >= 3; }
   function unlocked(v) {
     const i = D.VILLAINS.indexOf(v);
     if (i === 0) return true;
@@ -247,7 +275,7 @@
   const S = {
     persistent, MAX_PROFILES, DEFAULT_LOOK, xpNeed, CHEST_COST, today, settings: () => settings, setSetting(k, v) { settings[k] = v; saveSettings(); notify('settings'); },
     list: () => db.list, profile, newProfile, switchTo, removeProfile, logout, save,
-    has, buy, equip, setLook, openChest, grantItem, perks, addCoins, spend, addXp,
+    has, buy, equip, setLook, openChest, grantItem, perks, addCoins, spend, addXp, addSigma, spendSigma, wheelState, spinsLeft, useSpin, grantSpin, wheelQuestionDone, WHEEL, rollWheel, applyPrize, EXCHANGE, exchange,
     prog, isCleared, unlocked, recordBattle, recordRoom, stats, checkAch, ensureDaily, trackDaily, exportCode, importCode, resetAll,
     on(f) { listeners.push(f); },
   };

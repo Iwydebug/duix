@@ -77,6 +77,14 @@ Así nadie puede listar todas las salas: solo entra quien conoce el código. Las
 - Teclado propio en pantalla para escribir el código de sala (funciona en cualquier dispositivo; el teclado físico también sirve).
 - Fondo del mapa convertido en un mundo de caramelo: arcoíris, sol sonriente, islas de chocolate, paletas, cupcakes, dulces con símbolos matemáticos y dragones pastel con estela de arcoíris. El cielo cambia de color (día → atardecer → noche mágica) al recorrer el mapa.
 
+## Novedades 1.7
+- Pantalla completa real: fondos animados a todo el ancho en Mac/PC; en celular llena toda la pantalla (incluido el borde inferior).
+- Mapa del mundo estilo camino de niveles: cada tablero tiene 3 niveles (Disparo → Carrera → Laberinto) y el siguiente tablero se abre solo al pasar el nivel 3.
+- 3 juegos arcade fluidos, sin pausas entre preguntas, con tu avatar como protagonista (Carrera libre con minas/monedas/poderes y Laberinto tipo Pac-Man).
+- Salas tipo lobby: se mueven, emotes, cambio de ropa, sin vidas, revancha y volver a la sala.
+- Ruleta de la Fortuna (giro gratis diario, giros por pregunta y por victoria) y símbolos Σ canjeables.
+- Título interactivo (toca al héroe) y vestidor con escenario animado.
+
 ## Novedades 1.6
 - **Salas arregladas**: el área de juego no se dibujaba (solo se veía la pregunta). Ya se ve el villano, las cápsulas y tu héroe.
 - **Pantalla completa en cualquier dispositivo** (Mac, PC, iPhone, Android): el juego ocupa toda la altura, sin franjas vacías.

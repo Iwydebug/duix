@@ -95,7 +95,7 @@
     const sess = lsGet(LSK);
     if (sess && sess.code) {
       N.ready().then(() => N.get('rooms/' + sess.code + '/state')).then((st) => {
-        if (!st || st.phase === 'end') { lsDel(LSK); return; }
+        if (!st) { lsDel(LSK); return; }
         resume.hidden = false; resume.appendChild(h('div', { class: 'set-block roomcard' }, h('h3', { text: 'Tienes una sala abierta: ' + sess.code }), h('div', { class: 'row' },
           h('button', { class: 'btn small', type: 'button', onclick: () => go('room', { code: sess.code, role: sess.role }) }, 'Volver a la sala'),
           h('button', { class: 'btn small ghost', type: 'button', onclick: () => { lsDel(LSK); resume.hidden = true; } }, 'Olvidar'))));
@@ -112,10 +112,9 @@
       const [state, cfg, players] = await Promise.all([N.get('rooms/' + code + '/state'), N.get('rooms/' + code + '/cfg'), N.get('rooms/' + code + '/players')]);
       if (!state || !cfg) { msg.textContent = 'No encontré esa sala. Revisa el código.'; sfx('deny'); return; }
       const mine = players && players[p.id];
-      if (state.phase === 'end') { msg.textContent = 'Esa partida ya terminó.'; sfx('deny'); return; }
-      if (!mine && state.phase !== 'lobby') { msg.textContent = 'Esa partida ya empezó. Espera a la siguiente.'; sfx('deny'); return; }
+      if (!mine && state.phase === 'countdown') { msg.textContent = 'Esa partida ya empezó. Espera a la siguiente.'; sfx('deny'); return; }
       if (!mine && players && Object.keys(players).length >= MAX_PLAYERS) { msg.textContent = 'La sala está llena.'; sfx('deny'); return; }
-      if (!mine) await N.set('rooms/' + code + '/players/' + p.id, { name: p.name, look: p.look, score: 0, correct: 0, qi: 0, hearts: 3, done: false, online: true, joined: N.TS });
+      if (!mine) await N.set('rooms/' + code + '/players/' + p.id, { name: p.name, look: p.look, score: 0, correct: 0, qi: 0, done: false, online: true, joined: N.TS });
       lsSet(LSK, { code, role: 'player', pid: p.id });
       sfx('select'); go('room', { code, role: 'player' });
     } catch (e) { msg.textContent = netErr(e); sfx('deny'); } finally { btn.disabled = false; btn.textContent = old; }
@@ -146,27 +145,27 @@
   async function createRoom(c) {
     const p = St.profile();
     await N.ready();
-    const cfg = { n: c.n, level: c.level, topics: Array.from(c.topics), more: !!c.more, hostPlays: !!c.hostPlays, seed: Math.floor(Math.random() * 4294967295), v: 2 };
+    const cfg = { n: c.n, level: c.level, topics: Array.from(c.topics), more: !!c.more, hostPlays: !!c.hostPlays, seed: Math.floor(Math.random() * 4294967295), v: 3 };
     let code = '', ok = false;
     for (let i = 0; i < 10 && !ok; i++) { code = newCode(); ok = (await N.get('rooms/' + code + '/state')) === null; }
     if (!ok) throw new Error('No se pudo crear un código libre. Inténtalo otra vez.');
-    const room = { host: p.id, hostName: p.name, hostOnline: true, created: N.TS, cfg, state: { phase: 'lobby', t0: N.TS } };
-    if (cfg.hostPlays) room.players = { [p.id]: { name: p.name, look: p.look, score: 0, correct: 0, qi: 0, hearts: 3, done: false, online: true, joined: N.TS } };
+    const room = { host: p.id, hostName: p.name, hostOnline: true, created: N.TS, cfg, state: { phase: 'lobby', t0: N.TS, round: 0 } };
+    if (cfg.hostPlays) room.players = { [p.id]: { name: p.name, look: p.look, score: 0, correct: 0, qi: 0, done: false, online: true, joined: N.TS } };
     await N.set('rooms/' + code, room);
     lsSet(LSK, { code, role: 'host', pid: p.id });
     sfx('select'); go('room', { code, role: 'host' });
   }
 
   /* ============================================================
-   * SALA: lobby → combate arcade → podio
+   * SALA: plaza (lobby interactivo) → combate arcade → podio → de vuelta a la plaza
    * ============================================================ */
   SCREENS.room = (params, sc) => {
     const code = params.code, role = params.role, p = St.profile(), pid = p.id, isHost = role === 'host';
     const P = 'rooms/' + code;
-    const R = { cfg: null, state: null, players: {}, playersLoaded: false, hostOnline: true };
-    const my = { finished: false, report: null, rewarded: null, abandoned: false };
+    const R = { cfg: null, state: null, players: {}, pos: {}, playersLoaded: false, hostOnline: true };
+    const my = { finished: false, report: null, rewarded: null, back: false, round: -1 };
     const subs = [], timers = [];
-    let viewKey = '', left = false, offline = false, battle = null, questions = null, lastWrite = 0, writeT = 0, pending = null, lastRank = 0, renderT = 0, cdTimer = 0;
+    let viewKey = '', left = false, offline = false, battle = null, questions = null, lastWrite = 0, writeT = 0, pending = null, lastRank = 0, renderT = 0, cdTimer = 0, plaza = null, refs = {};
     const box = h('div', { class: 'room' });
     const holder = h('div', { class: 'btholder', hidden: true });
     const banner = h('div', { class: 'rbanner', hidden: true });
@@ -176,34 +175,45 @@
 
     const playing = () => !isHost || !!(R.cfg && R.cfg.hostPlays);
     const nowMs = () => N.now();
+    const round = () => (R.state && R.state.round) || 0;
     const myP = () => R.players[pid] || null;
     const ranking = () => Object.keys(R.players).map((id) => Object.assign({ id }, R.players[id])).sort((a, b) => ((b.score || 0) - (a.score || 0)) || ((b.correct || 0) - (a.correct || 0)) || String(a.name).localeCompare(String(b.name)));
     const setBanner = (t) => { banner.hidden = !t; banner.textContent = t || ''; };
+    const killPlaza = () => { if (plaza) { try { plaza.destroy(); } catch (e) { /* ok */ } plaza = null; } refs = {}; };
     function stop() {
-      if (left) return; left = true; subs.forEach((f) => { try { f(); } catch (e) { /* ok */ } }); timers.forEach(clearInterval); clearTimeout(writeT); clearTimeout(renderT); clearInterval(cdTimer);
+      if (left) return; left = true; subs.forEach((f) => { try { f(); } catch (e) { /* ok */ } }); timers.forEach(clearInterval); clearTimeout(writeT); clearTimeout(renderT); clearInterval(cdTimer); killPlaza();
       if (battle) { try { battle.destroy(); } catch (e) { /* ok */ } battle = null; }
+      try { N.remove(P + '/pos/' + pid).catch(() => {}); } catch (e) { /* ok */ }
     }
     K.onLeave(stop);
 
     /* ----- conexión ----- */
     function announce() {
       if (playing()) { N.set(P + '/players/' + pid + '/online', true).catch(() => {}); N.onDisconnect(P + '/players/' + pid + '/online', false).catch(() => {}); }
+      N.onDisconnect(P + '/pos/' + pid, null).catch(() => {});
       if (isHost) { N.set(P + '/hostOnline', true).catch(() => {}); N.onDisconnect(P + '/hostOnline', false).catch(() => {}); }
     }
     subs.push(N.onConnection((on) => { offline = !on; if (on) { announce(); setBanner(!R.hostOnline && !isHost ? 'El anfitrión perdió la conexión. Espera…' : ''); } else setBanner('Sin conexión… reconectando'); }));
 
     /* ----- suscripciones ----- */
-    N.get(P + '/cfg').then((cfg) => { R.cfg = cfg; render(true); });
+    subs.push(N.on(P + '/cfg', (cfg) => { if (cfg) { R.cfg = cfg; if (R.state) render(false); } }));
+    subs.push(N.on(P + '/pos', (v) => { R.pos = v || {}; }));
     subs.push(N.on(P + '/players', (v) => { R.players = v || {}; R.playersLoaded = true; onPlayers(); }));
     subs.push(N.on(P + '/hostOnline', (v) => { R.hostOnline = v !== false; if (!isHost) setBanner(!R.hostOnline && R.state && R.state.phase !== 'end' ? 'El anfitrión perdió la conexión. Espera…' : ''); }));
     subs.push(N.on(P + '/state', (s) => {
       if (s === null) { if (R.state && R.state.phase === 'end') return; showClosed(); return; }
-      R.state = s; render(false);
+      const prev = R.state; R.state = s;
+      if ((s.round || 0) !== my.round) { // nueva ronda: todo vuelve a empezar
+        if (my.round >= 0) { my.finished = false; my.report = null; my.rewarded = null; my.back = false; questions = null; if (battle) { try { battle.destroy(); } catch (e) { /* ok */ } battle = null; sc.classList.remove('s-battle'); holder.hidden = true; box.hidden = false; K.setAmbient(true, 'room'); } if (prev && prev.phase === 'end' && s.phase === 'lobby') toast('¡El anfitrión abrió una nueva partida!', ''); }
+        my.round = s.round || 0; viewKey = '';
+      }
+      render(false);
     }));
     function onPlayers() {
       const ph = R.state && R.state.phase;
       if (battle) { const now = Date.now(); if (now - lastRank > 900) { lastRank = now; updateRank(); if (battle.refresh) battle.refresh(); } return; }
-      if (ph === 'lobby' || ph === 'end') render(true); else if (ph === 'countdown') { clearTimeout(renderT); renderT = setTimeout(() => render(true), 350); } else render(false);
+      if (refs.plist) { refreshPlaza(); return; }
+      if (ph === 'end') render(true); else if (ph === 'countdown') { clearTimeout(renderT); renderT = setTimeout(() => render(true), 350); } else render(false);
     }
     function showClosed() {
       stop(); lsDel(LSK); sc.classList.remove('s-battle'); holder.hidden = true; box.hidden = false;
@@ -219,11 +229,16 @@
         else if (el > 20 * 60 * 1000) hostEnd();
       }, 1000));
     }
-    function hostEnd() { const s = R.state; if (!s || s.phase === 'end') return; N.update(P, { state: { phase: 'end', t0: N.TS } }).catch(() => {}); }
+    function hostEnd() { const s = R.state; if (!s || s.phase === 'end') return; N.update(P, { state: { phase: 'end', t0: N.TS, round: round() } }).catch(() => {}); }
     async function hostStart() {
       const n = Object.keys(R.players).length;
       if (!n) { toast('Aún no hay jugadores.', 'warn'); sfx('deny'); return; }
-      try { sfx('go'); await N.update(P, { state: { phase: 'countdown', t0: N.TS } }); } catch (e) { toast(netErr(e), 'warn'); }
+      try { sfx('go'); await N.update(P, { state: { phase: 'countdown', t0: N.TS, round: round() } }); } catch (e) { toast(netErr(e), 'warn'); }
+    }
+    async function hostRematch() {
+      const upd = {}; Object.keys(R.players).forEach((id) => { if (R.players[id].online === false) upd['players/' + id] = null; else { upd['players/' + id + '/score'] = 0; upd['players/' + id + '/correct'] = 0; upd['players/' + id + '/qi'] = 0; upd['players/' + id + '/done'] = false; } });
+      upd['cfg/seed'] = Math.floor(Math.random() * 4294967295); upd.state = { phase: 'lobby', t0: N.TS, round: round() + 1 };
+      try { sfx('select'); await N.update(P, upd); } catch (e) { toast(netErr(e), 'warn'); }
     }
 
     /* ----- ranking dentro del combate ----- */
@@ -238,17 +253,17 @@
     /* ----- combate ----- */
     function pushProgress(snap, immediate) {
       pending = snap; const now = Date.now();
-      const write = () => { if (!pending) return; const s = pending; pending = null; lastWrite = Date.now(); N.update(P + '/players/' + pid, { score: s.score, correct: s.correct, qi: s.qi, hearts: s.hearts }).catch(() => {}); };
+      const write = () => { if (!pending) return; const s = pending; pending = null; lastWrite = Date.now(); N.update(P + '/players/' + pid, { score: s.score, correct: s.correct, qi: s.qi }).catch(() => {}); };
       if (immediate || now - lastWrite > 700) { clearTimeout(writeT); write(); } else { clearTimeout(writeT); writeT = setTimeout(write, 700 - (now - lastWrite)); }
     }
     function startBattle() {
       if (battle || my.finished || left || !R.cfg) return;
-      questions = buildRoomQuestions(R.cfg);
+      killPlaza(); questions = buildRoomQuestions(R.cfg);
       K.setAmbient(false); sc.classList.add('s-battle'); box.hidden = true; holder.hidden = false; setBanner('');
       A.play('battle'); updateRank();
       battle = B.start({
         container: holder, villain: roomVillain(R.cfg), tier: R.cfg.level || 2, look: p.look, perks: {}, lockSettings: true, moreTime: !!R.cfg.more, extraTop: rankEl,
-        room: { total: R.cfg.n, getQuestion: (i) => questions[i], hp: sharedHp },
+        room: { total: R.cfg.n, getQuestion: (i) => questions[i], hp: sharedHp, noHearts: true },
         onProgress: (snap) => pushProgress(snap, snap.over),
         onEnd: (rep) => { setTimeout(() => finishMine(rep), 0); },
         onQuit: () => { battle = null; root.__roomBattle = null; leaveGame(); },
@@ -259,7 +274,7 @@
       if (my.finished || left) return; my.finished = true; my.report = rep;
       if (battle) { try { battle.destroy(); } catch (e) { /* ok */ } battle = null; }
       sc.classList.remove('s-battle'); holder.hidden = true; box.hidden = false; K.setAmbient(true, 'room'); A.play('menu');
-      const upd = { done: true, finishedAt: N.TS }; if (rep) { upd.score = rep.score; upd.correct = rep.correct; upd.qi = rep.answered; upd.hearts = Math.max(0, 3 - rep.heartsLost); }
+      const upd = { done: true, finishedAt: N.TS }; if (rep) { upd.score = rep.score; upd.correct = rep.correct; upd.qi = rep.answered; }
       if (quit) upd.online = false;
       clearTimeout(writeT); pending = null;
       N.update(P + '/players/' + pid, upd).catch(() => {});
@@ -268,58 +283,87 @@
     async function leaveGame() { lsDel(LSK); if (playing()) { try { await N.update(P + '/players/' + pid, { done: true, online: false }); } catch (e) { /* ok */ } } stop(); go('rooms'); }
 
     /* ----- vistas ----- */
-    function board(limit, hp) {
-      const rk = ranking(), n = (R.cfg && R.cfg.n) || 1, el = h('ol', { class: 'rboard' });
+    function boardFill(el, limit) {
+      const rk = ranking(), n = (R.cfg && R.cfg.n) || 1; el.innerHTML = '';
       rk.slice(0, limit || 99).forEach((x, i) => {
         const prog = Math.min(100, Math.round((x.qi || 0) / n * 100));
         el.appendChild(h('li', { class: 'rrow' + (x.id === pid ? ' me' : '') }, h('span', { class: 'rpos', text: String(i + 1) }), K.headThumb(x.look || {}, 'rh'),
           h('div', { class: 'rmid' }, h('b', { class: 'rname', text: x.name }), h('div', { class: 'rprog' }, h('i', { style: 'width:' + prog + '%' }))),
-          h('span', { class: 'rst', text: x.done ? ((x.hearts || 0) > 0 ? '✔' : '💀') : x.online === false ? '⚠' : '❤'.repeat(Math.max(0, Math.min(3, x.hearts === undefined ? 3 : x.hearts))) }), h('span', { class: 'rscore', text: String(x.score || 0) })));
+          h('span', { class: 'rst', text: x.done ? '✔' : x.online === false ? '⚠' : '🎮' }), h('span', { class: 'rscore', text: String(x.score || 0) })));
       });
-      return el;
     }
-    function bossBar() {
+    function bossBarEl() {
       const v = roomVillain(R.cfg || { topics: [] }), r = sharedHp();
       return h('div', { class: 'rboss' }, h('b', { text: v.name }), h('div', { class: 'rbar' }, h('i', { style: 'width:' + Math.max(0, r.frac * 100) + '%' })), h('span', { text: r.text }));
     }
-    function hostStrip() {
-      if (!isHost) return null;
-      const s = R.state;
-      return h('div', { class: 'hoststrip' }, h('span', { class: 'hcount' }, '👥 ', h('b', { class: 'hc', text: String(Object.keys(R.players).length) })),
-        s && s.phase === 'countdown' ? h('button', { class: 'btn small', type: 'button', onclick: () => { sfx('click'); hostEnd(); } }, 'Terminar ya ⏹') : null,
-        h('button', { class: 'btn small ghost', type: 'button', onclick: () => confirmLeave() }, 'Cerrar sala'));
-    }
     function confirmLeave() {
       const ph = R.state && R.state.phase;
-      if (isHost) modal({ title: '¿Cerrar la sala?', body: h('p', { text: 'La partida termina para todos.' }), buttons: [{ label: 'Seguir', cls: 'ghost' }, { label: 'Cerrar sala', cls: 'danger', onClick: () => closeRoom() }] });
+      if (isHost) modal({ title: '¿Cerrar la sala?', body: h('p', { text: 'La sala se cierra para todos.' }), buttons: [{ label: 'Seguir', cls: 'ghost' }, { label: 'Cerrar sala', cls: 'danger', onClick: () => closeRoom() }] });
       else if (ph === 'lobby' || ph === 'end') leave();
       else modal({ title: '¿Salir de la partida?', body: h('p', { text: 'Perderás tu lugar en el ranking.' }), buttons: [{ label: 'Seguir jugando', cls: 'ghost' }, { label: 'Salir', cls: 'danger', onClick: () => leaveGame() }] });
     }
     async function closeRoom() { try { await N.remove(P); } catch (e) { /* ok */ } lsDel(LSK); stop(); go('rooms'); }
     async function leave() {
       const ph = R.state && R.state.phase;
-      try { if (playing() && ph === 'lobby') await N.remove(P + '/players/' + pid); } catch (e) { /* ok */ }
+      try { if (playing() && (ph === 'lobby' || ph === 'end')) await N.remove(P + '/players/' + pid); } catch (e) { /* ok */ }
       lsDel(LSK); stop(); go('rooms');
     }
-
-    function viewLobby() {
-      const pls = ranking().sort((a, b) => (a.joined || 0) - (b.joined || 0)), link = linkFor(code), cfg = R.cfg || {};
-      const list = h('div', { class: 'plist' }, pls.map((x) => h('div', { class: 'pchip' + (x.id === pid ? ' me' : '') }, K.headThumb(x.look || {}, 'rh'), h('b', { text: x.name }))));
-      if (!pls.length) list.appendChild(h('p', { class: 'hint', text: 'Esperando jugadores…' }));
-      const v = roomVillain(cfg.topics ? cfg : { topics: [] });
+    function openOutfit() {
+      let cat = D.CATS[0].id; const prev = h('canvas', { class: 'px oprev' }); K.liveHero(prev, () => p.look, { scale: 4 });
+      const tabs = h('div', { class: 'ctabs' }), grid = h('div', { class: 'ogrid' });
+      const draw = () => {
+        tabs.innerHTML = ''; D.CATS.forEach((c) => tabs.appendChild(h('button', { type: 'button', class: 'ctab' + (c.id === cat ? ' on' : ''), onclick: () => { cat = c.id; sfx('click'); draw(); } }, h('span', { text: c.icon || '•' }), h('b', { text: c.name }))));
+        grid.innerHTML = ''; const its = D.ITEMS.filter((i) => i.cat === cat && p.owned.includes(i.id));
+        if (!its.length) grid.appendChild(h('p', { class: 'hint', text: 'Aún no tienes objetos de esta categoría. ¡Consíguelos en la Ciudad!' }));
+        its.forEach((it) => grid.appendChild(h('button', { type: 'button', class: 'ochip r-' + it.rarity + (p.look[it.cat] === it.id ? ' on' : ''), onclick: () => { St.equip(it.id); sfx('select'); N.update(P + '/players/' + pid, { look: p.look }).catch(() => {}); draw(); } }, it.name)));
+      };
+      draw(); modal({ title: 'Cámbiate de ropa', body: h('div', { class: 'outfit' }, h('div', { class: 'oprevbox' }, prev), tabs, grid), buttons: [{ label: 'Listo' }] });
+    }
+    function refreshPlaza() {
+      if (!refs.plist) return; const pls = ranking().sort((a, b) => (a.joined || 0) - (b.joined || 0));
+      refs.plist.innerHTML = ''; pls.forEach((x) => refs.plist.appendChild(h('div', { class: 'pchip' + (x.id === pid ? ' me' : '') + (x.online === false ? ' off' : '') }, K.headThumb(x.look || {}, 'rh'), h('b', { text: x.name }), x.done ? h('i', { text: '✔' }) : null)));
+      if (refs.count) refs.count.textContent = String(pls.length);
+      if (refs.board) boardFill(refs.board, 60);
+      if (refs.boss) { const nb = bossBarEl(); refs.boss.replaceWith(nb); refs.boss = nb; }
+    }
+    // plaza: lobby (antes de jugar), live (ya terminé y espero) o after (terminó la partida y volví)
+    function viewPlaza(mode) {
+      const cfg = R.cfg || {}, link = linkFor(code), v = roomVillain(cfg.topics ? cfg : { topics: [] });
       const lines = [`${cfg.n || '?'} preguntas`, cfg.level ? ['', 'fáciles', 'medias', 'difíciles'][cfg.level] : 'dificultad creciente'].concat(cfg.more ? ['más tiempo para leer'] : []);
-      box.appendChild(h('div', { class: 'rpanel lobby' }, h('div', { class: 'rtop' }, h('button', { class: 'btn small ghost', type: 'button', onclick: () => confirmLeave() }, isHost ? 'Cerrar sala' : 'Salir')),
-        h('p', { class: 'hint', text: isHost ? 'Los demás entran en DuiX → Salas con este código:' : 'Estás dentro. Espera a que el anfitrión empiece.' }),
-        h('div', { class: 'bigcode', 'aria-label': 'Código de la sala ' + code.split('').join(' ') }, code.split('').map((c) => h('span', { text: c }))),
-        isHost ? h('div', { class: 'qrbox' }, drawQR(link, 176), h('button', { class: 'btn small ghost', type: 'button', onclick: () => { if (navigator.share) navigator.share({ title: 'DuiX', text: 'Entra a mi sala de DuiX', url: link }).catch(() => {}); else if (navigator.clipboard) navigator.clipboard.writeText(link).then(() => toast('Enlace copiado.', ''), () => toast(link, '')); else toast(link, ''); } }, 'Compartir enlace')) : null,
-        h('div', { class: 'rvil' }, K.villainEl(v, 70), h('div', null, h('b', { text: 'Villano: ' + v.name }), h('small', { text: lines.join(' · ') }))),
-        h('h3', { class: 'rsub' }, 'Jugadores (', h('b', { class: 'pc', text: String(pls.length) }), ')'), list,
-        isHost ? h('button', { class: 'btn big', type: 'button', onclick: hostStart }, 'Empezar partida') : null));
+      const plazaBox = h('div', { class: 'plazabox' });
+      const emo = h('div', { class: 'emotes' }, root.DuiXPlaza.EMOTES.map((e) => h('button', { type: 'button', class: 'emo', 'aria-label': 'Emote ' + e, onclick: () => { sfx('click'); N.update(P + '/pos/' + pid, { e, et: N.TS }).catch(() => {}); if (e === '💃') sfx('levelup'); } }, e)));
+      const plist = h('div', { class: 'plist' }), count = h('b', { class: 'pc', text: '0' });
+      refs = { plist, count };
+      const title = mode === 'lobby' ? (isHost ? 'Sala lista' : 'Estás dentro') : mode === 'live' ? (my.finished ? '¡Terminaste!' : 'Partida en curso') : '¡Fin de la partida!';
+      const sub = mode === 'lobby' ? (isHost ? 'Los demás entran en DuiX → Salas con este código. ¡Mientras tanto, camina, baila y cámbiate de ropa!' : 'Espera a que el anfitrión empiece. ¡Camina por la plaza, haz emotes y cámbiate de ropa!') : mode === 'live' ? 'Espera a que terminen los demás mientras paseas por la plaza.' : (isHost ? 'Cuando todos estén en la plaza, abre una nueva partida.' : 'Espera a que el anfitrión abra una nueva partida.');
+      const parts = [
+        h('div', { class: 'rtop' }, h('button', { class: 'btn small ghost', type: 'button', onclick: () => confirmLeave() }, isHost ? 'Cerrar sala' : 'Salir'), mode === 'live' && isHost ? h('button', { class: 'btn small', type: 'button', onclick: () => { sfx('click'); hostEnd(); } }, 'Terminar ya ⏹') : null),
+        h('h2', { class: 'rtitle', text: title }),
+        h('div', { class: 'bigcode small', 'aria-label': 'Código de la sala ' + code.split('').join(' ') }, code.split('').map((c) => h('span', { text: c }))),
+        h('p', { class: 'hint', text: sub }),
+        plazaBox, emo,
+        h('div', { class: 'row plzrow' }, h('button', { class: 'btn small', type: 'button', onclick: () => { sfx('select'); openOutfit(); } }, '👕 Vestidor'),
+          isHost && mode === 'lobby' ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => { const q = plazaBox.parentNode.querySelector('.qrbox'); if (q) q.hidden = !q.hidden; } }, '📱 QR') : null,
+          isHost ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => { if (navigator.share) navigator.share({ title: 'DuiX', text: 'Entra a mi sala de DuiX', url: link }).catch(() => {}); else if (navigator.clipboard) navigator.clipboard.writeText(link).then(() => toast('Enlace copiado.', ''), () => toast(link, '')); else toast(link, ''); } }, 'Compartir') : null),
+        isHost && mode === 'lobby' ? h('div', { class: 'qrbox', hidden: true }, drawQR(link, 176)) : null,
+      ];
+      if (mode !== 'lobby') { refs.boss = bossBarEl(); const bd = h('ol', { class: 'rboard' }); refs.board = bd; parts.push(refs.boss, h('h3', { class: 'rsub', text: mode === 'after' ? 'Resultado final' : 'Ranking en vivo' }), bd); }
+      if (mode === 'lobby') parts.push(h('div', { class: 'rvil' }, K.villainEl(v, 64), h('div', null, h('b', { text: 'Villano: ' + v.name }), h('small', { text: lines.join(' · ') }))));
+      parts.push(h('h3', { class: 'rsub' }, 'En la plaza (', count, ')'), plist);
+      if (isHost && mode === 'lobby') parts.push(h('button', { class: 'btn big', type: 'button', onclick: hostStart }, 'Empezar partida'));
+      if (isHost && mode === 'after') parts.push(h('button', { class: 'btn big', type: 'button', onclick: hostRematch }, '¡Nueva partida!'), h('button', { class: 'btn ghost', type: 'button', onclick: () => closeRoom() }, 'Cerrar sala'));
+      if (!isHost && mode === 'after') parts.push(h('button', { class: 'btn ghost', type: 'button', onclick: () => leave() }, 'Salir de la sala'), h('button', { class: 'btn ghost', type: 'button', onclick: () => go('notebook') }, 'Ver Cuaderno'));
+      box.appendChild(h('div', { class: 'rpanel lobby plz' }, parts));
+      plaza = root.DuiXPlaza.mount(plazaBox, {
+        pid, code, now: nowMs, getPlayers: () => R.players, getPos: () => R.pos, getLook: () => p.look,
+        setPos: (x, y, f) => { N.update(P + '/pos/' + pid, { x, y, f }).catch(() => {}); }, onCoin: (n) => { St.addCoins(n); St.save(); K.refreshCoins && K.refreshCoins(); },
+      });
+      refreshPlaza();
     }
     function viewCountdown() {
       const v = roomVillain(R.cfg), s = R.state;
       const num = h('div', { class: 'cdnum', text: '3' });
-      box.appendChild(h('div', { class: 'rpanel cd' }, hostStrip(), h('h2', { class: 'rtitle', text: '¡A luchar!' }), h('div', { class: 'cdvil' }, K.villainEl(v, 120)), h('p', { class: 'hint', text: v.name + ' aparece… ¡prepárate!' }), num));
+      box.appendChild(h('div', { class: 'rpanel cd' }, h('h2', { class: 'rtitle', text: '¡A luchar!' }), h('div', { class: 'cdvil' }, K.villainEl(v, 120)), h('p', { class: 'hint', text: v.name + ' aparece… ¡prepárate!' }), num));
       clearInterval(cdTimer);
       const tick = () => {
         const el = nowMs() - (s.t0 || nowMs()), left3 = Math.ceil((3000 - el) / 1000);
@@ -327,11 +371,6 @@
         else { clearInterval(cdTimer); if (playing() && !my.finished) startBattle(); }
       };
       cdTimer = setInterval(tick, 100); tick();
-    }
-    function viewLive() {
-      const me = myP(), title = !playing() ? 'Partida en curso' : my.finished ? ((me && (me.hearts || 0) > 0) || (my.report && my.report.heartsLost < 3) ? '¡Terminaste!' : 'Te quedaste sin vidas') : 'Partida en curso';
-      const sub = !playing() ? 'Ranking en vivo. Termina cuando todos acaben (o pulsa “Terminar ya”).' : 'Espera a que terminen los demás. El ranking se actualiza solo.';
-      box.appendChild(h('div', { class: 'rpanel live' }, hostStrip(), h('h2', { class: 'rtitle', text: title }), my.report ? h('div', { class: 'rmine' }, h('b', { text: String(my.report.score) }), h('span', { text: ' puntos · ' + my.report.correct + ' aciertos' })) : null, h('p', { class: 'hint', text: sub }), bossBar(), h('h3', { class: 'rsub', text: 'Ranking en vivo' }), board(60)));
     }
     function viewEnd() {
       const rk = ranking(), me = rk.findIndex((x) => x.id === pid), mineP = me >= 0 ? rk[me] : null;
@@ -342,7 +381,7 @@
         pod.appendChild(h('div', { class: 'pcol p' + (idx + 1) }, idx === 0 ? h('div', { class: 'crown', text: '👑' }) : null, cv, h('b', { class: 'pname', text: x.name }), h('span', { class: 'pscore', text: String(x.score || 0) }), h('div', { class: 'pstep' }, h('span', { text: String(idx + 1) }))));
       });
       let reward = null;
-      if (playing() && mineP) {
+      if (playing() && mineP && mineP.done) {
         const key = code + ':' + ((R.cfg && R.cfg.seed) || 0), done = lsGet(LSR);
         if (!my.rewarded && !(done && done.key === key && done.pid === pid)) {
           const rep = my.report || { mistakes: [], bestStreak: 0 };
@@ -354,8 +393,8 @@
       }
       const rest = h('ol', { class: 'rboard' }, rk.slice(3).map((x, i) => h('li', { class: 'rrow' + (x.id === pid ? ' me' : '') }, h('span', { class: 'rpos', text: String(i + 4) }), K.headThumb(x.look || {}, 'rh'), h('div', { class: 'rmid' }, h('b', { class: 'rname', text: x.name })), h('span', { class: 'rscore', text: String(x.score || 0) }))));
       box.appendChild(h('div', { class: 'rpanel end' }, h('h2', { class: 'rtitle', text: '¡Fin de la partida!' }), pod, reward, rk.length > 3 ? rest : null,
-        isHost ? h('button', { class: 'btn big', type: 'button', onclick: () => closeRoom() }, 'Cerrar sala') : h('button', { class: 'btn big', type: 'button', onclick: () => leave() }, 'Salir'),
-        !isHost ? h('button', { class: 'btn ghost', type: 'button', onclick: () => go('notebook') }, 'Ver Cuaderno') : null));
+        h('button', { class: 'btn big', type: 'button', onclick: () => { sfx('select'); my.back = true; viewKey = ''; render(true); } }, '↩ Volver a la sala'),
+        isHost ? h('button', { class: 'btn ghost', type: 'button', onclick: () => closeRoom() }, 'Cerrar sala') : h('button', { class: 'btn ghost', type: 'button', onclick: () => leave() }, 'Salir')));
     }
 
     function render(force) {
@@ -366,20 +405,19 @@
         clearInterval(cdTimer);
       }
       if (battle) return; // el combate manda
-      // partida ya empezada y el jugador vuelve (recarga): si ya avanzó, se cuenta como retirado; si no, empieza
       if (ph === 'countdown' && playing() && !my.finished && R.playersLoaded && nowMs() - (s.t0 || 0) > 3000) {
         const me = myP();
         if (me && me.done) { my.finished = true; }
         else if (me && (me.qi || 0) > 0) { finishMine(null, true); return; }
       }
-      const key = ph + ':' + (my.finished ? 'F' : '');
+      const key = ph + ':' + (my.finished ? 'F' : '') + (my.back ? 'B' : '') + ':' + my.round;
       if (!force && key === viewKey) return;
-      viewKey = key; box.innerHTML = '';
-      if (ph === 'lobby') viewLobby();
-      else if (ph === 'end') { A.play('menu'); viewEnd(); }
+      viewKey = key; killPlaza(); box.innerHTML = '';
+      if (ph === 'lobby') viewPlaza('lobby');
+      else if (ph === 'end') { A.play('menu'); if (my.back) viewPlaza('after'); else viewEnd(); }
       else if (playing() && !my.finished && nowMs() - (s.t0 || 0) < 3000) viewCountdown();
       else if (playing() && !my.finished) { if (R.playersLoaded) startBattle(); else box.appendChild(h('div', { class: 'rpanel' }, h('p', { class: 'hint', text: 'Conectando…' }))); }
-      else viewLive();
+      else viewPlaza('live');
     }
   };
   root.DuiXRooms = { _battle: () => root.__roomBattle || null };
