@@ -89,13 +89,19 @@
       defeat: 'Mi período… ¡se acabó!',
     },
     {
-      id: 'indeterminado', n: 15, topic: 'mix', name: 'El Indeterminado', title: 'El Jefe del Vacío', district: 'El Vacío 0/0', tema: 'Todos los temas',
+      id: 'limites', n: 15, topic: 'limites', name: 'Aproximín', title: 'El Que Nunca Llega', district: 'Frontera del Límite', tema: 'Límites',
+      body: 'ghost', glyph: 'lím', pal: { main: '#2ec4b6', shade: '#0f7a70', light: '#9ff5ea', accent: '#ffd166', eye: '#0b2a33' }, sky: ['#021a1f', '#0f6b6b'], glow: '#2ec4b6',
+      intro: 'Me acerco… me acerco… ¡pero jamás me toco! ¿Hacia dónde voy cuando x se acerca?',
+      defeat: 'Me tabularon por los dos lados… ¡y por fin llegué a mi límite!',
+    },
+    {
+      id: 'indeterminado', n: 16, topic: 'mix', name: 'El Indeterminado', title: 'El Jefe del Vacío', district: 'El Vacío 0/0', tema: 'Todos los temas',
       body: 'void', glyph: '0/0', pal: { main: '#2a1a4a', shade: '#100a20', light: '#7a4fd1', accent: '#ff3b6b', eye: '#ff3b6b' }, sky: ['#000000', '#2a0a3d'], glow: '#b14cff', boss: true,
       intro: 'Nací de dividir entre cero. Ni valgo algo… ni valgo nada. ¡Y voy a borrarte de esta ciudad!',
       defeat: 'Detrás de mí… ¡alguien más movía los hilos!',
     },
     {
-      id: 'duinity', n: 16, topic: 'mix', name: 'Duinity', title: 'El Infinito', district: 'Dimensión Infinita', tema: 'Modo Duinity (sin fin)',
+      id: 'duinity', n: 17, topic: 'mix', name: 'Duinity', title: 'El Infinito', district: 'Dimensión Infinita', tema: 'Modo Duinity (sin fin)',
       body: 'king', glyph: '∞', pal: { main: '#ffd23f', shade: '#c98900', light: '#fff2a8', accent: '#ff3b6b', eye: '#2a0a3d' }, sky: ['#0a0020', '#4a1a8f'], glow: '#ffd23f', boss: true, endless: true,
       intro: 'Yo soy el límite al que nadie llega. ¿Cuánto puedes resistir contra el infinito?',
       defeat: '¡Imposible… llegaste hasta donde yo no acababa!',
@@ -238,8 +244,17 @@
       'Ejemplo: sen 150°: ángulo de referencia 30°, cuadrante II (sen positivo) → 1/2.',
       '📖 Stewart, Precálculo §6.1 “Medida de un ángulo” (p. 434), §6.2 (p. 443), §6.3 (p. 451), §5.1 “La circunferencia unitaria” (p. 370) y §5.3 (p. 386).',
     ],
+    limites: [
+      'Límite (idea intuitiva): lím(x→a) f(x) = L significa que f(x) se acerca a L cuando x se acerca a a, sin importar lo que pase exactamente en x = a.',
+      'Tabulación: evalúa f en valores cada vez más cercanos a a por la izquierda (a − 0,1; a − 0,01…) y por la derecha (a + 0,1; a + 0,01…). Si ambos lados se acercan al mismo número L, ese es el límite.',
+      'Si los dos lados se acercan a números distintos, el límite NO existe.',
+      'Cálculo básico: si f es un polinomio, sustituye x = a. Si sale 0/0 (indeterminado), factoriza y simplifica (o racionaliza con el conjugado) y luego sustituye.',
+      'Límites al infinito: en (px + q)/(rx + s) con x → ∞, el límite es p/r (los términos constantes pesan cada vez menos).',
+      'Ejemplo: lím(x→3) (x² − 9)/(x − 3) = lím(x→3) (x + 3) = 6.',
+      '📖 Stewart, Precálculo, Cap. 13 “Límites: una mirada previa al cálculo” §13.1 “Hallar límites numérica y gráficamente” y §13.2 “Hallar límites algebraicamente”.',
+    ],
     mix: [
-      'Aquí entran TODOS los temas: intervalos, fracciones, factorización, polinomios, plano, desigualdades, funciones, desplazamientos, tablas, potencias, composición, radicales, logaritmos y trigonometría.',
+      'Aquí entran TODOS los temas: intervalos, fracciones, factorización, polinomios, plano, desigualdades, funciones, desplazamientos, tablas, potencias, composición, radicales, logaritmos, trigonometría.',
       'Lee con calma cada pregunta y descarta opciones absurdas.',
       'Usa la Pista (te da una idea clara y descarta una opción) y tu Superpoder cuando lo necesites.',
       'Si dudas de un tema, repásalo antes en su distrito. Todos traen la referencia al libro de Stewart.',
@@ -259,6 +274,7 @@
     { id: 'weapon', name: 'Arma', icon: '⚔️' },
     { id: 'emblem', name: 'Emblema', icon: '⭐' },
     { id: 'amulet', name: 'Amuleto', icon: '🛡️' },
+    { id: 'emote', name: 'Emotes', icon: '💃' },
   ];
 
   const ITEMS = [
@@ -364,6 +380,21 @@
     { id: 'am-log', cat: 'amulet', name: 'Amuleto Logarítmico', rarity: 'epico', price: 300, perk: '+15% de monedas.', coins: 0.15 },
     { id: 'am-reloj', cat: 'amulet', name: 'Reloj de Arena', rarity: 'epico', price: 350, perk: 'Las respuestas caen 15% más lento.', slow: 0.15 },
     { id: 'am-titan', cat: 'amulet', name: 'Corazón de Titán', rarity: 'legendario', price: 700, perk: '+1 vida y ignora el primer golpe de cada batalla.', hearts: 1, shield: 1 },
+    // ---- Emotes (bailes y gestos animados, como en Free Fire / Fortnite)
+    { id: 'em-none', cat: 'emote', name: 'Sin emote', rarity: 'comun', price: 0, anim: 'none', fx: '' },
+    { id: 'em-saludo', cat: 'emote', name: 'Saludo Héroe', rarity: 'comun', price: 0, anim: 'wave', fx: '👋', desc: 'El saludo clásico de todo superhéroe.' },
+    { id: 'em-baile', cat: 'emote', name: 'Baile Arcade', rarity: 'comun', price: 0, anim: 'sway', fx: '🎵', desc: 'Mueve el esqueleto al ritmo del chiptune.' },
+    { id: 'em-salto', cat: 'emote', name: 'Salto Victoria', rarity: 'comun', price: 0, anim: 'hop', fx: '⭐', desc: '¡Saltos de campeón!' },
+    { id: 'em-giro', cat: 'emote', name: 'Giro Ninja', rarity: 'raro', price: 150, anim: 'spin', fx: '💨', desc: 'Giras como un trompo ninja.' },
+    { id: 'em-robot', cat: 'emote', name: 'Robot Retro', rarity: 'raro', price: 180, anim: 'robot', fx: '⚙️', desc: 'Bip bop: movimientos de robot.' },
+    { id: 'em-floss', cat: 'emote', name: 'Floss Fantasma', rarity: 'raro', price: 220, anim: 'floss', fx: '✨', desc: 'El baile más viral de la galaxia.' },
+    { id: 'em-latido', cat: 'emote', name: 'Corazón Loco', rarity: 'raro', price: 200, anim: 'pulse', fx: '❤️', desc: 'Tu corazón late por el cálculo.' },
+    { id: 'em-mortal', cat: 'emote', name: 'Mortal Atrás', rarity: 'epico', price: 320, anim: 'flip', fx: '💥', desc: 'Voltereta hacia atrás con explosión.' },
+    { id: 'em-moon', cat: 'emote', name: 'Moonwalk Neón', rarity: 'epico', price: 350, anim: 'moon', fx: '🌙', desc: 'Deslízate hacia atrás como una estrella.' },
+    { id: 'em-tornado', cat: 'emote', name: 'Tornado', rarity: 'epico', price: 380, anim: 'tornado', fx: '🌀', desc: 'Un remolino de pura energía.' },
+    { id: 'em-temblor', cat: 'emote', name: 'Terremoto', rarity: 'epico', price: 300, anim: 'shake', fx: '💢', desc: 'Sacude toda la pista.' },
+    { id: 'em-rey', cat: 'emote', name: 'Rey del Baile', rarity: 'legendario', price: 600, anim: 'king', fx: '👑', desc: 'Combo de giros, saltos y poses reales.' },
+    { id: 'em-sigma', cat: 'emote', name: 'Danza Sigma', rarity: 'legendario', price: 700, anim: 'sigma', fx: 'Σ', desc: 'La danza secreta de los matemáticos.' },
   ];
   const ITEM_BY_ID = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
 
@@ -383,11 +414,11 @@
     { id: 'racha12', name: 'Imparable', desc: 'Logra una racha de 12 aciertos.', goal: 12, prog: (s) => s.bestStreak, coins: 80, item: 'wp-plasma' },
     { id: 'racha25', name: 'Máquina de límites', desc: 'Logra una racha de 25 aciertos.', goal: 25, prog: (s) => s.bestStreak, coins: 200 },
     { id: 'villanos5', name: 'Cazador de villanos', desc: 'Derrota a 5 villanos distintos.', goal: 5, prog: (s) => s.districts, coins: 60 },
-    { id: 'villanos14', name: 'Guardián de la Ciudad', desc: 'Derrota a los 14 villanos.', goal: 14, prog: (s) => s.districts, coins: 250, item: 'mask-visor' },
+    { id: 'villanos14', name: 'Guardián de la Ciudad', desc: 'Derrota a los 15 villanos.', goal: 15, prog: (s) => s.districts, coins: 250, item: 'mask-visor' },
     { id: 'perfecto', name: 'Sin rasguños', desc: 'Gana una batalla sin perder ninguna vida.', goal: 1, prog: (s) => s.perfect, coins: 40 },
     { id: 'perfecto5', name: 'Intocable', desc: 'Gana 5 batallas sin perder ninguna vida.', goal: 5, prog: (s) => s.perfect, coins: 150, item: 'cape-larga-negra' },
     { id: 'estrellas', name: 'Coleccionista de estrellas', desc: 'Consigue 25 estrellas en total.', goal: 25, prog: (s) => s.stars, coins: 100 },
-    { id: 'estrellas42', name: 'Cielo despejado', desc: 'Consigue las 42 estrellas del mapa.', goal: 42, prog: (s) => s.stars, coins: 400, item: 'suit-dorado' },
+    { id: 'estrellas42', name: 'Cielo despejado', desc: 'Consigue las 45 estrellas del mapa.', goal: 45, prog: (s) => s.stars, coins: 400, item: 'suit-dorado' },
     { id: 'heroico', name: 'Modo heroico', desc: 'Gana en dificultad Difícil.', goal: 1, prog: (s) => s.hardWins, coins: 80 },
     { id: 'nivel5', name: 'Héroe en ascenso', desc: 'Llega al nivel 5.', goal: 5, prog: (s) => s.level, coins: 60 },
     { id: 'nivel10', name: 'Leyenda de Ciudad Límite', desc: 'Llega al nivel 10.', goal: 10, prog: (s) => s.level, coins: 200 },
@@ -408,6 +439,7 @@
     { id: 'm-districts2', name: 'Juega 2 distritos distintos', goal: 2, stat: 'districts', reward: 35 },
   ];
 
-  const DATA = { VILLAINS, REPASO, RARITY, CATS, ITEMS, ITEM_BY_ID, SKINS, HAIR_COLORS, BASE_SUITS, FREE_HAIR, ACH, MISSIONS };
+  const AUTHOR = { name: 'Deiwy', full: 'Deiwy', career: 'Estadística', course: 'Cálculo Diferencial', book: 'Stewart, Precálculo', year: 2026 }; // ← pon aquí tu nombre completo
+  const DATA = { AUTHOR, VILLAINS, REPASO, RARITY, CATS, ITEMS, ITEM_BY_ID, SKINS, HAIR_COLORS, BASE_SUITS, FREE_HAIR, ACH, MISSIONS };
   if (typeof module !== 'undefined' && module.exports) module.exports = DATA; else root.DuiXData = DATA;
 })(typeof window !== 'undefined' ? window : globalThis);

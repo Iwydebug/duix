@@ -7,8 +7,9 @@
 (function (root) {
   'use strict';
   const D = root.DuiXData, A = root.DuiXAudio, St = root.DuiXStore, Q = root.DuiXQ, N = root.DuiXNet, U = root.DuiXUI, B = root.DuiXBattle;
+  const G = root.DuiXGames;
   const K = U.kit, h = K.h, sfx = K.sfx, toast = K.toast, modal = K.modal, go = K.go, SCREENS = K.SCREENS, later = K.later;
-  const TOPICS = D.VILLAINS.filter((v) => v.n <= 14);
+  const TOPICS = D.VILLAINS.filter((v) => !v.boss);
   const ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ', MAX_PLAYERS = 60;
   const LSK = 'duix.room', LSR = 'duix.rewarded';
   const lsGet = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
@@ -128,10 +129,13 @@
     const drawChips = () => { chips.innerHTML = ''; TOPICS.forEach((v) => chips.appendChild(h('button', { type: 'button', class: 'tchip' + (c.topics.has(v.topic) ? ' on' : ''), 'aria-pressed': c.topics.has(v.topic) ? 'true' : 'false', onclick: () => { if (c.topics.has(v.topic)) { if (c.topics.size > 1) c.topics.delete(v.topic); else { toast('Deja al menos un tema.', 'warn'); return; } } else c.topics.add(v.topic); sfx('click'); drawChips(); } }, v.tema))); };
     drawChips();
     return h('div', null,
-      h('div', { class: 'set-block' }, h('div', { class: 'set col' }, h('div', null, h('b', { text: 'Preguntas por jugador' }), h('small', { text: 'Cada jugador responde todas; 8 dura unos 4 minutos.' })), seg([[5, '5'], [8, '8'], [10, '10'], [15, '15']], () => c.n, (v) => { c.n = v; })),
+      h('div', { class: 'set-block' }, h('div', { class: 'set col' }, h('div', null, h('b', { text: 'Preguntas por jugador' }), h('small', { text: 'Cada jugador responde todas; 9 dura unos 5 minutos.' })), seg([[6, '6'], [9, '9'], [12, '12'], [15, '15']], () => c.n, (v) => { c.n = v; })),
         h('div', { class: 'set col' }, h('div', null, h('b', { text: 'Dificultad' }), h('small', { text: '“Creciente” empieza fácil y termina difícil.' })), seg([[1, 'Fácil'], [2, 'Media'], [3, 'Difícil'], [0, 'Creciente']], () => c.level, (v) => { c.level = v; }))),
       h('div', { class: 'set-block' }, h('h3', { text: 'Temas' }), h('div', { class: 'row' }, h('button', { type: 'button', class: 'btn small ghost', onclick: () => { TOPICS.forEach((v) => c.topics.add(v.topic)); sfx('click'); drawChips(); } }, 'Todos')), chips,
         h('small', { class: 'hint', text: 'Con un solo tema pelean contra su villano; con varios, contra El Indeterminado.' })),
+      h('div', { class: 'set-block' }, h('h3', { text: 'Modo de juego' }),
+        switchRow('Mezclar los 3 juegos', 'Disparo → Carrera → Laberinto Pac-Man (las preguntas se reparten entre los tres)', () => c.mix !== false, (v) => { c.mix = v; }),
+        h('div', { class: 'set col' }, h('div', null, h('b', { text: '🕵️ Impostores' }), h('small', { text: 'Juegan normal pero pueden sabotear (turbo, niebla, robar puntos). Cada 3 preguntas todos votan quién es. Se necesitan 3+ jugadores.' })), seg([[0, 'Ninguno'], [1, '1'], [2, '2']], () => (c.imp || 0), (v) => { c.imp = v; }))),
       h('div', { class: 'set-block' }, secsRow(c),
         switchRow('Yo también juego', 'Apágalo si solo vas a proyectar el ranking', () => c.hostPlays, (v) => { c.hostPlays = v; })));
   }
@@ -141,7 +145,7 @@
     return h('div', { class: 'set col' }, h('div', null, h('b', { text: 'Tiempo por pregunta' }), h('small', { text: 'Segundos que tarda la respuesta en llegar al héroe (15 s a 1 min). Vale para todos.' })), h('div', { class: 'secsrow' }, h('span', { text: '15' }), rng, h('span', { text: '60' }), out));
   }
   SCREENS.roomCreate = (_, sc) => {
-    const c = { n: 8, level: 0, topics: new Set(TOPICS.map((v) => v.topic)), secs: 30, hostPlays: true };
+    const c = { n: 9, level: 0, topics: new Set(TOPICS.map((v) => v.topic)), secs: 30, hostPlays: true, mix: true, imp: 1 };
     const blocks = configBlocks(c);
     const msg = h('p', { class: 'hint err', role: 'alert' }), btn = h('button', { class: 'btn big', type: 'button' }, 'Crear sala');
     btn.addEventListener('click', async () => {
@@ -155,7 +159,7 @@
   async function createRoom(c) {
     const p = St.profile();
     await N.ready();
-    const cfg = { n: c.n, level: c.level, topics: Array.from(c.topics), secs: Math.max(15, Math.min(60, c.secs || 30)), hostPlays: !!c.hostPlays, seed: Math.floor(Math.random() * 4294967295), v: 3 };
+    const cfg = { n: c.n, level: c.level, topics: Array.from(c.topics), secs: Math.max(15, Math.min(60, c.secs || 30)), hostPlays: !!c.hostPlays, mix: c.mix !== false, imp: c.imp || 0, seed: Math.floor(Math.random() * 4294967295), v: 4 };
     let code = '', ok = false;
     for (let i = 0; i < 10 && !ok; i++) { code = newCode(); ok = (await N.get('rooms/' + code + '/state')) === null; }
     if (!ok) throw new Error('No se pudo crear un código libre. Inténtalo otra vez.');
@@ -172,7 +176,7 @@
   SCREENS.room = (params, sc) => {
     const code = params.code, role = params.role, p = St.profile(), pid = p.id, isHost = role === 'host';
     const P = 'rooms/' + code;
-    const R = { cfg: null, state: null, players: {}, pos: {}, playersLoaded: false, hostOnline: true };
+    const R = { cfg: null, state: null, players: {}, pos: {}, playersLoaded: false, hostOnline: true, votes: {}, sab: null };
     const my = { finished: false, report: null, rewarded: null, back: false, round: -1 };
     const subs = [], timers = [];
     let viewKey = '', left = false, offline = false, battle = null, questions = null, lastWrite = 0, writeT = 0, pending = null, lastRank = 0, renderT = 0, cdTimer = 0, plaza = null, refs = {};
@@ -214,7 +218,7 @@
       if (s === null) { if (R.state && R.state.phase === 'end') return; showClosed(); return; }
       const prev = R.state; R.state = s;
       if ((s.round || 0) !== my.round) { // nueva ronda: todo vuelve a empezar
-        if (my.round >= 0) { my.finished = false; my.report = null; my.rewarded = null; my.back = false; questions = null; if (battle) { try { battle.destroy(); } catch (e) { /* ok */ } battle = null; sc.classList.remove('s-battle'); holder.hidden = true; box.hidden = false; K.setAmbient(true, 'room'); } if (prev && prev.phase === 'end' && s.phase === 'lobby') toast('¡El anfitrión abrió una nueva partida!', ''); }
+        if (my.round >= 0) { my.finished = false; my.report = null; my.rewarded = null; my.back = false; questions = null; seg = null; announced = {}; if (battle) { try { battle.destroy(); } catch (e) { /* ok */ } battle = null; clearOverlays(); sc.classList.remove('s-battle'); holder.hidden = true; box.hidden = false; K.setAmbient(true, 'room'); } if (prev && prev.phase === 'end' && s.phase === 'lobby') toast('¡El anfitrión abrió una nueva partida!', ''); }
         my.round = s.round || 0; viewKey = '';
       }
       render(false);
@@ -239,11 +243,13 @@
         else if (el > 20 * 60 * 1000) hostEnd();
       }, 1000));
     }
-    function hostEnd() { const s = R.state; if (!s || s.phase === 'end') return; N.update(P, { state: { phase: 'end', t0: N.TS, round: round() } }).catch(() => {}); }
+    function hostEnd() { const s = R.state; if (!s || s.phase === 'end') return; N.update(P, { state: { phase: 'end', t0: N.TS, round: round(), imps: s.imps || null } }).catch(() => {}); }
     async function hostStart() {
       const n = Object.keys(R.players).length;
       if (!n) { toast('Aún no hay jugadores.', 'warn'); sfx('deny'); return; }
-      try { sfx('go'); await N.update(P, { state: { phase: 'countdown', t0: N.TS, round: round() } }); } catch (e) { toast(netErr(e), 'warn'); }
+      const ids = Object.keys(R.players).filter((id) => R.players[id].online !== false), want = Math.min((R.cfg && R.cfg.imp) || 0, Math.floor((ids.length - 1) / 2)), imps = {};
+      if (ids.length >= 3) { const pool = ids.slice(); for (let k = 0; k < want; k++) { const i = Math.floor(Math.random() * pool.length); imps[pool.splice(i, 1)[0]] = true; } }
+      try { sfx('go'); await N.update(P, { state: { phase: 'countdown', t0: N.TS, round: round(), imps: Object.keys(imps).length ? imps : null }, votes: null, sab: null }); } catch (e) { toast(netErr(e), 'warn'); }
     }
     async function hostRematch() {
       const upd = {}; Object.keys(R.players).forEach((id) => { if (R.players[id].online === false) upd['players/' + id] = null; else { upd['players/' + id + '/score'] = 0; upd['players/' + id + '/correct'] = 0; upd['players/' + id + '/qi'] = 0; upd['players/' + id + '/done'] = false; } });
@@ -266,29 +272,156 @@
       const write = () => { if (!pending) return; const s = pending; pending = null; lastWrite = Date.now(); N.update(P + '/players/' + pid, { score: s.score, correct: s.correct, qi: s.qi }).catch(() => {}); };
       if (immediate || now - lastWrite > 700) { clearTimeout(writeT); write(); } else { clearTimeout(writeT); writeT = setTimeout(write, 700 - (now - lastWrite)); }
     }
+    /* ----- 3 juegos seguidos + impostor ----- */
+    const KIND_NAME = { shoot: '🎯 Disparo', run: '🏃 Carrera', maze: '👻 Laberinto Pac-Man' };
+    let seg = null, fx = { speedUntil: 0 }, impCd = 0, lastCp = 0, voteOpen = false, lastSabId = '', announced = {}, cdTick = 0;
+    const segPlan = (cfg) => {
+      const n = cfg.n; if (cfg.mix === false) return [['shoot', n]];
+      const b = Math.floor(n / 3), r = n % 3, cnt = [b + (r > 0 ? 1 : 0), b + (r > 1 ? 1 : 0), b];
+      return [['shoot', cnt[0]], ['run', cnt[1]], ['maze', cnt[2]]].filter((x) => x[1] > 0);
+    };
+    const imps = () => (R.state && R.state.imps) || {};
+    const amImp = () => !!imps()[pid];
+    const nImps = () => Object.keys(imps()).length;
+    // ¿quién ya fue descubierto? (se calcula igual en todos los celulares a partir de los votos)
+    function expelledMap() {
+      const out = {}, ids = Object.keys(imps()); if (!ids.length) return out;
+      const crew = Math.max(1, Object.keys(R.players).length - ids.length), need = Math.max(2, Math.ceil(crew / 2)), hits = {};
+      Object.values(R.votes || {}).forEach((cp) => Object.keys(cp || {}).forEach((voter) => { const t = cp[voter]; if (imps()[t] && !imps()[voter]) { hits[t] = hits[t] || {}; hits[t][voter] = 1; } }));
+      ids.forEach((t) => { if (hits[t] && Object.keys(hits[t]).length >= need) out[t] = true; });
+      return out;
+    }
+    const speedMul = () => (Date.now() < fx.speedUntil ? 1.45 : 1);
+    function curTotals() {
+      const bs = (battle && battle.state) || { score: 0, correct: 0, answered: 0, mistakes: [], bestStreak: 0 }, b = seg ? seg.base : { score: 0, correct: 0, answered: 0 }, a = seg ? seg.agg : { mistakes: [], bestStreak: 0 };
+      return { score: b.score + Math.round(bs.score || 0), correct: b.correct + (bs.correct || 0), answered: b.answered + (bs.answered || 0), mistakes: a.mistakes.concat(bs.mistakes || []), bestStreak: Math.max(a.bestStreak, bs.bestStreak || 0) };
+    }
+    const adjScore = (d) => { if (battle && battle.state) battle.state.score = Math.max(0, (battle.state.score || 0) + d); else if (seg) seg.base.score = Math.max(0, seg.base.score + d); };
+    const overlay = (cls, html, ms) => { const e = h('div', { class: 'rov ' + cls, html }); holder.appendChild(e); if (ms) setTimeout(() => { e.classList.add('out'); setTimeout(() => e.remove(), 350); }, ms); return e; };
+    const clearOverlays = () => { holder.querySelectorAll('.rov,.imp-ui').forEach((e) => e.remove()); holder.classList.remove('fog'); };
     function startBattle() {
       if (battle || my.finished || left || !R.cfg) return;
       killPlaza(); questions = buildRoomQuestions(R.cfg);
-      if (innerWidth / Math.max(1, innerHeight) > 1.05) K.setAmbient(true, 'roombattle', { hue: 200 }); else K.setAmbient(false); sc.classList.add('s-battle'); box.hidden = true; holder.hidden = false; setBanner('');
+      K.setAmbient(false); sc.classList.add('s-battle'); box.hidden = true; holder.hidden = false; setBanner('');
       A.play('battle'); updateRank();
-      battle = B.start({
-        container: holder, villain: roomVillain(R.cfg), tier: R.cfg.level || 2, look: p.look, perks: {}, lockSettings: true, fallSecs: R.cfg.secs || (R.cfg.more ? 40 : 30), extraTop: rankEl,
-        room: { total: R.cfg.n, getQuestion: (i) => questions[i], hp: sharedHp, noHearts: true },
-        onProgress: (snap) => pushProgress(snap, snap.over),
-        onEnd: (rep) => { setTimeout(() => finishMine(rep), 0); },
+      seg = { plan: segPlan(R.cfg), i: 0, off: 0, base: { score: 0, correct: 0, answered: 0 }, agg: { mistakes: [], bestStreak: 0 } };
+      fx = { speedUntil: 0 }; impCd = 0; lastCp = 0; voteOpen = false; announced = {}; lastSabId = ((R.sab && R.sab.id) || '');
+      clearOverlays(); setupImpUI();
+      const first = () => startSeg();
+      if (nImps() && playing()) roleCard(first); else first();
+    }
+    function startSeg() {
+      if (left || my.finished || !seg) return;
+      const [kind, count] = seg.plan[seg.i], off = seg.off, cfg = R.cfg;
+      const bcfg = {
+        container: holder, villain: roomVillain(cfg), tier: cfg.level || 2, look: p.look, perks: {}, lockSettings: true, fallSecs: cfg.secs || (cfg.more ? 40 : 30), extraTop: rankEl, speedMul,
+        room: { total: count, getQuestion: (i) => questions[off + i], hp: sharedHp, noHearts: true },
+        onProgress: (snap) => onSnap(snap),
+        onEnd: (rep) => { setTimeout(() => segDone(rep), 0); },
         onQuit: () => { battle = null; root.__roomBattle = null; leaveGame(); },
-      });
+      };
+      const factory = kind === 'shoot' ? (c2) => B.start(c2) : kind === 'run' ? (c2) => G.startRun(c2) : (c2) => G.startMaze(c2);
+      if (seg.plan.length > 1 && seg.i > 0) overlay('segban', '<b>' + KIND_NAME[kind] + '</b><small>Juego ' + (seg.i + 1) + ' de ' + seg.plan.length + '</small>', 1300);
+      battle = G.withTutorial(bcfg, kind, factory);
       root.__roomBattle = battle;
+    }
+    function onSnap(snap) {
+      if (!seg) return;
+      pushProgress({ score: seg.base.score + snap.score, correct: seg.base.correct + snap.correct, qi: seg.base.answered + snap.qi, over: false }, snap.over);
+      checkVote(seg.base.answered + snap.qi);
+    }
+    function segDone(rep) {
+      if (left || my.finished || !seg) return;
+      const count = seg.plan[seg.i][1];
+      seg.base.score += rep.score; seg.base.correct += rep.correct; seg.base.answered += Math.max(rep.answered, 0);
+      seg.agg.mistakes = seg.agg.mistakes.concat(rep.mistakes || []); seg.agg.bestStreak = Math.max(seg.agg.bestStreak, rep.bestStreak || 0);
+      seg.off += count; seg.i++;
+      if (battle) { try { battle.destroy(); } catch (e) { /* ok */ } battle = null; }
+      if (seg.i < seg.plan.length) { startSeg(); return; }
+      const t = seg.base; let score = t.score;
+      if (amImp() && !expelledMap()[pid]) score += 150;
+      finishMine({ score, correct: t.correct, answered: t.answered, bestStreak: seg.agg.bestStreak, mistakes: seg.agg.mistakes, heartsLost: 0 });
     }
     function finishMine(rep, quit) {
       if (my.finished || left) return; my.finished = true; my.report = rep;
       if (battle) { try { battle.destroy(); } catch (e) { /* ok */ } battle = null; }
+      clearOverlays(); seg = null;
       sc.classList.remove('s-battle'); holder.hidden = true; box.hidden = false; K.setAmbient(true, 'room'); A.play('menu');
       const upd = { done: true, finishedAt: N.TS }; if (rep) { upd.score = rep.score; upd.correct = rep.correct; upd.qi = rep.answered; }
       if (quit) upd.online = false;
       clearTimeout(writeT); pending = null;
       N.update(P + '/players/' + pid, upd).catch(() => {});
       viewKey = ''; render(true);
+    }
+
+    /* ----- impostor: rol, sabotajes y votaciones ----- */
+    function roleCard(done) {
+      const imp = amImp(), n = nImps();
+      const e = overlay('rolecard ' + (imp ? 'imp' : 'crew'), imp
+        ? '<div class="rc-ico">🕵️</div><h2>¡ERES EL IMPOSTOR!</h2><p>Juega normal para que no sospechen y usa tu botón <b>🕵️ Sabotaje</b>: turbo a los demás, niebla o robar puntos. Si te descubren, pierdes tus poderes.</p><small>No se lo digas a nadie 🤫</small>'
+        : '<div class="rc-ico">🧑‍🚀</div><h2>Eres TRIPULANTE</h2><p>Entre ustedes hay <b>' + n + ' impostor' + (n > 1 ? 'es' : '') + '</b>. Responde bien y, cada 3 preguntas, vota quién crees que es. ¡Acertar da +100!</p><small>Si ves cosas raras (turbo, niebla, puntos que se van)… es sabotaje.</small>');
+      e.addEventListener('click', () => { e.remove(); done(); }, { once: true });
+      sfx(imp ? 'boom' : 'select');
+      const t = setTimeout(() => { if (e.parentNode) { e.remove(); done(); } }, 4200); timers.push(t);
+    }
+    function setupImpUI() {
+      if (!nImps() || !playing()) return;
+      const imp = amImp();
+      const tag = h('div', { class: 'imp-ui imp-tag ' + (imp ? 'imp' : 'crew'), text: imp ? '🕵️ IMPOSTOR' : '🧑‍🚀 Tripulante' });
+      holder.appendChild(tag);
+      if (!imp) return;
+      const btn = h('button', { type: 'button', class: 'imp-ui imp-btn', 'aria-label': 'Sabotaje' }, h('span', { class: 'ib-i', text: '🕵️' }), h('small', { text: 'Sabotaje' }), h('i', { class: 'ib-cd' }));
+      const menu = h('div', { class: 'imp-ui imp-menu', hidden: true },
+        [['turbo', '⏩', 'Turbo', 'Todo va más rápido 8 s'], ['fog', '🌫️', 'Niebla', 'No ven bien 6 s'], ['steal', '💸', 'Robo', '−60 pts a cada uno, +50 para ti']].map(([k, ico, nm, ds]) => h('button', { type: 'button', class: 'imp-opt', onclick: () => { menu.hidden = true; doSabotage(k); } }, h('b', { text: ico + ' ' + nm }), h('small', { text: ds }))));
+      btn.addEventListener('click', () => { if (expelledMap()[pid]) { toast('Te descubrieron: sin poderes.', 'warn'); return; } if (Date.now() < impCd) { sfx('deny'); return; } sfx('click'); menu.hidden = !menu.hidden; });
+      holder.appendChild(btn); holder.appendChild(menu);
+      cdTick = setInterval(() => { const left2 = Math.max(0, impCd - Date.now()), dead = !!expelledMap()[pid]; btn.classList.toggle('cd', left2 > 0 || dead); btn.classList.toggle('dead', dead); btn.querySelector('.ib-cd').style.setProperty('--p', dead ? 1 : left2 / 22000); }, 250); timers.push(cdTick);
+    }
+    function doSabotage(k) {
+      impCd = Date.now() + 22000; sfx('power');
+      N.set(P + '/sab', { k, by: pid, id: Math.random().toString(36).slice(2, 8), t: N.now() }).catch(() => {});
+      if (k === 'steal') { adjScore(+50); toast('💸 +50 puntos (robo)', ''); } else toast(k === 'turbo' ? '⏩ ¡Turbo enviado!' : '🌫️ ¡Niebla enviada!', '');
+    }
+    function onSab(v) {
+      R.sab = v; if (!v || !battle || my.finished || v.id === lastSabId) return; lastSabId = v.id;
+      if (v.by === pid || amImp() || N.now() - (v.t || 0) > 6000) return;
+      const wrap = holder.querySelector('.bt'); if (wrap) { wrap.classList.remove('hurt'); void wrap.offsetWidth; wrap.classList.add('hurt'); }
+      sfx('boom');
+      if (v.k === 'turbo') { fx.speedUntil = Date.now() + 8000; toast('⚠️ ¡SABOTAJE! Todo va más rápido…', 'warn'); }
+      else if (v.k === 'fog') { holder.classList.add('fog'); setTimeout(() => holder.classList.remove('fog'), 6000); toast('⚠️ ¡SABOTAJE! Niebla…', 'warn'); }
+      else if (v.k === 'steal') { adjScore(-60); toast('⚠️ ¡SABOTAJE! −60 puntos', 'warn'); }
+    }
+    subs.push(N.on(P + '/sab', onSab));
+    subs.push(N.on(P + '/votes', (v) => { R.votes = v || {}; checkExpelled(); }));
+    function checkExpelled() {
+      const ex = expelledMap();
+      Object.keys(ex).forEach((id) => { if (announced[id]) return; announced[id] = 1; const nm = (R.players[id] && R.players[id].name) || 'Alguien'; if (battle || box.hidden === false) toast('🚨 ¡' + nm + ' era IMPOSTOR y fue descubierto!', 'ach'); if (id === pid) toast('Te descubrieron: pierdes tus sabotajes.', 'warn'); });
+    }
+    function checkVote(answered) {
+      if (!nImps() || !playing() || amImp() || voteOpen || !battle) return;
+      const cp = Math.floor(answered / 3);
+      if (cp > lastCp && answered < (R.cfg.n || 0)) { lastCp = cp; openVote(cp); }
+      else if (amImp() && cp > lastCp) lastCp = cp;
+    }
+    function openVote(cp) {
+      voteOpen = true; const st0 = battle && battle.state; if (st0) st0.paused = true;
+      const others = Object.keys(R.players).filter((id) => id !== pid && R.players[id].online !== false);
+      let secs = 15, done = false;
+      const close = () => { if (done) return; done = true; clearInterval(iv); e.remove(); voteOpen = false; if (battle && battle.state) battle.state.paused = false; };
+      const cast = (id) => {
+        if (done) return; sfx(id ? 'select' : 'back');
+        if (id) {
+          N.set(P + '/votes/' + cp + '/' + pid, id).catch(() => {});
+          const nm = R.players[id].name;
+          if (imps()[id]) { adjScore(+100); toast('🎯 ¡Acertaste! ' + nm + ' ES impostor (+100)', 'ach'); sfx('win'); } else { adjScore(-40); toast('❌ ' + nm + ' es inocente (−40)', 'warn'); }
+        }
+        close();
+      };
+      const e = h('div', { class: 'rov vote' }, h('div', { class: 'vbox' }, h('small', { class: 'vt', text: 'VOTACIÓN ' + cp }), h('h2', { text: '¿Quién es el impostor?' }), h('p', { class: 'vsub', text: 'Piensa en quién sabotea: turbo, niebla o puntos que desaparecen.' }),
+        h('div', { class: 'vgrid' }, others.map((id) => h('button', { type: 'button', class: 'vopt', onclick: () => cast(id) }, K.headThumb(R.players[id].look || {}, ''), h('b', { text: String(R.players[id].name).slice(0, 10) })))),
+        h('button', { type: 'button', class: 'btn ghost small', onclick: () => cast(null) }, 'No sé · saltar'), h('small', { class: 'vtimer', text: secs + ' s' })));
+      holder.appendChild(e);
+      const iv = setInterval(() => { secs--; const t = e.querySelector('.vtimer'); if (t) t.textContent = secs + ' s'; if (secs <= 0) cast(null); }, 1000); timers.push(iv);
     }
     async function leaveGame() { lsDel(LSK); if (playing()) { try { await N.update(P + '/players/' + pid, { done: true, online: false }); } catch (e) { /* ok */ } } stop(); go('rooms'); }
 
@@ -337,10 +470,10 @@
       modal({ title: 'Ajustes', body: h('div', { class: 'set-block' }, h('b', { text: 'Música' }), mp, switchRow('Efectos de sonido', '', () => St.settings().sfx, (v) => St.setSetting('sfx', v)), switchRow('Pantalla retro (CRT)', '', () => St.settings().crt, (v) => St.setSetting('crt', v))), buttons: [{ label: 'Listo' }] });
     }
     function openHostConfig() {
-      const cfg0 = R.cfg || {}; const c = { n: cfg0.n || 8, level: cfg0.level || 0, topics: new Set(cfg0.topics || TOPICS.map((v) => v.topic)), secs: cfg0.secs || 30, hostPlays: cfg0.hostPlays !== false };
+      const cfg0 = R.cfg || {}; const c = { n: cfg0.n || 8, level: cfg0.level || 0, topics: new Set(cfg0.topics || TOPICS.map((v) => v.topic)), secs: cfg0.secs || 30, hostPlays: cfg0.hostPlays !== false, mix: cfg0.mix !== false, imp: cfg0.imp || 0 };
       modal({ title: 'Configurar la sala', cls: 'hostcfg', body: h('div', { class: 'hostcfgbody' }, configBlocks(c), h('small', { class: 'hint', text: 'Solo tú ves esta configuración. Los cambios valen para la próxima partida.' })),
         buttons: [{ label: 'Cancelar', cls: 'ghost' }, { label: 'Guardar', cls: 'gold', onClick: () => {
-          const upd = { n: c.n, level: c.level, topics: Array.from(c.topics), secs: Math.max(15, Math.min(60, c.secs || 30)), hostPlays: !!c.hostPlays };
+          const upd = { n: c.n, level: c.level, topics: Array.from(c.topics), secs: Math.max(15, Math.min(60, c.secs || 30)), hostPlays: !!c.hostPlays, mix: c.mix !== false, imp: c.imp || 0 };
           N.update(P + '/cfg', upd).then(() => { toast('Configuración guardada', ''); sfx('buy'); }).catch((e) => toast(netErr(e), 'warn'));
           if (!!c.hostPlays !== (cfg0.hostPlays !== false)) { if (c.hostPlays) N.set(P + '/players/' + pid, { name: p.name, look: p.look, score: 0, correct: 0, qi: 0, done: false, online: true, joined: N.TS }).catch(() => {}); else N.remove(P + '/players/' + pid).catch(() => {}); }
         } }] });
@@ -357,7 +490,7 @@
       const cfg = R.cfg || {}, link = linkFor(code), v = roomVillain(cfg.topics ? cfg : { topics: [] });
       const lines = [`${cfg.n || '?'} preguntas`, cfg.level ? ['', 'fáciles', 'medias', 'difíciles'][cfg.level] : 'dificultad creciente'].concat([(cfg.secs || 30) + ' s por pregunta']);
       const plazaBox = h('div', { class: 'plazabox' });
-      const emo = h('div', { class: 'emotes' }, root.DuiXPlaza.EMOTES.map((e) => h('button', { type: 'button', class: 'emo', 'aria-label': 'Emote ' + e, onclick: () => { sfx('click'); N.update(P + '/pos/' + pid, { e, et: N.TS }).catch(() => {}); if (e === '💃') sfx('levelup'); } }, e)));
+      const emo = h('div', { class: 'emotes' }, root.DuiXPlaza.EMOTES.map((e) => h('button', { type: 'button', class: 'emo', 'aria-label': 'Emote ' + e, onclick: () => { sfx('click'); N.update(P + '/pos/' + pid, { e, et: N.TS }).catch(() => {}); if (e === '💃') sfx('levelup'); } }, e)).concat([h('button', { type: 'button', class: 'emo emo-wheel', 'aria-label': 'Rueda de emotes', onclick: () => { sfx('select'); K.emoteWheel((it) => { N.update(P + '/pos/' + pid, { e: 'dance:' + it.id, et: N.TS }).catch(() => {}); }); } }, '💃 Emotes')]));
       const plist = h('div', { class: 'plist' }), count = h('b', { class: 'pc', text: '0' });
       refs = { plist, count };
       const title = mode === 'lobby' ? (isHost ? 'Sala lista' : 'Estás dentro') : mode === 'live' ? (my.finished ? '¡Terminaste!' : 'Partida en curso') : '¡Fin de la partida!';
@@ -418,7 +551,10 @@
         if (my.rewarded) { const nm = (my.report && my.report.mistakes || []).length; reward = h('div', { class: 'rreward' }, h('b', { text: 'Puesto ' + (me + 1) + ' de ' + rk.length }), h('span', null, K.img('coin', 2), ' +' + my.rewarded.coins + ' monedas · +' + my.rewarded.xp + ' XP' + (my.rewarded.bonus ? ' (incluye premio de podio)' : '')), nm ? h('small', { text: 'Tus ' + nm + ' errores quedaron en el Cuaderno para repasar.' }) : h('small', { text: '¡Sin errores!' })); }
       }
       const rest = h('ol', { class: 'rboard' }, rk.slice(3).map((x, i) => h('li', { class: 'rrow' + (x.id === pid ? ' me' : '') }, h('span', { class: 'rpos', text: String(i + 4) }), K.headThumb(x.look || {}, 'rh'), h('div', { class: 'rmid' }, h('b', { class: 'rname', text: x.name })), h('span', { class: 'rscore', text: String(x.score || 0) }))));
-      box.appendChild(h('div', { class: 'rpanel end' }, h('h2', { class: 'rtitle', text: '¡Fin de la partida!' }), pod, reward, rk.length > 3 ? rest : null,
+      const impIds = Object.keys(imps()), exm = expelledMap();
+      const reveal = impIds.length ? h('div', { class: 'imp-reveal' }, h('b', { text: '🕵️ ' + (impIds.length > 1 ? 'Los impostores eran' : 'El impostor era') }),
+        h('div', { class: 'ir-row' }, impIds.map((id) => { const x = R.players[id] || {}; return h('span', { class: 'ir-one' }, K.headThumb(x.look || {}, ''), h('b', { text: String(x.name || '???').slice(0, 10) }), h('small', { text: exm[id] ? '¡Descubierto!' : 'Escapó (+150)' })); }))) : null;
+      box.appendChild(h('div', { class: 'rpanel end' }, h('h2', { class: 'rtitle', text: '¡Fin de la partida!' }), pod, reveal, reward, rk.length > 3 ? rest : null,
         h('button', { class: 'btn big', type: 'button', onclick: () => { sfx('select'); my.back = true; viewKey = ''; render(true); } }, '↩ Volver a la sala'),
         isHost ? h('button', { class: 'btn ghost', type: 'button', onclick: () => closeRoom() }, 'Cerrar sala') : h('button', { class: 'btn ghost', type: 'button', onclick: () => leave() }, 'Salir')));
     }
@@ -427,7 +563,7 @@
       const s = R.state; if (left || !s || !R.cfg) return;
       const ph = s.phase;
       if (ph === 'end') {
-        if (battle) { const bs = battle.state; if (!my.report) my.report = { mistakes: bs.mistakes, bestStreak: bs.bestStreak, score: Math.round(bs.score), correct: bs.correct, answered: bs.answered, heartsLost: bs.heartsLost }; try { battle.destroy(); } catch (e) { /* ok */ } battle = null; sc.classList.remove('s-battle'); holder.hidden = true; box.hidden = false; K.setAmbient(true, 'room'); }
+        if (battle) { if (!my.report) { const t = curTotals(); my.report = { mistakes: t.mistakes, bestStreak: t.bestStreak, score: t.score, correct: t.correct, answered: t.answered, heartsLost: 0 }; } try { battle.destroy(); } catch (e) { /* ok */ } battle = null; clearOverlays(); seg = null; sc.classList.remove('s-battle'); holder.hidden = true; box.hidden = false; K.setAmbient(true, 'room'); }
         clearInterval(cdTimer);
       }
       if (battle) return; // el combate manda

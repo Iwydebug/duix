@@ -20,7 +20,7 @@
   const xpNeed = (lv) => 80 + 40 * (lv - 1);
   const LEVEL_ITEMS = { 3: 'emb-inf', 5: 'suit-lima', 7: 'mask-gafas', 8: 'pet-slime', 10: 'cape-larga-azul', 12: 'am-lupa', 15: 'wing-hada', 20: 'wp-arcoiris' };
   const STARTERS = D.ITEMS.filter((i) => i.price === 0 && !i.unlock).map((i) => i.id);
-  const DEFAULT_LOOK = { gender: 'm', skin: 1, hair: 'hair-corto', hairColor: 0, suit: 'suit-rojo', mask: 'mask-antifaz', wings: 'wing-none', cape: 'cape-corta', pet: 'pet-none', emblem: 'emb-star', weapon: 'wp-rayo', amulet: 'am-none' };
+  const DEFAULT_LOOK = { gender: 'm', skin: 1, hair: 'hair-corto', hairColor: 0, suit: 'suit-rojo', mask: 'mask-antifaz', wings: 'wing-none', cape: 'cape-corta', pet: 'pet-none', emblem: 'emb-star', weapon: 'wp-rayo', amulet: 'am-none', emote: 'em-saludo' };
 
   const DEFAULT_SETTINGS = { sfx: true, music: true, musicStyle: 'arcade', moreTime: false, volume: 0.7, crt: false, reduceMotion: false, big: false };
 
@@ -150,7 +150,7 @@
   }
 
   /* ---------- mapa / progreso ---------- */
-  const FIRST14 = D.VILLAINS.slice(0, 14);
+  const FIRST14 = D.VILLAINS.slice(0, 15);
   function prog(id) { const p = profile(); return (p && p.progress[id]) || { stars: 0, tier: 0, plays: 0, wins: 0 }; }
   function isCleared(id) { return prog(id).tier >= 3; }
   function unlocked(v) {
@@ -175,6 +175,7 @@
       if (pr.tier < 1) firstClear = true;
       pr.tier = Math.max(pr.tier, res.tier);
       pr.stars = Math.max(pr.stars, res.stars);
+      if (!v.endless) { pr.ts = pr.ts || {}; pr.ts[res.tier] = Math.max(pr.ts[res.tier] || 0, res.stars); }
       if (res.stars === 3) st.perfect++;
       if (res.tier === 3) st.hardWins++;
       if (v.id === 'indeterminado') st.boss++;
@@ -208,6 +209,28 @@
       districts: FIRST14.filter((v) => isCleared(v.id)).length,
       stars: FIRST14.reduce((a, v) => a + prog(v.id).stars, 0),
     };
+  }
+
+
+  /* ---------- PUNTAJE OFICIAL (máximo exacto: 100 puntos) ----------
+   * 15 tableros de tema × 6 pts = 90  +  jefe final 10 pts = 100.
+   * Cada tablero tiene 3 niveles de dificultad; puntos del nivel = peso × (estrellas ÷ 3).
+   * Tableros normales: pesos 1 / 2 / 3 (Fácil / Medio / Difícil).  Jefe: 2 / 3 / 5.  Duinity es un bonus y NO suma. */
+  const SCORE_W = { normal: [1, 2, 3], boss: [2, 3, 5] };
+  const SCORE_BOARDS = D.VILLAINS.filter((v) => !v.endless);
+  function boardScore(v, p) {
+    const pr = ((p || profile()) || { progress: {} }).progress[v.id] || {};
+    const W = v.boss ? SCORE_W.boss : SCORE_W.normal;
+    let ts = pr.ts;
+    if (!ts && pr.tier > 0) { ts = {}; for (let k = 1; k <= pr.tier; k++) ts[k] = Math.max(1, pr.stars || 1); } // partidas guardadas antes de v1.8
+    ts = ts || {};
+    const tiers = [1, 2, 3].map((k) => Math.round(W[k - 1] * ((ts[k] || 0) / 3) * 100) / 100);
+    return { id: v.id, name: v.name, tema: v.tema, boss: !!v.boss, tiers, weights: W, pts: Math.round(tiers.reduce((a, b) => a + b, 0) * 100) / 100, max: W.reduce((a, b) => a + b, 0) };
+  }
+  function score(p) {
+    const rows = SCORE_BOARDS.map((v) => boardScore(v, p));
+    const total = Math.round(rows.reduce((a, r) => a + r.pts, 0) * 10) / 10;
+    return { total, max: rows.reduce((a, r) => a + r.max, 0), rows };
   }
 
   /* ---------- logros ---------- */
@@ -276,7 +299,7 @@
     persistent, MAX_PROFILES, DEFAULT_LOOK, xpNeed, CHEST_COST, today, settings: () => settings, setSetting(k, v) { settings[k] = v; saveSettings(); notify('settings'); },
     list: () => db.list, profile, newProfile, switchTo, removeProfile, logout, save,
     has, buy, equip, setLook, openChest, grantItem, perks, addCoins, spend, addXp, addSigma, spendSigma, wheelState, spinsLeft, useSpin, grantSpin, wheelQuestionDone, WHEEL, rollWheel, applyPrize, EXCHANGE, exchange,
-    prog, isCleared, unlocked, recordBattle, recordRoom, stats, checkAch, ensureDaily, trackDaily, exportCode, importCode, resetAll,
+    prog, isCleared, unlocked, score, boardScore, recordBattle, recordRoom, stats, checkAch, ensureDaily, trackDaily, exportCode, importCode, resetAll,
     on(f) { listeners.push(f); },
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = S; else root.DuiXStore = S;

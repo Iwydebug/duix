@@ -3,7 +3,7 @@
   'use strict';
   const D = root.DuiXData, S = root.DuiXSprites, A = root.DuiXAudio, Q = root.DuiXQ, St = root.DuiXStore;
   const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "DejaVu Sans", Arial, sans-serif';
-  const LW = 360, LANES = 4, LANE_W = LW / LANES, LANE_COL = ['#ff7a59', '#ffd23f', '#5ce1e6', '#c58bff'];
+  let LW = 360, LANE_W = 90; const LANES = 4, LANE_COL = ['#ff7a59', '#ffd23f', '#5ce1e6', '#c58bff'];
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
   const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
@@ -85,7 +85,7 @@
       const f = $('.bt-field'); const r = { width: f.clientWidth, height: f.clientHeight }; if (r.width < 10 || r.height < 10) return;
       dpr = Math.min(2.5, root.devicePixelRatio || 1); W = r.width; H = r.height;
       cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.width = W + 'px'; cv.style.height = H + 'px';
-      LH = H * (LW / W);
+      { const sc0 = Math.min(W / 360, H / 320); LW = W / sc0; LH = H / sc0; LANE_W = LW / LANES; vil.x = LW / 2; hero.x = hero.tx = LANE_W * (st.lane + 0.5); }
     }
     let LH = 560;
     const ro = root.ResizeObserver ? new ResizeObserver(resize) : null; if (ro) ro.observe($('.bt-field')); root.addEventListener('resize', resize);
@@ -177,7 +177,7 @@
     }
     function onCorrect(c) {
       const clean = !st.qWrong && !st.qMiss;
-      c.state = 'dead'; st.answered++;
+      c.state = 'dead'; st.answered++; FB.right(wrap, st.q, clean);
       if (clean) { st.correct++; st.streak++; st.bestStreak = Math.max(st.bestStreak, st.streak); } else st.streak = 0;
       const mult = clean ? multOf() : 1, tb = clamp(1 - c.y / FLOOR(), 0, 1) * 40;
       const gain = Math.round((clean ? 100 : 40) * mult * (st.goldQ ? 2 : 1) + (clean ? tb : 0));
@@ -205,13 +205,14 @@
       c.state = 'dead'; st.qWrong = true; st.streak = 0; st.power = Math.floor(st.power * 0.5); st.qLogged = false; logMistake(c.lane);
       A.sfx('wrong'); float(c.x, c.y, '✖', '#ff4d4d', 30);
       damageHero(); renderHud();
+      if (st.hearts <= 0) FB.reveal(wrap, st.q, c.lane); else FB.wrong(wrap, st.q, c.lane);
       if (st.hearts <= 0) { explain('Elegiste «' + st.q.options[c.lane] + '». La correcta era «' + st.q.options[st.q.correct] + '». ' + st.q.explain); return defeat(); }
     }
     function onMiss(c) {
       // la respuesta correcta tocó el suelo
       st.qMiss = true; st.streak = 0; st.answered++; st.qLogged = false; logMistake(-1); c.state = 'good'; c.goldT = 0;
       caps.forEach((o) => { if (o !== c && o.state === 'fall') { o.state = 'dead'; burst(o.x, o.y + o.h / 2, '#7a6aa8', 8, 80, 0.4); } });
-      A.sfx('wrong'); damageHero(); explain('Se acabó el tiempo. La respuesta era «' + st.q.options[st.q.correct] + '». ' + st.q.explain); renderHud();
+      A.sfx('wrong'); damageHero(); FB.reveal(wrap, st.q, -1, '⏱ Se acabó el tiempo'); explain('Se acabó el tiempo. La respuesta era «' + st.q.options[st.q.correct] + '». ' + st.q.explain); renderHud();
       if (st.hearts <= 0) return defeat();
       st.state = 'between'; st.stateT = 0; st.wait = 1.2;
     }
@@ -260,7 +261,7 @@
         if (st.stateT >= 0.55) { endBig(); st.state = 'play'; st.stateT = 0; A.sfx('go'); banner('¡YA!', 'go', 550); renderHud(); }
       } else if (st.state === 'play') {
         caps.forEach((c) => {
-          if (c.state !== 'fall') return; c.t += dt; c.y += c.vy * dt; c.x = LANE_W * (c.lane + 0.5) + Math.sin(c.t * 1.6 + c.wob) * 3;
+          if (c.state !== 'fall') return; c.t += dt; c.y += c.vy * dt * (cfg.speedMul ? cfg.speedMul() : 1); c.x = LANE_W * (c.lane + 0.5) + Math.sin(c.t * 1.6 + c.wob) * 3;
           if (c.y + c.h >= FLOOR()) { if (c.ok) onMiss(c); else { c.state = 'dead'; burst(c.x, FLOOR(), '#7a6aa8', 8, 70, 0.4); } }
         });
         // si solo queda la correcta y ninguna otra, sigue igual
@@ -331,7 +332,7 @@
       ctx.save(); ctx.scale(sc, sc);
       const sx = shake > 0 ? (Math.random() - 0.5) * shake : 0, sy = shake > 0 ? (Math.random() - 0.5) * shake : 0; ctx.translate(sx, sy);
       // fondo
-      const bw = 90, bh = Math.ceil(LH / 4 / 8) * 8, key = bw + 'x' + bh; if (key !== bgKey) { bgKey = key; bgCv = S.cityBg(v, bw, bh); }
+      const bw = Math.max(90, Math.ceil(LW / 4 / 4) * 4), bh = Math.ceil(LH / 4 / 8) * 8, key = bw + 'x' + bh; if (key !== bgKey) { bgKey = key; bgCv = S.cityBg(v, bw, bh); }
       ctx.drawImage(bgCv, -6, -6, LW + 12, bh * 4 + 12);
       if (amb && !St.settings().reduceMotion) amb.overlay(ctx, LW, LH, t, 2); else if (amb) amb.overlay(ctx, LW, LH, 3, 2);
       // columnas de carril
@@ -415,5 +416,27 @@
     return { destroy, refresh: renderHud, pause: () => togglePause(true), state: st, _fire: fire, _hint: useHint, _power: usePower, _caps: caps };
   }
 
+
+  /* ---------- Retroalimentación pedagógica (rúbrica 8): explica el porqué al acertar y al fallar ---------- */
+  const FB = (() => {
+    const esc2 = (t) => String(t).replace(/[&<>]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[m]);
+    let timer = null;
+    function show(host, kind, title, body, ms) {
+      if (!host) return;
+      let e = host.querySelector('.bt-fb');
+      if (!e) { e = document.createElement('div'); e.className = 'bt-fb'; e.setAttribute('role', 'status'); e.setAttribute('aria-live', 'polite'); host.appendChild(e); }
+      e.className = 'bt-fb ' + kind; e.innerHTML = '<b>' + esc2(title) + '</b><span>' + esc2(body) + '</span>';
+      e.style.animation = 'none'; void e.offsetWidth; e.style.animation = '';
+      clearTimeout(timer); timer = setTimeout(() => { e.classList.add('out'); }, ms || Math.min(9000, 3800 + body.length * 28));
+    }
+    const opt = (q, i) => (i >= 0 && q.options[i] !== undefined ? '«' + q.options[i] + '»' : '');
+    return {
+      right(host, q, clean) { show(host, 'ok', clean ? '✅ ¡Correcto!' : '✅ ¡Ahora sí! Ya diste con la respuesta', q.explain); },
+      wrong(host, q, chosen) { show(host, 'bad', '❌ ' + (opt(q, chosen) ? opt(q, chosen) + ' no es la respuesta' : 'Esa no es la respuesta'), q.hint ? '💡 ' + q.hint : 'Léelo con calma y descarta opciones.', 4200); },
+      reveal(host, q, chosen, why) { show(host, 'bad', '❌ ' + (why || (opt(q, chosen) ? 'Elegiste ' + opt(q, chosen) : 'No respondiste')) + ' · La correcta: «' + q.options[q.correct] + '»', q.explain); },
+      clear(host) { const e = host && host.querySelector('.bt-fb'); if (e) e.remove(); },
+    };
+  })();
+  root.DuiXFB = FB;
   root.DuiXBattle = { start };
 })(typeof window !== 'undefined' ? window : globalThis);

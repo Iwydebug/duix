@@ -15,7 +15,7 @@
     polinomios: ['x³', '2x²', '+', 'x⁴', 'P(x)'], plano: ['(x,y)', '↗', '+', '−', 'y', 'x'], desigualdades: ['<', '>', '≤', '≥', '≠'],
     funciones: ['f(x)', '→', 'g(x)', 'y=x', 'f+g'], desplazamientos: ['↔', '↕', 'x−h', '+k', '↗'], tabulaciones: ['x|y', '1 2 3', '▦', 'f(2)'],
     potenciacion: ['aⁿ', 'x²', '2³', '10⁶', 'x⁻¹'], composicion: ['f∘g', 'g(f)', '(f∘g)(x)', '∘'], radicales: ['√', '∛', 'x^½', '√x', 'ⁿ√'],
-    logaritmos: ['log', 'ln', 'logₐ', 'e', 'eˣ'], trigonometria: ['sen', 'cos', 'tan', 'π', 'θ', '180°'],
+    logaritmos: ['log', 'ln', 'logₐ', 'e', 'eˣ'], limites: ['lím', '→', 'x→a', '0/0', 'L', '∞'], trigonometria: ['sen', 'cos', 'tan', 'π', 'θ', '180°'],
     all: ['π', '∑', '∞', '√', '∫', 'x²', 'f(x)', '≠', '≤', 'log', 'sen', 'θ', 'Δ', 'e', 'lím', '0/0'],
   };
   const COL = ['#5ce1e6', '#ffd23f', '#ff7ac8', '#c58bff', '#9dff8a', '#ffffff'];

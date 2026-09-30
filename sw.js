@@ -1,5 +1,5 @@
 /* DuiX — service worker: guarda el juego para usarlo sin internet */
-const VERSION = 'duix-v1.7.1';
+const VERSION = 'duix-v1.8.0';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './css/style.css',
   './js/data.js', './js/questions.js', './js/store.js', './js/audio.js', './js/sprites.js', './js/hero.js', './js/ambient.js', './js/battle.js', './js/games.js', './js/ui.js', './js/firebase-config.js', './js/net.js', './js/vendor/qrcode.js', './js/plaza.js', './js/rooms.js', './js/vendor/firebase-app-compat.js', './js/vendor/firebase-database-compat.js', './js/app.js',
@@ -16,6 +16,6 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(fetch(req).then((r) => { const cp = r.clone(); caches.open(VERSION).then((c) => c.put('./index.html', cp)); return r; }).catch(() => caches.match('./index.html')));
     return;
   }
-  // recursos: caché primero, y se refresca en segundo plano
-  e.respondWith(caches.match(req).then((hit) => { const net = fetch(req).then((r) => { if (r && r.ok) { const cp = r.clone(); caches.open(VERSION).then((c) => c.put(req, cp)); } return r; }).catch(() => hit); return hit || net; }));
+  // recursos: red primero (siempre la versión más nueva) y, sin internet, la copia guardada
+  e.respondWith(fetch(req, { cache: 'no-cache' }).then((r) => { if (r && r.ok) { const cp = r.clone(); caches.open(VERSION).then((c) => c.put(req, cp)); } return r; }).catch(() => caches.match(req)));
 });

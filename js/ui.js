@@ -96,7 +96,7 @@
   }
 
   /* ---------- navegación ---------- */
-  const SCREENS = {}, NAVSCREENS = ['hub', 'wardrobe', 'rooms', 'goals', 'notebook', 'settings'];
+  const SCREENS = {}, NAVSCREENS = ['hub', 'wardrobe', 'rooms', 'goals', 'notebook', 'settings', 'credits'];
   const MUSIC = { title: 'menu', profiles: 'menu', creator: 'menu', hub: 'map', district: 'map', wardrobe: 'menu', rooms: 'menu', goals: 'menu', notebook: 'menu', settings: 'menu', results: 'menu', wheel: 'menu' };
   function teardown() { stopLive(); cleanups.forEach((f) => { try { f(); } catch (e) { /* ok */ } }); cleanups = []; if (battle) { battle.destroy(); battle = null; } setAmbient(false); $('#modal').hidden = true; $('#modal').innerHTML = ''; $('#toasts').innerHTML = ''; }
   const AMB_SCREENS = ['hub', 'district', 'rooms', 'roomCreate', 'room', 'wardrobe', 'goals', 'notebook', 'settings', 'results', 'profiles', 'creator', 'wheel'];
@@ -116,8 +116,7 @@
     app().dataset.screen = name;
     if (NAVSCREENS.includes(name)) buildNav(name); else $('#nav').hidden = true;
     if (MUSIC[name]) A.play(MUSIC[name]);
-    if (name === 'battle' && innerWidth / Math.max(1, innerHeight) > 1.05) setAmbient(true, (params && params.id) || 'battle', { hue: 200 });
-    else if (AMB_SCREENS.includes(name)) setAmbient(true, name === 'district' && params && params.id ? params.id : name, { world: name === 'hub', hue: AMB_HUE[name] || 0 });
+    if (AMB_SCREENS.includes(name)) setAmbient(true, name === 'district' && params && params.id ? params.id : name, { world: name === 'hub', hue: AMB_HUE[name] || 0 });
     SCREENS[name](params || {}, sc);
     sc.classList.remove('enter'); void sc.offsetWidth; sc.classList.add('enter');
   }
@@ -140,7 +139,7 @@
       hero,
       h('div', { class: 'insert' }, h('span', { class: 'blink', text: 'INSERT COIN' }), h('small', { text: 'Toca la pantalla para jugar' })),
       marquee,
-      h('div', { class: 'credit', text: 'Hecho por Deiwy · Proyecto de Cálculo Diferencial' }));
+      h('div', { class: 'credit', text: 'Hecho por ' + D.AUTHOR.full + ' · Proyecto de Cálculo Diferencial' }));
     sc.appendChild(el);
     // interacción: tocar al héroe salta y suelta símbolos; el fondo sigue al puntero
     const SYM = ['Σ', '∫', 'π', '√', '∞', 'Δ', 'f(x)', 'lím', '≤', 'dx'];
@@ -179,6 +178,27 @@
   /* ============================================================
    * CREADOR DE HÉROE
    * ============================================================ */
+  /* ---------- emotes (animaciones estilo Free Fire / Fortnite) ---------- */
+  const emoItems = () => D.ITEMS.filter((i) => i.cat === 'emote' && i.id !== 'em-none');
+  const ownedEmotes = () => { const p = St.profile(); return p ? emoItems().filter((i) => p.owned.includes(i.id)) : []; };
+  function playEmoteOn(cv, box, it, ms) {
+    if (!it || !it.anim || it.anim === 'none') return;
+    [...cv.classList].filter((c) => c.startsWith('emo-')).forEach((c) => cv.classList.remove(c)); void cv.offsetWidth; cv.classList.add('emo-' + it.anim);
+    const t0 = Date.now(), dur = ms || 3600; sfx('levelup');
+    const spawn = () => { if (!box.isConnected) return; const r = cv.getBoundingClientRect(), br = box.getBoundingClientRect();
+      for (let i = 0; i < 3; i++) box.appendChild(h('span', { class: 'tsym efx', text: it.fx, style: `left:${r.left - br.left + r.width * (0.2 + Math.random() * 0.6)}px;top:${r.top - br.top + r.height * (0.2 + Math.random() * 0.4)}px;--dx:${Math.round((Math.random() - 0.5) * 160)}px;--dy:${-Math.round(60 + Math.random() * 110)}px;color:#ffd23f` })); box.querySelectorAll('.tsym.efx').forEach((e, i, a) => { if (a.length > 24 && i < a.length - 24) e.remove(); }); };
+    spawn(); const iv = setInterval(() => { if (Date.now() - t0 > dur || !cv.isConnected) { clearInterval(iv); cv.classList.remove('emo-' + it.anim); return; } spawn(); }, 600);
+    cleanups.push(() => clearInterval(iv));
+  }
+  // rueda de emotes: elige uno de los que tienes
+  function emoteWheel(onPick) {
+    const list = ownedEmotes(); const wrap = h('div', { class: 'ewheel' }); let close;
+    const N2 = Math.max(1, list.length), R2 = Math.min(130, 92 + N2 * 4);
+    list.forEach((it, i) => { const a = -Math.PI / 2 + i / N2 * Math.PI * 2, tx = Math.cos(a) * R2, ty = Math.sin(a) * R2;
+      wrap.appendChild(h('button', { type: 'button', class: 'ec r-' + it.rarity, style: `transform:translate(${tx}px,${ty}px);--t:translate(${tx}px,${ty}px)`, 'aria-label': it.name, onclick: () => { close(); onPick(it); } }, h('span', { text: it.fx || '💃' }), h('small', { text: it.name }))); });
+    wrap.appendChild(h('div', { class: 'ecenter', text: 'Emotes' }));
+    close = modal({ title: '', body: wrap, buttons: [{ label: 'Cerrar', cls: 'ghost' }] });
+  }
   const stageDeco = () => [h('div', { class: 'wspot' }), [0, 1, 2, 3, 4, 5, 6, 7].map((i) => h('i', { class: 'wspark', style: `left:${8 + i * 11}%;animation-delay:${(i * 0.37).toFixed(2)}s;--sz:${6 + (i % 3) * 3}px` }))];
   SCREENS.creator = (_, sc) => {
     const first = !St.list().length;
@@ -293,9 +313,9 @@
       el.dataset.y = py(i); map.appendChild(el); els.push(el);
     });
     // héroe (avatar) parado en el nivel actual; si avanzaste, camina hasta él
-    const hcv = h('canvas', { class: 'px lhero-cv' }); liveHero(hcv, () => p.look, { scale: 2 });
+    const hcv = h('canvas', { class: 'px lhero-cv' }); liveHero(hcv, () => p.look, { scale: 3 });
     const hero = h('div', { class: 'lhero' }, hcv, h('span', { class: 'lhero-sh' }));
-    const setHero = (x, y) => { hero.style.left = x + '%'; hero.style.top = y + 'px'; };
+    const setHero = (x, y) => { hero.style.left = x + '%'; hero.style.top = y + 'px'; hero.dataset.y = y; };
     let fromIdx = -1;
     if (lastHeroIdx !== null && lastHeroIdx !== nextIdx && lastHeroIdx < nextIdx) fromIdx = lastHeroIdx;
     const targetY = () => py(nextIdx) - (nodes[nextIdx].kind === 'board' ? 44 : 24);
@@ -307,20 +327,20 @@
     lastHeroIdx = nextIdx;
     // zoom suave según qué tan cerca del centro de la pantalla está cada nodo
     let raf = 0, mapTop = 0;
-    const zoom = () => { raf = 0; const mid = sc.scrollTop + sc.clientHeight / 2 - mapTop; for (let i = 0; i < els.length; i++) { const d = Math.abs(+els[i].dataset.y - mid), k = Math.max(0, 1 - d / (sc.clientHeight * 0.55)); els[i].style.setProperty('--zs', (0.78 + 0.42 * k * k).toFixed(3)); } };
+    const zoom = () => { raf = 0; const mid = sc.scrollTop + sc.clientHeight / 2 - mapTop; for (let i = 0; i < els.length; i++) { const d = Math.abs(+els[i].dataset.y - mid), k = Math.max(0, 1 - d / (sc.clientHeight * 0.55)); els[i].style.setProperty('--zs', (0.62 + 0.9 * k * k).toFixed(3)); } if (hero && hero.dataset) { const hd = Math.abs(+hero.dataset.y - mid), hk = Math.max(0, 1 - hd / (sc.clientHeight * 0.55)); hero.style.setProperty('--zs', (0.75 + 0.75 * hk * hk).toFixed(3)); } };
     const onScroll = () => { if (!raf) raf = requestAnimationFrame(zoom); };
     sc.addEventListener('scroll', onScroll, { passive: true }); cleanups.push(() => { sc.removeEventListener('scroll', onScroll); if (raf) cancelAnimationFrame(raf); });
     const playNext = () => { sfx('select'); go('district', { id: nextV.id, tier: nx.v.endless ? 2 : nextT }); };
     sc.appendChild(h('div', { class: 'hubwrap' }, topbar(),
-      h('div', { class: 'cta' }, h('div', { class: 'cta-l' }, h('b', { text: 'Mundo DuiX' }), h('small', { text: `${stats.districts}/14 tableros · ${stats.stars}/42 ★` })),
-        h('div', { class: 'ctabtns' }, h('button', { class: 'chip', onclick: () => { sfx('click'); go('goals'); } }, '📋 ', h('b', { text: dn + '/3' })))),
+      h('div', { class: 'cta' }, h('div', { class: 'cta-l' }, h('b', { text: 'Mundo DuiX' }), h('small', { text: `${stats.districts}/15 tableros · ${stats.stars}/45 ★` })),
+        h('div', { class: 'ctabtns' }, h('button', { class: 'chip', 'aria-label': 'Puntaje y créditos', onclick: () => { sfx('click'); go('credits'); } }, '🏆 ', h('b', { text: fmtPts(St.score().total) + '/100' })), h('button', { class: 'chip', onclick: () => { sfx('click'); go('goals'); } }, '📋 ', h('b', { text: dn + '/3' })))),
       h('button', { class: 'btn big playnext', onclick: playNext }, img('play', 3), h('span', { text: 'Continuar: ' + nextV.name + (nx.v.endless ? '' : ' · Nivel ' + nextT) })),
       map));
     // iconos flotantes fijos a los costados del mapa (como en Candy Crush)
     { const mk = (ico, label, fn, badge, cls) => h('button', { class: 'dockbtn ' + (cls || ''), 'aria-label': label, onclick: () => { sfx('select'); fn(); } }, h('span', { class: 'dico', text: ico }), h('small', { text: label }), badge ? h('i', { class: 'dbadge', text: badge }) : null);
       const spins = St.spinsLeft();
       const L = h('div', { class: 'hubdock left' }, mk('🎡', 'Ruleta', () => go('wheel'), spins ? String(spins) : '', 'wheelbtn'), mk('🎁', 'Vestidor', () => go('wardrobe')));
-      const Rr = h('div', { class: 'hubdock right' }, mk('🏆', 'Metas', () => go('goals'), dn ? dn + '/3' : ''), mk('👥', 'Salas', () => go('rooms')));
+      const Rr = h('div', { class: 'hubdock right' }, mk('🏆', 'Metas', () => go('goals'), dn ? dn + '/3' : ''), mk('💃', 'Emotes', () => emoteWheel((it) => { if (it.anim && it.anim !== 'none') playEmoteOn(hcv, hero, it, 3200); }), '', 'emobtn'), mk('👥', 'Salas', () => go('rooms')));
       app().appendChild(L); app().appendChild(Rr); cleanups.push(() => { L.remove(); Rr.remove(); }); }
     if (params.welcome) later(() => toast(`¡Bienvenido, <b>${esc(p.name)}</b>! El Mundo DuiX te necesita.`, '', 3800), 400);
     later(() => { mapTop = map.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop; const y = py(fromIdx >= 0 ? fromIdx : nextIdx) + mapTop; sc.scrollTop = y - sc.clientHeight * 0.6; zoom(); if (fromIdx >= 0 && fromIdx < nextIdx) { const y2 = py(nextIdx) + mapTop; const s0 = sc.scrollTop, s1 = y2 - sc.clientHeight * 0.6, T0 = performance.now(); const sm = (ts) => { const k = Math.min(1, (ts - T0 - 700) / (300 + (nextIdx - fromIdx) * 380)); if (k > 0) sc.scrollTop = s0 + (s1 - s0) * k; if (k < 1 && cur && cur.name === 'hub') requestAnimationFrame(sm); }; requestAnimationFrame(sm); } }, 40);
@@ -392,12 +412,14 @@
     const sigma = (res.win ? 1 + (res.stars === 3 ? 2 : 0) : 0) + (res.sigma || 0);
     St.addCoins(coins); if (sigma) St.addSigma(sigma); if (res.win) St.grantSpin(1);
     const ups = St.addXp(xp);
+    const scBefore = St.score().total;
     const rec = St.recordBattle(v, res);
+    const scAfter = St.score().total;
     const ach = St.checkAch();
     let chest = null; if (res.win && res.stars === 3 && Math.random() < 0.6) chest = St.openChest(true);
     St.save();
     battle = null;
-    go('results', { id: v.id, tier, res, coins, sigma, xp, ups, ach, chest, first: rec && rec.firstClear, before });
+    go('results', { id: v.id, tier, res, coins, sigma, xp, ups, ach, chest, scBefore, scAfter, first: rec && rec.firstClear, before });
   }
 
   /* ============================================================
@@ -416,19 +438,23 @@
       h('div', { class: 'rw' }, img('star', 3), h('b', { text: acc + '%' }), h('small', { text: 'precisión' })),
       h('div', { class: 'rw' }, img('heart', 3), h('b', { text: String(res.bestStreak) }), h('small', { text: 'mejor racha' })));
     const mist = res.mistakes.length ? h('div', { class: 'mist' }, h('h3', { class: 'h3', text: `Para repasar (${res.mistakes.length})` }), res.mistakes.map(mistakeCard)) : h('p', { class: 'hint', text: res.answered ? '¡Ni un error para repasar!' : '' });
+    const resHero = (() => { const cv = h('canvas', { class: 'px' }); liveHero(cv, () => p.look, { scale: 3, pose: () => 'idle' }); const box = h('div', { class: 'rhero' }, cv); const em = D.ITEM_BY_ID[p.look.emote]; if (res.win && em && em.anim !== 'none') later(() => playEmoteOn(cv, box, em, 4200), 700); return box; })();
     const nextV = V[V.indexOf(v) + 1];
     const canNext = res.win && nextV && St.unlocked(nextV);
     sc.appendChild(h('div', { class: 'results ' + (win ? 'win' : 'lose') },
       h('div', { class: 'rhead' }, h('div', { class: 'rvil', style: `--glow:${v.glow}` }, villainEl(v, 96)), h('div', { class: 'rbubble' }, h('p', { text: '“' + (res.win ? v.defeat : v.intro.split('.')[0] + '…') + '”' }))),
       h('h1', { class: 'h1 rtitle', text: title }),
+      res.win ? resHero : null,
       res.endless ? null : stars,
       rewards,
+      res.endless ? null : h('button', { class: 'scorebar', onclick: () => { sfx('select'); go('credits'); }, 'aria-label': 'Ver puntaje total' }, h('span', { class: 'sb-l', text: 'PUNTAJE' }), h('b', { text: fmtPts(P.scAfter) + ' / 100' }), P.scAfter > P.scBefore ? h('span', { class: 'sb-d', text: '+' + fmtPts(P.scAfter - P.scBefore) }) : h('small', { text: res.win ? 'Ya tenías estos puntos: sube de dificultad o de estrellas para ganar más' : 'Gana el tablero para sumar puntos' })),
       P.ups && P.ups.length ? h('div', { class: 'levelup' }, h('b', { text: '¡Subiste al nivel ' + P.ups[P.ups.length - 1].level + '!' }), h('small', { text: P.ups.map((u) => `Nivel ${u.level}: +${u.coins} monedas${u.item ? ' · ' + D.ITEM_BY_ID[u.item].name : ''}`).join(' · ') })) : null,
       P.chest && P.chest.ok ? h('div', { class: 'levelup chest' }, img('chest', 3), h('b', { text: '¡Cofre de botín!' }), h('small', { text: P.chest.item ? `Conseguiste: ${P.chest.item.name} (${D.RARITY[P.chest.item.rarity].name})` : `+${P.chest.coins} monedas extra` })) : null,
       mist,
       h('div', { class: 'rbtns' },
         canNext ? h('button', { class: 'btn big', onclick: () => { sfx('select'); go('district', { id: nextV.id }); } }, 'Siguiente distrito') : null,
         h('button', { class: 'btn' + (canNext ? '' : ' big'), onclick: () => { sfx('select'); go('district', { id: v.id, tier: P.tier }); } }, res.win ? 'Volver a luchar' : 'Reintentar'),
+        v.boss && res.win ? h('button', { class: 'btn gold big', onclick: () => { sfx('select'); go('credits', { final: true }); } }, '🏆 Créditos y puntaje final') : null,
         res.win ? h('button', { class: 'btn gold', onclick: () => { sfx('select'); go('wheel'); } }, '🎡 ¡Girar ruleta!') : null,
         h('button', { class: 'btn ghost', onclick: () => { sfx('back'); go('hub', { scrollTo: true }); } }, 'Volver al mapa'))));
     // sonidos y avisos
@@ -462,6 +488,7 @@
     const L = Object.assign({}, look, { [it.cat]: it.id });
     if (it.cat === 'hair' || it.cat === 'mask') { cv.width = 30; cv.height = 30; ctx.drawImage(S.heroCanvas(it.cat === 'hair' ? Object.assign({}, L, { mask: 'mask-none' }) : L, 'idle', 0, { nopet: true }), 21, 3, 30, 30, 0, 0, 30, 30); }
     else if (it.cat === 'emblem') { cv.width = 84; cv.height = 84; const suit = D.ITEM_BY_ID[look.suit] || D.ITEM_BY_ID['suit-rojo']; ctx.fillStyle = suit.main; ctx.fillRect(0, 0, 84, 84); const rows = S.EMB[it.shape]; const sc = Math.floor(60 / Math.max(rows[0].length, rows.length)), ox = Math.round((84 - rows[0].length * sc) / 2), oy = Math.round((84 - rows.length * sc) / 2); ctx.fillStyle = suit.accent === '#ffffff' ? '#fff' : S.lighten(suit.accent, 0.25); rows.forEach((r, j) => { for (let i = 0; i < r.length; i++) if (r[i] === '#') ctx.fillRect(ox + i * sc, oy + j * sc, sc, sc); }); }
+    else if (it.cat === 'emote') { cv.width = 84; cv.height = 84; ctx.fillStyle = '#1a1033'; ctx.fillRect(0, 0, 84, 84); ctx.font = '40px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(it.id === 'em-none' ? '🚫' : (it.fx || '💃'), 42, 46); ctx.font = '12px serif'; ctx.fillText('💃', 68, 14); }
     else if (it.cat === 'amulet') { cv.width = 84; cv.height = 84; ctx.fillStyle = '#1a1033'; ctx.fillRect(0, 0, 84, 84); ctx.font = '44px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(AMULET_ICON[it.id] || '✨', 42, 46); }
     else { cv.width = S.HERO_W; cv.height = S.HERO_H; ctx.drawImage(S.heroCanvas(L, it.cat === 'weapon' ? 'shoot' : 'idle', 0), 0, 0); }
     return cv;
@@ -475,7 +502,7 @@
     liveHero(stage, lookNow, { scale: 6, pose: () => (forcePose && Date.now() < forceUntil ? forcePose : (cat === 'weapon' || Math.floor(Date.now() / 1600) % 4 === 0 ? 'shoot' : 'idle')) });
     const stageBox = h('div', { class: 'wstage' }, stageDeco(), h('div', { class: 'wpod' }, stage), h('div', { class: 'wname', text: p.name }));
     stageBox.style.cursor = 'pointer';
-    stageBox.addEventListener('click', () => { forcePose = 'shoot'; forceUntil = Date.now() + 700; stage.classList.remove('jump'); void stage.offsetWidth; stage.classList.add('jump'); sfx('select'); });
+    stageBox.addEventListener('click', () => { const em = D.ITEM_BY_ID[p.look.emote]; if (em && em.anim && em.anim !== 'none') { playEmoteOn(stage, stageBox, em, 3000); return; } forcePose = 'shoot'; forceUntil = Date.now() + 700; stage.classList.remove('jump'); void stage.offsetWidth; stage.classList.add('jump'); sfx('select'); });
     const tabs = h('div', { class: 'ctabs', role: 'tablist' });
     const grid = h('div', { class: 'igrid' });
     const bar = h('div', { class: 'ibar' });
@@ -496,7 +523,7 @@
         eq ? h('span', { class: 'ibadge on', text: 'Puesto' }) : own ? h('span', { class: 'ibadge', text: 'Tuyo' }) : trying ? h('span', { class: 'ibadge on', text: 'Probando' }) : lockAch ? h('span', { class: 'ibadge ach', text: '🏆 Logro' }) : h('span', { class: 'ibadge price' }, img('coin', 2), h('b', { text: String(it.price) })));
     }
     function choose(it) {
-      sel = it.id; stage.classList.remove('jump'); void stage.offsetWidth; stage.classList.add('jump');
+      sel = it.id; if (it.cat === 'emote') playEmoteOn(stage, stageBox, it, 3600); else { stage.classList.remove('jump'); void stage.offsetWidth; stage.classList.add('jump'); }
       if (owned(it.id)) { St.equip(it.id); delete pv[it.cat]; sfx('select'); }
       else { pv[it.cat] = it.id; sfx('click'); }
       renderAll();
@@ -644,7 +671,7 @@
     if (!p.mistakes.length) wrap.appendChild(h('p', { class: 'hint', text: 'Aquí aparecerán las preguntas que falles, con su explicación, para que las repases. ¡Todavía no tienes ninguna!' }));
     else { wrap.appendChild(h('p', { class: 'hint', text: 'Tus últimos errores, con la respuesta correcta y por qué.' })); p.mistakes.slice(0, 20).forEach((m) => { const t = (V.find((x) => x.topic === m.topic) || {}).tema; wrap.appendChild(h('div', null, t ? h('small', { class: 'mt', text: t }) : null, mistakeCard(m))); }); }
     wrap.appendChild(h('h1', { class: 'h1', text: 'Repaso por tema' }));
-    V.filter((v) => v.n <= 14).forEach((v) => { const det = h('details', { class: 'acc' }, h('summary', null, villainEl(v, 34), h('b', { text: v.tema })), repasoList(v.topic)); wrap.appendChild(det); });
+    V.filter((v) => !v.boss).forEach((v) => { const det = h('details', { class: 'acc' }, h('summary', null, villainEl(v, 34), h('b', { text: v.tema })), repasoList(v.topic)); wrap.appendChild(det); });
     sc.appendChild(wrap);
   };
 
@@ -667,6 +694,7 @@
     sc.appendChild(h('div', { class: 'settings' }, topbar(), h('h1', { class: 'h1', text: 'Ajustes' }),
       h('div', { class: 'set-block' }, tog('sfx', 'Efectos de sonido'), h('div', { class: 'set col' }, h('div', null, h('b', { text: 'Música' }), h('small', { text: 'Elige el estilo que no te distraiga' })), musicPick), h('div', { class: 'set' }, h('div', null, h('b', { text: 'Volumen' })), vol)),
       h('div', { class: 'set-block' }, tog('crt', 'Pantalla retro (CRT)', 'Líneas de barrido y bordes suaves'), tog('reduceMotion', 'Reducir movimiento', 'Menos animaciones'), tog('big', 'Texto grande')),
+      h('div', { class: 'set-block' }, h('h3', { text: 'Créditos y puntaje' }), h('button', { class: 'btn', onclick: () => { sfx('select'); go('credits'); } }, '🏆 Ver créditos y puntaje final (' + fmtPts(St.score().total) + '/100)')),
       inst,
       h('div', { class: 'set-block' }, h('h3', { text: 'Progreso de ' + p.name }),
         h('p', { class: 'hint', text: 'Tu progreso se guarda en este dispositivo. Para llevarlo a otro, copia el código y pégalo allá.' }),
@@ -674,7 +702,38 @@
           h('button', { class: 'btn small ghost', onclick: () => { const r = St.importCode(code.value); if (r.ok) { toast('¡Héroe cargado!', ''); go('hub'); } else toast(r.err, 'warn'); } }, 'Cargar código')), code,
         h('div', { class: 'row' }, h('button', { class: 'btn small ghost', onclick: () => { St.logout(); go('profiles'); } }, 'Cambiar de héroe'),
           h('button', { class: 'btn small danger', onclick: () => modal({ title: '¿Borrar todo?', body: h('p', { text: 'Se borrarán TODOS los héroes y su progreso en este dispositivo.' }), buttons: [{ label: 'Cancelar', cls: 'ghost' }, { label: 'Borrar todo', cls: 'danger', onClick: () => { St.resetAll(); go('title'); } }] }) }, 'Borrar todo'))),
-      h('div', { class: 'about' }, h('b', { text: 'DuiX' }), h('p', { text: 'Juego de Cálculo Diferencial hecho por Deiwy, estudiante de Estadística.' }), h('small', { text: 'Temas: intervalos, fracciones, factorización, polinomios, plano cartesiano, desigualdades, funciones, desplazamientos, tabulaciones, potenciación, composición, radicales, logaritmos y trigonometría.' }))));
+      h('div', { class: 'about' }, h('b', { text: 'DuiX' }), h('p', { text: 'Juego de Cálculo Diferencial hecho por ' + D.AUTHOR.full + ', estudiante de Estadística.' }), h('small', { text: 'Temas: intervalos, fracciones, factorización, polinomios, plano cartesiano, desigualdades, funciones, desplazamientos, tabulaciones, potenciación, composición, radicales, logaritmos y trigonometría.' }))));
+  };
+
+
+  /* ============================================================
+   * CRÉDITOS Y PUNTAJE FINAL (rúbrica: nombre del autor + puntaje total)
+   * ============================================================ */
+  const fmtPts = (n) => (Math.round(n * 10) / 10).toString().replace('.', ',');
+  SCREENS.credits = (P, sc) => {
+    const p = St.profile(), A0 = D.AUTHOR, sco = St.score();
+    const pct = sco.total / sco.max;
+    const grade = pct >= 0.9 ? '¡Héroe legendario!' : pct >= 0.6 ? '¡Gran defensor de la ciudad!' : pct >= 0.3 ? 'Vas por buen camino' : 'Tu aventura apenas comienza';
+    const rows = sco.rows.map((r) => h('tr', { class: r.pts >= r.max - 0.01 ? 'full' : r.pts > 0 ? 'part' : '' },
+      h('td', { class: 'cr-n', text: r.boss ? '👑 ' + r.name : r.name }), h('td', { class: 'cr-t', text: r.tema }),
+      h('td', { class: 'cr-p' }, h('b', { text: fmtPts(r.pts) }), h('small', { text: ' / ' + r.max }))));
+    sc.appendChild(h('div', { class: 'credits' }, topbar(),
+      h('h1', { class: 'h1', text: P && P.final ? '¡Misión cumplida!' : 'Créditos y puntaje' }),
+      h('div', { class: 'cr-score' }, h('small', { text: 'PUNTAJE FINAL DE ' + p.name.toUpperCase() }), h('div', { class: 'cr-big' }, h('b', { text: fmtPts(sco.total) }), h('span', { text: ' / ' + sco.max })), h('p', { text: grade }),
+        h('div', { class: 'cr-bar' }, h('i', { style: `width:${Math.round(pct * 100)}%` }))),
+      h('div', { class: 'cr-card' }, h('h3', { text: 'Créditos' }),
+        h('p', { class: 'cr-au' }, h('span', { text: 'Juego creado por' }), h('b', { text: A0.full }), h('span', { text: `Estudiante de ${A0.career}` })),
+        h('p', { class: 'cr-sm', text: `Proyecto de ${A0.course} · Basado en ${A0.book} · ${A0.year}` })),
+      h('div', { class: 'cr-card' }, h('h3', { text: 'Cómo se calcula el puntaje (máx. 100)' }),
+        h('ul', { class: 'cr-rules' },
+          h('li', { text: '15 tableros de tema × 6 puntos = 90 puntos.' }),
+          h('li', { text: 'El jefe final El Indeterminado vale 10 puntos → total exacto: 100.' }),
+          h('li', { text: 'Cada tablero tiene 3 dificultades: Fácil (1 pt), Medio (2 pts) y Difícil (3 pts). En el jefe: 2, 3 y 5 pts.' }),
+          h('li', { text: 'Puntos de una dificultad = su valor × (estrellas ÷ 3). Con 3 estrellas se gana completo.' }),
+          h('li', { text: 'Duinity (modo sin fin) es un extra: no suma al puntaje.' }))),
+      h('div', { class: 'cr-card' }, h('h3', { text: 'Puntos por tablero' }), h('table', { class: 'cr-tab' }, h('tbody', null, rows)),
+        h('div', { class: 'cr-tot' }, h('span', { text: 'TOTAL' }), h('b', { text: fmtPts(sco.total) + ' / ' + sco.max }))),
+      h('div', { class: 'rbtns' }, h('button', { class: 'btn big', onclick: () => { sfx('back'); go('hub', { scrollTo: true }); } }, 'Volver al mapa'))));
   };
 
   /* ---------- arranque ---------- */
@@ -688,6 +747,6 @@
     go('title');
   }
 
-  const kit = { h, add, esc, img, sfx, modal, toast, topbar, avatarEl, headThumb, liveHero, villainEl, go, later, refreshCoins, announceAch, plural, $, $$, onLeave: (f) => cleanups.push(f), setAmbient, SCREENS, MUSIC };
+  const kit = { emoteWheel, ownedEmotes, playEmoteOn, h, add, esc, img, sfx, modal, toast, topbar, avatarEl, headThumb, liveHero, villainEl, go, later, refreshCoins, announceAch, plural, $, $$, onLeave: (f) => cleanups.push(f), setAmbient, SCREENS, MUSIC };
   root.DuiXUI = { boot, go, toast, kit, _cur: () => cur, _battle: () => battle, SCREENS };
 })(typeof window !== 'undefined' ? window : globalThis);

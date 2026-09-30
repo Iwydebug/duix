@@ -77,6 +77,11 @@ Así nadie puede listar todas las salas: solo entra quien conoce el código. Las
 - Teclado propio en pantalla para escribir el código de sala (funciona en cualquier dispositivo; el teclado físico también sirve).
 - Fondo del mapa convertido en un mundo de caramelo: arcoíris, sol sonriente, islas de chocolate, paletas, cupcakes, dulces con símbolos matemáticos y dragones pastel con estela de arcoíris. El cielo cambia de color (día → atardecer → noche mágica) al recorrer el mapa.
 
+## Novedades 1.7.2
+- Los 3 juegos (Disparo, Carrera, Laberinto) y el combate de las salas ahora llenan TODA la pantalla en computador, sin marco ni columna angosta.
+- Emotes estilo Free Fire / Fortnite: 14 bailes y gestos animados en la tienda (pestaña Emotes), se equipa uno de victoria (baila en la pantalla de resultados) y en las salas hay una rueda de emotes con los que tengas.
+- Mapa: héroe más grande y zoom más marcado al hacer scroll.
+
 ## Novedades 1.7.1
 - Laberinto tipo Pac-Man real: las respuestas son fantasmas que se mueven; te comes el de la respuesta correcta. Píldoras Σ = poder (los fantasmas huyen y, si los atrapas, van a la cárcel). Avatar más lento.
 - Preguntas por partida bajan con el nivel: Disparo 4, Carrera 3, Laberinto 2 (jefes +1).
@@ -100,3 +105,13 @@ Así nadie puede listar todas las salas: solo entra quien conoce el código. Las
 - **Mapa en camino** estilo mapa de niveles: niveles numerados en zigzag, camino que se ilumina al avanzar, tu héroe marca dónde vas.
 - **3 juegos por distrito**: Nivel 1 *Disparo*, Nivel 2 *Carrera* (elige la puerta correcta corriendo por carriles), Nivel 3 *Pares* (une problema con resultado contra reloj). Puedes elegir cualquiera desbloqueado; el siguiente se abre al superar el anterior.
 - Tarjetas de nivel a todo color. Las salas siguen usando el juego de disparo.
+
+## Novedades 1.8.0 (rúbrica del profesor)
+- **Tablero 15 «Límites» (Aproximín):** concepto intuitivo, tabulación por ambos lados y cálculo básico (sustitución, 0/0, conjugado, al infinito). También «punto-pendiente» en Plano cartesiano.
+- **Puntaje oficial sobre 100:** 15 tableros × 6 pts + jefe 10 pts. Pantalla **Créditos y puntaje** (Ajustes, mapa 🏆 y fin del jefe) con el nombre del autor (`AUTHOR` en `js/data.js`: escribe ahí tu nombre completo).
+- **Retroalimentación** al acertar y al fallar en los 3 juegos (tarjeta que explica el porqué).
+- **Mini-tutorial** por juego, con «Omitir» y «No volver a mostrar».
+- **Pac-Man con túneles** laterales que teletransportan.
+- **Salas:** los 3 juegos seguidos y **modo Impostor** (sabotajes: turbo, niebla, robo; votación cada 3 preguntas). No requiere cambiar las reglas de Firebase.
+- Héroe más grande (título y mapa), botón 💃 Emotes en el mapa, emotes Baile y Salto gratis.
+- La app ahora se actualiza sola (red primero + recarga al detectar versión nueva).

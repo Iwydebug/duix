@@ -8,6 +8,7 @@
   const D = root.DuiXData, S = root.DuiXSprites, A = root.DuiXAudio, Q = root.DuiXQ, St = root.DuiXStore;
   const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "DejaVu Sans", Arial, sans-serif';
   const LANE_COL = ['#ff7a59', '#ffd23f', '#5ce1e6', '#c58bff'];
+  const FB = root.DuiXFB;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
   const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
@@ -18,8 +19,8 @@
    * Núcleo común: HUD, corazones, puntaje, pausa, informe
    * ------------------------------------------------------------------ */
   function core(cfg, kind, bodyHtml, ctlHtml) {
-    const v = cfg.villain, perks = cfg.perks || {}, tier = cfg.tier;
-    const startHearts = 3 + (perks.hearts || 0);
+    const v = cfg.villain, perks = cfg.perks || {}, tier = cfg.tier, room = cfg.room || null;
+    const startHearts = room && room.noHearts ? 99 : 3 + (perks.hearts || 0);
     const st = { hearts: startHearts, maxHearts: startHearts, shield: perks.shield || 0, score: 0, streak: 0, bestStreak: 0, correct: 0, answered: 0, coins: 0, hintsUsed: 0, heartsLost: 0, mistakes: [], time: 0, over: false, win: false, paused: false };
     const wrap = el('div', 'bt gm gm-' + kind);
     wrap.innerHTML = `
@@ -32,19 +33,25 @@
       ${bodyHtml}
       <div class="bt-ctl">${ctlHtml}</div>
       <div class="bt-pausemenu" hidden><div class="bt-pbox"><h2>Pausa</h2><button class="btn big" data-a="resume">Seguir jugando</button><button class="btn" data-a="restart">↻ Reiniciar</button><div class="bt-pset"><b>Música</b><div class="seg bt-mpick"></div><label class="set bt-sfxrow"><span>Efectos de sonido</span><input type="checkbox" class="bt-sfxchk"><span class="sw2"></span></label></div><button class="btn ghost" data-a="quit">Salir</button></div></div>`;
+    if (room) { wrap.classList.add('room'); const rb = wrap.querySelector('[data-a=restart]'); if (rb) rb.remove(); }
+    if (cfg.extraTop) wrap.insertBefore(cfg.extraTop, wrap.querySelector('.bt-boss'));
     cfg.container.appendChild(wrap);
     const $ = (s) => wrap.querySelector(s);
     const api = { wrap, $, st, v, perks, tier, destroyed: false, raf: 0, last: 0, onTick: null, onResume: null };
     const mult = () => 1 + Math.min(2, Math.floor(Math.max(0, st.streak - 1) / 3) * 0.5);
     api.mult = mult;
-    api.hearts = () => { const h = $('.bt-hearts'); h.innerHTML = ''; for (let i = 0; i < st.maxHearts; i++) { const im = new Image(); im.alt = ''; im.src = S.icon(i < st.hearts ? 'heart' : 'heartEmpty', 3); h.appendChild(im); } if (st.shield > 0) h.appendChild(el('span', 'bt-shield', '🛡')); };
+    api.hearts = () => { const h = $('.bt-hearts'); h.innerHTML = ''; if (room && room.noHearts) { h.textContent = '⚔ Sala'; h.className = 'bt-hearts room'; return; } for (let i = 0; i < st.maxHearts; i++) { const im = new Image(); im.alt = ''; im.src = S.icon(i < st.hearts ? 'heart' : 'heartEmpty', 3); h.appendChild(im); } if (st.shield > 0) h.appendChild(el('span', 'bt-shield', '🛡')); };
     api.hud = (frac, text) => {
       $('.bt-score').textContent = String(Math.round(st.score));
       $('.bt-coins b').textContent = String(St.profile() ? St.profile().coins + st.coins : st.coins);
       const m = mult(); $('.bt-combo').textContent = st.streak >= 2 ? `Racha ${st.streak}${m > 1 ? ' · x' + m : ''}` : '';
-      $('.bt-hpbar i').style.width = clamp(frac, 0, 1) * 100 + '%'; $('.bt-hptxt').textContent = text || '';
+      if (room && room.hp) { const r = room.hp(); $('.bt-hpbar i').style.width = clamp(r.frac, 0, 1) * 100 + '%'; $('.bt-hptxt').textContent = r.text; } else { $('.bt-hpbar i').style.width = clamp(frac, 0, 1) * 100 + '%'; $('.bt-hptxt').textContent = text || ''; }
+      if (cfg.onProgress) { const snap = [Math.round(st.score), st.correct, st.answered, st.over ? 1 : 0].join(); if (snap !== api.lastSnap) { api.lastSnap = snap; cfg.onProgress({ score: Math.round(st.score), correct: st.correct, qi: st.answered, over: st.over }); } }
     };
+    api.addScore = (d) => { st.score = Math.max(0, st.score + d); };
+    api.speedMul = () => (cfg.speedMul ? cfg.speedMul() : 1);
     api.damage = () => {
+      if (room && room.noHearts) { A.sfx('hurt'); wrap.classList.remove('hurt'); void wrap.offsetWidth; wrap.classList.add('hurt'); return true; }
       if (st.shield > 0) { st.shield--; A.sfx('power'); api.hearts(); return false; }
       st.hearts--; st.heartsLost++; A.sfx('hurt'); api.hearts();
       wrap.classList.remove('hurt'); void wrap.offsetWidth; wrap.classList.add('hurt'); return true;
@@ -59,7 +66,7 @@
       const acc = st.answered ? st.correct / st.answered : 0; let stars = 0; if (st.win) stars = st.heartsLost === 0 ? 3 : (st.heartsLost === 1 || acc >= 0.75) ? 2 : 1;
       return { win: !!st.win, stars, correct: st.correct, answered: st.answered, bestStreak: st.bestStreak, mistakes: st.mistakes, score: Math.round(st.score), coins: st.coins, heartsLost: st.heartsLost, hintsUsed: st.hintsUsed, tier, time: Math.round(st.time), endless: false };
     };
-    api.toggle = (p) => { if (st.over) return; st.paused = p === undefined ? !st.paused : p; $('.bt-pausemenu').hidden = !st.paused; A.sfx('pause'); if (!st.paused) { api.last = 0; api.onResume && api.onResume(); } };
+    api.toggle = (p) => { if (st.over) return; if (room) { const show = p === undefined ? $('.bt-pausemenu').hidden : p; $('.bt-pausemenu').hidden = !show; return; } st.paused = p === undefined ? !st.paused : p; $('.bt-pausemenu').hidden = !st.paused; A.sfx('pause'); if (!st.paused) { api.last = 0; api.onResume && api.onResume(); } };
     // música / efectos
     { const mp = $('.bt-mpick'), chk = $('.bt-sfxchk');
       const now = () => { const q = St.settings(); return !q.music ? 'off' : q.musicStyle === 'calma' ? 'calma' : 'arcade'; };
@@ -67,7 +74,7 @@
       draw(); chk.checked = !!St.settings().sfx; chk.addEventListener('change', () => St.setSetting('sfx', chk.checked)); }
     $('.bt-pause').addEventListener('click', () => api.toggle(true));
     $('.bt-pausemenu').addEventListener('click', (e) => { const a = e.target.dataset && e.target.dataset.a; if (a === 'resume') api.toggle(false); if (a === 'quit') { api.destroy(); cfg.onQuit && cfg.onQuit(); } if (a === 'restart' && cfg.onRestart) { api.destroy(); cfg.onRestart(); } });
-    const onVis = () => { if (document.hidden) api.toggle(true); };
+    const onVis = () => { if (document.hidden && !room) api.toggle(true); };
     document.addEventListener('visibilitychange', onVis);
     const loop = (ts) => {
       if (api.destroyed) return; api.raf = requestAnimationFrame(loop);
@@ -120,14 +127,14 @@
    * NIVEL 2 · CARRERA
    * ------------------------------------------------------------------ */
   function startRun(cfg) {
-    const v = cfg.villain, N = v.boss ? 4 : 3;
+    const v = cfg.villain, room = cfg.room || null, N = room ? room.total : v.boss ? 4 : 3;
     const body = `<div class="bt-q"><div class="bt-qtag"></div><div class="bt-qtext"></div><div class="bt-qtable"></div><div class="bt-explain" hidden></div></div>
       <div class="bt-field"><canvas></canvas><div class="bt-banner" hidden></div></div>${BIGHTML}`;
     const ctl = `<button class="bt-btn bt-hint"><img alt="" src="${S.icon('bulb', 3)}"><span>Pista</span><em></em></button>
       <div class="bt-keys">Arrastra el dedo para mover a tu héroe en cualquier dirección<br><small>Teclado: flechas o WASD · H pista</small></div>`;
     const c = core(cfg, 'run', body, ctl), st = c.st, $ = c.$, cv = $('.bt-field canvas'), ctx = cv.getContext('2d');
     st.sigma = 0;
-    const intro = qIntro(c), LW = 360, GW = LW / 4 - 6;
+    const intro = qIntro(c); let LW = 360, GW = LW / 4 - 6;
     let W = 0, H = 0, dpr = 1, LH = 560, state = 'intro', sT = 0, readFor = 3, scroll = 0, spawned = 0, curIdx = -1, slowT = 0;
     const walls = [], items = [], parts = [], floats = [];
     let shake = 0, flash = 0, stun = 0, ended = false;
@@ -136,8 +143,8 @@
     const hintCost = () => Math.max(1, Math.round(20 * ((cfg.perks || {}).hintCost || 1)));
     const villain = S.villainCanvas(v);
     const D = 430, SPAWN_Y = -80;
-    const baseV = () => (LH * 0.75 / 17) * (1 + Math.min(0.2, spawned * 0.05)) * (1 - (cfg.perks || {}).slow * 0.5 || 1) * (slowT > 0 ? 0.5 : 1);
-    function resize() { const f = $('.bt-field'); const w = f.clientWidth, h = f.clientHeight; if (w < 10 || h < 10) return; dpr = Math.min(2.5, root.devicePixelRatio || 1); W = w; H = h; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.width = W + 'px'; cv.style.height = H + 'px'; LH = H * (LW / W); if (!hero.y) { hero.y = hero.ty = LH - 60; } }
+    const baseV = () => (LH * 0.75 / 17) * (1 + Math.min(0.2, spawned * 0.05)) * (1 - (cfg.perks || {}).slow * 0.5 || 1) * (slowT > 0 ? 0.5 : 1) * (room && cfg.fallSecs ? Math.max(0.45, Math.min(1.5, 27 / cfg.fallSecs)) : 1) * c.speedMul();
+    function resize() { const f = $('.bt-field'); const w = f.clientWidth, h = f.clientHeight; if (w < 10 || h < 10) return; dpr = Math.min(2.5, root.devicePixelRatio || 1); W = w; H = h; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.width = W + 'px'; cv.style.height = H + 'px'; { const sc0 = Math.min(W / 360, H / 320); LW = W / sc0; LH = H / sc0; GW = LW / 4 - 6; } if (!hero.y) { hero.y = hero.ty = LH - 60; hero.x = hero.tx = LW / 2; } hero.tx = clamp(hero.tx, 20, LW - 20); hero.x = clamp(hero.x, 20, LW - 20); }
     function wrapLines(text, maxW) {
       const tokens = []; let cur = '';
       for (let i = 0; i < text.length; i++) { cur += text[i]; const n = text[i + 1]; if (text[i] === ' ' || (text[i] === ')' && n === '(') || (text[i] === ',' && n === ' ')) { tokens.push(cur); cur = ''; } }
@@ -149,7 +156,7 @@
       }
       ctx.font = `700 9px ${FONT}`; const out = []; let l = ''; for (const ch of text) { if (ctx.measureText(l + ch).width > maxW) { out.push(l); l = ch; } else l += ch; } out.push(l); return { lines: out, fs: 9 };
     }
-    function makeQ() { let q; try { q = Q.generate(v.topic, v.topic === 'mix' ? Math.max(2, cfg.tier) : cfg.tier); } catch (e) { q = Q.generate('fracciones', 1); } return q; }
+    function makeQ() { let q; if (room) { try { return room.getQuestion(spawned); } catch (e) { /* ok */ } } try { q = Q.generate(v.topic, v.topic === 'mix' ? Math.max(2, cfg.tier) : cfg.tier); } catch (e) { q = Q.generate('fracciones', 1); } return q; }
     function spawnWall(y) {
       const q = st.nextQ || makeQ(); st.nextQ = null; const idx = spawned++;
       const gates = q.options.map((t, i) => { const lay = wrapLines(t, GW - 10); return { lane: i, x: LW / 4 * i + 3, w: GW, h: Math.max(50, lay.lines.length * lay.fs * 1.22 + 18), lines: lay.lines, fs: lay.fs, text: t, ok: i === q.correct, gone: false, crossed: false, mark: 0 }; });
@@ -167,10 +174,11 @@
     function burst(x, y, col, n, sp, life) { for (let i = 0; i < n; i++) { const a = Math.random() * 6.283, s = (0.3 + Math.random()) * sp; parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 30, t: 0, life: life * (0.5 + Math.random() * 0.7), c: Array.isArray(col) ? col[i % col.length] : col, s: 2 + Math.floor(Math.random() * 3) }); } }
     const fl = (x, y, text, col, size) => floats.push({ x, y, text, c: col || '#fff', size: size || 20, t: 0, life: 0.9 });
     const prog = () => c.hud(1 - st.answered / N, st.answered + '/' + N);
-    function finish(win) { if (ended) return; ended = true; st.over = true; st.win = win; state = 'end'; sT = 0; if (win) { A.sfx('levelup'); c.banner('¡VICTORIA!', 'go'); } else { A.sfx('lose'); c.banner('¡DERROTA!', 'lose'); } }
+    function finish(win) { if (ended) return; ended = true; st.over = true; st.win = win; state = 'end'; sT = 0; if (win) { A.sfx('levelup'); c.banner(room ? '¡LISTO!' : '¡VICTORIA!', 'go'); } else { A.sfx('lose'); c.banner('¡DERROTA!', 'lose'); } }
     function answerWall(w, g) {
       w.resolved = true; st.answered++; const x = g ? g.x + g.w / 2 : hero.x, y = g ? w.y + g.h / 2 : hero.y;
       if (g && g.ok) {
+        FB.right(c.wrap, w.q, !w.wrong);
         const clean = !w.wrong; if (clean) { st.correct++; st.streak++; st.bestStreak = Math.max(st.bestStreak, st.streak); } else st.streak = 0;
         const r = c.gain(clean, 0); g.mark = 1; burst(x, y, ['#ffe14a', '#fff', LANE_COL[g.lane]], 26, 200, 0.7); fl(x, y - 16, '+' + r.g, '#ffe14a', 24);
         w.gates.forEach((o) => { if (o !== g) o.gone = true; });
@@ -179,7 +187,7 @@
       } else {
         st.streak = 0; w.wrong = true; c.log(w.q, g ? g.lane : -1); c.damage(); burst(x, y, ['#ff3b5c', '#7a6aa8'], 20, 160, 0.6); fl(x, y - 16, g ? '✖' : '¡Se pasó!', '#ff4d4d', g ? 30 : 20);
         shake = 10; flash = 0.35; if (g) g.gone = true; w.gates.forEach((o) => { if (o.ok) o.mark = 2; });
-        explainBox(c, 'La correcta era «' + w.q.options[w.q.correct] + '». ' + w.q.explain);
+        explainBox(c, 'La correcta era «' + w.q.options[w.q.correct] + '». ' + w.q.explain); FB.reveal(c.wrap, w.q, g ? g.lane : -1, g ? '' : '¡Se pasó!');
         if (st.hearts <= 0) return finish(false);
         if (st.answered >= N) return finish(true);
       }
@@ -212,7 +220,7 @@
       const sp = 250; let kx = 0, ky = 0; if (keys.arrowleft || keys.a) kx -= 1; if (keys.arrowright || keys.d) kx += 1; if (keys.arrowup || keys.w) ky -= 1; if (keys.arrowdown || keys.s) ky += 1;
       if (kx || ky) { hero.tx = clamp(hero.tx + kx * sp * dt, 20, LW - 20); hero.ty = clamp(hero.ty + ky * sp * dt, LH * 0.3, LH - 40); }
       if (stun <= 0) { const dx = hero.tx - hero.x; hero.x += dx * Math.min(1, dt * 12); hero.y += (hero.ty - hero.y) * Math.min(1, dt * 12); if (Math.abs(dx) > 1.5) hero.face = dx > 0 ? 1 : -1; }
-      if (state === 'intro') { if (sT > 0.1 && !st.said) { st.said = true; c.banner('¡A CORRER!', 'go', 1200); } if (sT > 1.3) { const q = makeQ(); st.nextQ = q; fillQ(c, q, topicTag(v, q)); state = 'read'; sT = 0; const len = q.text.length + (q.table ? 30 : 0) + q.options.reduce((a, o) => a + o.length, 0) * 0.4; readFor = Math.min(10, Math.max(4, 2 + len * 0.06)); intro.show(q, readFor, topicTag(v, q)); } }
+      if (state === 'intro') { if (sT > 0.1 && !st.said) { st.said = true; c.banner('¡A CORRER!', 'go', 1200); } if (sT > 1.3) { const q = makeQ(); st.nextQ = q; fillQ(c, q, topicTag(v, q)); state = 'read'; sT = 0; const len = q.text.length + (q.table ? 30 : 0) + q.options.reduce((a, o) => a + o.length, 0) * 0.4; readFor = Math.min(room ? 6 : 10, Math.max(room ? 3 : 4, 2 + len * 0.06)); intro.show(q, readFor, topicTag(v, q)); } }
       else if (state === 'read') { if (sT >= readFor) { state = 'settle'; sT = 0; intro.settle(); A.sfx('tick'); } }
       else if (state === 'settle') { if (sT >= 0.55) { intro.end(); state = 'play'; sT = 0; A.sfx('go'); c.banner('¡YA!', 'go', 550); spawnWall(SPAWN_Y); curIdx = 0; prog(); } }
       else if (state === 'play') {
@@ -244,7 +252,7 @@
         for (let i = items.length - 1; i >= 0; i--) if (items[i].y > LH + 60 || items[i].got) items.splice(i, 1);
         c.hud(1 - st.answered / N, st.answered + '/' + N);
       }
-      else if (state === 'end') { scroll += 14 * dt; if (sT > (st.win ? 2.6 : 2.0) && !st.reported) { st.reported = true; const r = c.report(); r.sigma = st.sigma; cfg.onEnd(r); } }
+      else if (state === 'end') { scroll += 14 * dt; if (sT > (room ? 0.9 : st.win ? 2.6 : 2.0) && !st.reported) { st.reported = true; const r = c.report(); r.sigma = st.sigma; cfg.onEnd(r); } }
     };
     function drawGate(w, g) {
       const x = g.x, y = w.y, col = LANE_COL[g.lane]; ctx.save(); if (g.gone) { ctx.restore(); return; }
@@ -309,22 +317,24 @@
     return { lines: [text.slice(0, 9)], fs: 8 };
   }
   function startMaze(cfg) {
-    const v = cfg.villain, N = v.boss ? 3 : 2;
+    const v = cfg.villain, room = cfg.room || null, N = room ? room.total : v.boss ? 3 : 2;
     const body = `<div class="bt-q"><div class="bt-qtag"></div><div class="bt-qtext"></div><div class="bt-qtable"></div><div class="bt-explain" hidden></div></div>
       <div class="bt-field"><canvas></canvas><div class="bt-banner" hidden></div></div>${BIGHTML}`;
     const ctl = `<button class="bt-btn bt-hint"><img alt="" src="${S.icon('bulb', 3)}"><span>Pista</span><em></em></button>
       <div class="bt-keys">¡Cómete al fantasma con la respuesta correcta!<br><small>Desliza o usa flechas/WASD · Σ = poder · H pista</small></div>`;
     const c = core(cfg, 'maze', body, ctl), st = c.st, $ = c.$, cv = $('.bt-field canvas'), ctx = cv.getContext('2d');
     st.sigma = 0;
-    const intro = qIntro(c), LW = 360, COLS = 11, T = LW / COLS;
+    const intro = qIntro(c); let LW = 360, COLS = 11, T = LW / COLS; const T0 = 360 / 11;
     let W = 0, H = 0, dpr = 1, LH = 560, ROWS = 11, oy = 0, grid = null, state = 'intro', sT = 0, readFor = 3, q = null, qn = 0, ended = false, shake = 0, flash = 0, fright = 0, invul = 0, dots = 0, hintT = 0;
     const parts = [], floats = [], pills = [], dotSet = new Map();
     const hero = { i: 5, j: 9, ni: 5, nj: 9, p: 1, dir: [0, 0], want: [0, 0], face: 1 };
     const hintCost = () => Math.max(1, Math.round(20 * ((cfg.perks || {}).hintCost || 1)));
     const villain = S.villainCanvas(v);
     const rnd = (() => { let s = (Date.now() ^ 0x9e3779b9) >>> 0; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; })();
-    function resize() { const f = $('.bt-field'); const w = f.clientWidth, h = f.clientHeight; if (w < 10 || h < 10) return; dpr = Math.min(2.5, root.devicePixelRatio || 1); W = w; H = h; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.width = W + 'px'; cv.style.height = H + 'px'; LH = H * (LW / W); const r = clamp(Math.floor(LH / T), 9, 17); const nr = r % 2 ? r : r - 1; if (!grid || nr !== ROWS) { ROWS = nr; build(); } oy = (LH - ROWS * T) / 2; }
-    const pass = (i, j) => i >= 0 && j >= 0 && i < COLS && j < ROWS && grid[j][i] === 0;
+    function resize() { const f = $('.bt-field'); const w = f.clientWidth, h = f.clientHeight; if (w < 10 || h < 10) return; dpr = Math.min(2.5, root.devicePixelRatio || 1); W = w; H = h; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.width = W + 'px'; cv.style.height = H + 'px'; { const sc0 = Math.min(W / 360, H / 320); LW = W / sc0; LH = H / sc0; } let nc = Math.round(LW / T0); nc = clamp(nc % 2 ? nc : nc + 1, 11, 33); T = LW / nc; const r = clamp(Math.floor(LH / T), 9, 21); const nr = r % 2 ? r : r - 1; if (!grid || nr !== ROWS || nc !== COLS) { ROWS = nr; COLS = nc; build(); if (q && grid) placePills(); } oy = (LH - ROWS * T) / 2; }
+    let tun = [];
+    const pass = (i, j) => (j >= 0 && j < ROWS && (i === -1 || i === COLS) && tun.indexOf(j) >= 0) || (i >= 0 && j >= 0 && i < COLS && j < ROWS && grid[j][i] === 0);
+    const wrapI = (i) => (i < 0 ? COLS - 1 : i >= COLS ? 0 : i);
     function build() {
       grid = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
       const stack = [[1, 1]]; grid[1][1] = 0;
@@ -334,10 +344,12 @@
         const [x, y, hx, hy] = nb[Math.floor(rnd() * nb.length)]; grid[cj + hy][ci + hx] = 0; grid[y][x] = 0; stack.push([x, y]);
       }
       for (let j = 1; j < ROWS - 1; j++) for (let i = 1; i < COLS - 1; i++) if (grid[j][i] === 1 && ((i % 2 === 0) !== (j % 2 === 0)) && rnd() < 0.32) grid[j][i] = 0;
+      // túneles laterales (como Pac-Man): filas impares abiertas en ambos bordes
+      tun = []; { const rows = []; for (let j = 3; j < ROWS - 2; j += 2) if (grid[j][1] === 0 && grid[j][COLS - 2] === 0) rows.push(j); rows.sort(() => rnd() - 0.5); rows.slice(0, ROWS >= 15 ? 2 : 1).forEach((j) => { grid[j][0] = 0; grid[j][COLS - 1] = 0; tun.push(j); }); if (!tun.length) { const j = Math.floor(ROWS / 2) | 1; grid[j][1] = 0; grid[j][COLS - 2] = 0; grid[j][0] = 0; grid[j][COLS - 1] = 0; tun.push(j); } }
       dotSet.clear(); for (let j = 0; j < ROWS; j++) for (let i = 0; i < COLS; i++) if (grid[j][i] === 0) dotSet.set(i + ',' + j, true);
       const si = Math.floor(COLS / 2) | 1, sj = ROWS - 2; hero.i = hero.ni = si; hero.j = hero.nj = sj; hero.p = 1; hero.dir = [0, 0]; hero.want = [0, 0]; dotSet.delete(si + ',' + sj);
     }
-    function bfs(fi, fj) { const d = Array.from({ length: ROWS }, () => Array(COLS).fill(-1)); const qu = [[fi, fj]]; d[fj][fi] = 0; for (let h = 0; h < qu.length; h++) { const [x, y] = qu[h]; [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([a, b]) => { if (pass(x + a, y + b) && d[y + b][x + a] < 0) { d[y + b][x + a] = d[y][x] + 1; qu.push([x + a, y + b]); } }); } return d; }
+    function bfs(fi, fj) { const d = Array.from({ length: ROWS }, () => Array(COLS).fill(-1)); const qu = [[fi, fj]]; d[fj][fi] = 0; for (let h = 0; h < qu.length; h++) { const [x, y] = qu[h]; [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([a, b]) => { if (pass(x + a, y + b)) { const nx = wrapI(x + a), ny = y + b; if (d[ny][nx] < 0) { d[ny][nx] = d[y][x] + 1; qu.push([nx, ny]); } } }); } return d; }
     function placePills() {
       pills.length = 0; const d = bfs(hero.ni, hero.nj), cand = []; for (let j = 1; j < ROWS - 1; j++) for (let i = 1; i < COLS - 1; i++) if (grid[j][i] === 0 && d[j][i] >= 5) cand.push([i, j]);
       cand.sort(() => rnd() - 0.5); const pick = [];
@@ -347,20 +359,21 @@
       const far = []; for (let j = 1; j < ROWS - 1; j += 2) for (let i = 1; i < COLS - 1; i += 2) if (grid[j][i] === 0 && d[j][i] >= 3 && !pick.some(([a, b]) => a === i && b === j)) far.push([i, j]);
       far.sort(() => rnd() - 0.5); far.slice(0, 2).forEach(([i, j]) => pills.push({ i, j, sigma: true, gone: false }));
     }
-    function makeQ() { let x; try { x = Q.generate(v.topic, v.topic === 'mix' ? 3 : cfg.tier); } catch (e) { x = Q.generate('fracciones', 1); } return x; }
+    function makeQ() { let x; if (room) { try { return room.getQuestion(qn - 1); } catch (e) { /* ok */ } } try { x = Q.generate(v.topic, v.topic === 'mix' ? 3 : cfg.tier); } catch (e) { x = Q.generate('fracciones', 1); } return x; }
     const fl = (x, y, text, col, size) => floats.push({ x, y, text, c: col || '#fff', size: size || 20, t: 0, life: 0.9 });
     const burst = (x, y, col, n, sp, life) => { for (let i = 0; i < n; i++) { const a = Math.random() * 6.283, s = (0.3 + Math.random()) * sp; parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 30, t: 0, life: life * (0.5 + Math.random() * 0.7), c: Array.isArray(col) ? col[i % col.length] : col, s: 2 + Math.floor(Math.random() * 3) }); } };
     const px = (i) => (i + 0.5) * T, py = (j) => oy + (j + 0.5) * T;
     const posOf = (e) => ({ x: px(e.i + (e.ni - e.i) * e.p), y: py(e.j + (e.nj - e.j) * e.p) });
     const prog = () => c.hud(1 - st.answered / N, st.answered + '/' + N);
     function newQuestion(first) { q = makeQ(); qn++; if (first) fillQ(c, q, topicTag(v, q)); else { fillQ(c, q, topicTag(v, q)); const qb = $('.bt-q'); qb.classList.remove('flip'); void qb.offsetWidth; qb.classList.add('flip'); A.sfx('tick'); } placePills(); }
-    function finish(win) { if (ended) return; ended = true; st.over = true; st.win = win; state = 'end'; sT = 0; if (win) { A.sfx('levelup'); c.banner('¡VICTORIA!', 'go'); } else { A.sfx('lose'); c.banner('¡DERROTA!', 'lose'); } }
+    function finish(win) { if (ended) return; ended = true; st.over = true; st.win = win; state = 'end'; sT = 0; if (win) { A.sfx('levelup'); c.banner(room ? '¡LISTO!' : '¡VICTORIA!', 'go'); } else { A.sfx('lose'); c.banner('¡DERROTA!', 'lose'); } }
     function respawn() { invul = 2.2; hero.i = hero.ni = Math.floor(COLS / 2) | 1; hero.j = hero.nj = ROWS - 2; hero.p = 1; hero.dir = [0, 0]; hero.want = [0, 0]; }
     function eatPill(pl) {
       if (pl.sigma) { pl.gone = true; st.sigma++; fright = 7; A.sfx('levelup'); const p = posOf(hero); burst(p.x, p.y, ['#c58bff', '#fff', '#5ce1e6'], 26, 180, 0.8); fl(p.x, p.y - 20, '¡PODER! Los fantasmas huyen', '#e2b8ff', 16); return; }
       if (pl.gone) return; const p = posOf(hero);
       if (pl.ok) {
         pl.gone = true; st.answered += 1;
+        FB.right(c.wrap, q, !q.wrong);
         const clean = !q.wrong; if (clean) { st.correct++; st.streak++; st.bestStreak = Math.max(st.bestStreak, st.streak); } else st.streak = 0;
         const r = c.gain(clean, 0); burst(p.x, p.y, ['#ffe14a', '#fff', '#3ddc97'], 30, 210, 0.8); fl(p.x, p.y - 20, '+' + r.g, '#ffe14a', 24); A.sfx('correct'); A.sfx('hit'); setTimeout(() => A.sfx('coin'), 90); shake = 6; if (st.streak >= 3 && clean) A.sfx('combo', st.streak);
         if (st.answered >= N) return finish(true);
@@ -369,6 +382,7 @@
         pl.jail = 5; pl.i = pl.ni = pl.home[0]; pl.j = pl.nj = pl.home[1]; pl.p = 1; st.score += 150; A.sfx('hit'); const cp = posOf(pl); burst(cp.x, cp.y, ['#c58bff', '#fff'], 22, 180, 0.7); fl(cp.x, cp.y - 10, '¡A la cárcel! +150', '#e2b8ff', 16);
       } else if (invul <= 0) {
         st.streak = 0; q.wrong = true; c.log(q, pl.k); c.damage(); burst(p.x, p.y, ['#ff3b5c', '#7a6aa8'], 22, 170, 0.6); fl(p.x, p.y - 20, '✖ ¡Ese no era!', '#ff4d4d', 22); shake = 10; flash = 0.35; A.sfx('boom');
+        FB.wrong(c.wrap, q, pl.k);
         explainBox(c, 'Ese no era. ' + (q.hint ? '💡 ' + q.hint : 'Sigue buscando la respuesta correcta.'));
         if (st.hearts <= 0) return finish(false);
         pl.jail = 3; pl.i = pl.ni = pl.home[0]; pl.j = pl.nj = pl.home[1]; pl.p = 1; respawn();
@@ -394,7 +408,7 @@
     const stepEnt = (e, dt, speed, chooser) => {
       let rem = speed * dt;
       while (rem > 0) {
-        if (e.p >= 1) { e.i = e.ni; e.j = e.nj; e.p = 1; const d = chooser(e); if (!d || (!d[0] && !d[1])) { e.dir = [0, 0]; return; } e.dir = d; e.ni = e.i + d[0]; e.nj = e.j + d[1]; e.p = 0; }
+        if (e.p >= 1) { e.i = wrapI(e.ni); e.j = e.nj; e.ni = e.i; e.p = 1; const d = chooser(e); if (!d || (!d[0] && !d[1])) { e.dir = [0, 0]; return; } e.dir = d; e.ni = e.i + d[0]; e.nj = e.j + d[1]; e.p = 0; }
         const use = Math.min(rem, 1 - e.p); e.p += use; rem -= use;
       }
     };
@@ -404,7 +418,7 @@
       if (!opts.length) return [-ch.dir[0], -ch.dir[1]];
       const chase = fright > 0 ? 0.75 : 0.42;
       if (Math.random() > chase) return opts[Math.floor(Math.random() * opts.length)];
-      const d = bfs(hero.ni, hero.nj); let best = null, bv = fright > 0 ? -1 : 1e9; opts.forEach(([a, b]) => { const val = d[ch.j + b][ch.i + a]; if (fright > 0 ? val > bv : val < bv) { bv = val; best = [a, b]; } }); return best || opts[0];
+      const d = bfs(hero.ni, hero.nj); let best = null, bv = fright > 0 ? -1 : 1e9; opts.forEach(([a, b]) => { const val = d[ch.j + b][wrapI(ch.i + a)]; if (fright > 0 ? val > bv : val < bv) { bv = val; best = [a, b]; } }); return best || opts[0];
     };
     c.onTick = (dt) => {
       { const f = cv.parentNode; if (f && (Math.abs(f.clientWidth - W) > 1 || Math.abs(f.clientHeight - H) > 1)) resize(); }
@@ -412,7 +426,7 @@
       parts.forEach((p) => { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 260 * dt; }); for (let i = parts.length - 1; i >= 0; i--) if (parts[i].t >= parts[i].life) parts.splice(i, 1);
       floats.forEach((f) => { f.t += dt; f.y -= 26 * dt; }); for (let i = floats.length - 1; i >= 0; i--) if (floats[i].t >= floats[i].life) floats.splice(i, 1);
       shake = Math.max(0, shake - dt * 30); flash = Math.max(0, flash - dt); fright = Math.max(0, fright - dt); invul = Math.max(0, invul - dt); hintT = Math.max(0, hintT - dt);
-      if (state === 'intro') { if (sT > 0.1 && !st.said) { st.said = true; c.banner('¡AL LABERINTO!', 'go', 1200); } if (sT > 1.3) { newQuestion(true); state = 'read'; sT = 0; const len = q.text.length + (q.table ? 30 : 0) + q.options.reduce((a, o) => a + o.length, 0) * 0.4; readFor = Math.min(10, Math.max(4, 2 + len * 0.06)); intro.show(q, readFor, topicTag(v, q)); } }
+      if (state === 'intro') { if (sT > 0.1 && !st.said) { st.said = true; c.banner('¡AL LABERINTO!', 'go', 1200); } if (sT > 1.3) { newQuestion(true); state = 'read'; sT = 0; const len = q.text.length + (q.table ? 30 : 0) + q.options.reduce((a, o) => a + o.length, 0) * 0.4; readFor = Math.min(room ? 6 : 10, Math.max(room ? 3 : 4, 2 + len * 0.06)); intro.show(q, readFor, topicTag(v, q)); } }
       else if (state === 'read') { if (sT >= readFor) { state = 'settle'; sT = 0; intro.settle(); A.sfx('tick'); } }
       else if (state === 'settle') { if (sT >= 0.55) { intro.end(); state = 'play'; sT = 0; A.sfx('go'); c.banner('¡YA!', 'go', 550); prog(); } }
       else if (state === 'play') {
@@ -425,12 +439,12 @@
           if (pl.gone || ended) continue;
           if (pl.sigma) { if (Math.abs(pl.i - (hero.i + (hero.ni - hero.i) * hero.p)) < 0.6 && Math.abs(pl.j - (hero.j + (hero.nj - hero.j) * hero.p)) < 0.6) eatPill(pl); continue; }
           if (pl.jail > 0) { pl.jail -= dt; continue; }
-          stepEnt(pl, dt, fright > 0 ? 1.7 : 2.4 + Math.min(1, cfg.tier * 0.1 + qn * 0.2), chaserChoose);
+          stepEnt(pl, dt, (fright > 0 ? 1.7 : 2.4 + Math.min(1, cfg.tier * 0.1 + qn * 0.2)) * (room && cfg.fallSecs ? Math.max(0.6, Math.min(1.35, 27 / cfg.fallSecs)) : 1) * c.speedMul(), chaserChoose);
           const cp = posOf(pl); if (Math.hypot(cp.x - hp.x, cp.y - hp.y) < T * 0.66) eatPill(pl);
         }
         c.hud(1 - st.answered / N, st.answered + '/' + N);
       }
-      else if (state === 'end') { if (sT > (st.win ? 2.6 : 2.0) && !st.reported) { st.reported = true; const r = c.report(); r.sigma = st.sigma; cfg.onEnd(r); } }
+      else if (state === 'end') { if (sT > (room ? 0.9 : st.win ? 2.6 : 2.0) && !st.reported) { st.reported = true; const r = c.report(); r.sigma = st.sigma; cfg.onEnd(r); } }
     };
     const draw = (t) => {
       if (W <= 0 || !grid) return; const sc = W / LW; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.imageSmoothingEnabled = false; ctx.clearRect(0, 0, W, H);
@@ -442,6 +456,8 @@
         ctx.strokeStyle = pal.accent; ctx.globalAlpha = 0.75; ctx.lineWidth = 2;
         ctx.beginPath(); if (!(j > 0 && grid[j - 1][i] === 1)) { ctx.moveTo(x + 1, y + 1); ctx.lineTo(x + T - 1, y + 1); } if (!(j < ROWS - 1 && grid[j + 1][i] === 1)) { ctx.moveTo(x + 1, y + T - 1); ctx.lineTo(x + T - 1, y + T - 1); } if (!(i > 0 && grid[j][i - 1] === 1)) { ctx.moveTo(x + 1, y + 1); ctx.lineTo(x + 1, y + T - 1); } if (!(i < COLS - 1 && grid[j][i + 1] === 1)) { ctx.moveTo(x + T - 1, y + 1); ctx.lineTo(x + T - 1, y + T - 1); } ctx.stroke(); ctx.globalAlpha = 1;
       }
+      // portales de los túneles
+      tun.forEach((j) => [0, COLS - 1].forEach((i) => { const x = px(i), y = py(j), r = T * (0.34 + 0.06 * Math.sin(t * 6 + i)); ctx.save(); ctx.globalAlpha = 0.85; ctx.strokeStyle = '#5ce1e6'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(x, y, r * 0.7, r * 1.25, 0, 0, 6.283); ctx.stroke(); ctx.strokeStyle = '#c58bff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(x, y, r * 0.35, r * 0.8, t * 3, 0, 6.283); ctx.stroke(); ctx.restore(); }));
       // puntos
       ctx.fillStyle = '#ffe9a8'; dotSet.forEach((_, k) => { const [i, j] = k.split(',').map(Number); ctx.fillRect(Math.round(px(i)) - 2, Math.round(py(j)) - 2, 4, 4); });
       // píldoras de poder y fantasmas-respuesta
@@ -475,10 +491,55 @@
     return { destroy: c.destroy, refresh: prog, pause: () => c.toggle(true), state: st, _mz: { get pills() { return pills; }, get hero() { return hero; }, get grid() { return grid; }, get st() { return state; }, bfs, want: (d) => { hero.want = d; }, pass, get cols() { return COLS; } } };
   }
 
+
+  /* ------------------------------------------------------------------
+   * Mini-tutorial (se puede omitir; "No volver a mostrar" lo guarda)
+   * ------------------------------------------------------------------ */
+  const TUT = {
+    shoot: { name: 'Disparo', pages: [
+      ['📖', 'Lee la pregunta', 'Arriba aparece un problema de Cálculo. Tómate tu tiempo: no hay prisa para pensar.'],
+      ['🎯', 'Dispara a la respuesta correcta', 'Caen 4 respuestas. TOCA la que creas correcta y tu héroe le dispara (en compu: teclas 1 a 4).'],
+      ['❤️', 'Cuidado con las vidas', 'Si le disparas a una incorrecta, o la correcta cae al suelo, pierdes una vida. Cada acierto daña al villano. 💡 Pista y ⚡ Poder te ayudan.'],
+    ] },
+    run: { name: 'Carrera', pages: [
+      ['👆', 'Mueve a tu héroe', 'Arrastra el dedo por la pantalla y tu héroe te sigue (en compu: flechas o WASD).'],
+      ['🚪', 'Cruza la puerta correcta', 'Cada puerta lleva una respuesta. Atraviesa SOLO la correcta. Esquiva las minas 💣.'],
+      ['🪙', 'Recoge extras', 'Las monedas 🪙 suman puntos y Σ te da poderes. Si te equivocas, verás la explicación para aprender.'],
+    ] },
+    maze: { name: 'Laberinto', pages: [
+      ['👆', 'Desliza para moverte', 'Desliza el dedo (o usa flechas/WASD) y tu héroe avanza por el laberinto comiendo puntitos.'],
+      ['👻', 'Cómete al fantasma correcto', 'Cada fantasma lleva una respuesta. Cómete SOLO el de la respuesta correcta. Si tocas otro, pierdes una vida.'],
+      ['⇄', 'Túneles y poder Σ', 'Los túneles de los lados te teletransportan al otro extremo. La píldora Σ asusta a los fantasmas: ¡puedes mandarlos a la cárcel!'],
+    ] },
+  };
+  function withTutorial(cfg, kind, startFn) {
+    const key = 'duix.tut.' + kind; let seen = false;
+    try { seen = localStorage.getItem(key) === '1'; } catch (e) { /* ok */ }
+    if (seen || cfg.noTutorial || root.__noTutorial) return startFn(cfg);
+    const T = TUT[kind]; let i = 0, inner = null, dead = false, remember = false;
+    const ov = el('div', 'tut'); ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-label', 'Cómo se juega ' + T.name);
+    function draw() {
+      const pg = T.pages[i], last = i === T.pages.length - 1;
+      ov.innerHTML = `<button class="tut-skip" data-a="skip">Omitir ✕</button>
+        <div class="tut-card"><small class="tut-game">CÓMO SE JUEGA · ${esc(T.name.toUpperCase())}</small>
+          <div class="tut-ico" aria-hidden="true">${pg[0]}</div><h2>${esc(pg[1])}</h2><p>${esc(pg[2])}</p>
+          <div class="tut-dots">${T.pages.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join('')}</div>
+          <label class="tut-rem"><input type="checkbox" ${remember ? 'checked' : ''}> No volver a mostrar</label>
+          <div class="tut-btns">${i > 0 ? '<button class="btn ghost" data-a="prev">Atrás</button>' : ''}<button class="btn big" data-a="next">${last ? '¡A jugar!' : 'Siguiente'}</button></div></div>`;
+    }
+    function finish() { if (dead) return; try { if (remember) localStorage.setItem(key, '1'); } catch (e) { /* ok */ } dead = true; ov.remove(); dead = false; inner = startFn(cfg); }
+    ov.addEventListener('change', (e) => { if (e.target.type === 'checkbox') remember = e.target.checked; });
+    ov.addEventListener('click', (e) => { const b = e.target.closest('[data-a]'); if (!b) return; A.sfx('click'); const a = b.dataset.a; if (a === 'skip') finish(); else if (a === 'prev') { i = Math.max(0, i - 1); draw(); } else if (i >= T.pages.length - 1) finish(); else { i++; draw(); } });
+    draw(); cfg.container.appendChild(ov);
+    const none = { mistakes: [], score: 0, correct: 0, answered: 0, bestStreak: 0, hearts: 3 };
+    return { destroy() { dead = true; ov.remove(); if (inner) inner.destroy(); }, refresh() { if (inner && inner.refresh) inner.refresh(); }, pause() { if (inner && inner.pause) inner.pause(); },
+      get state() { return inner ? inner.state : none; }, get _mz() { return inner && inner._mz; }, get _fire() { return inner && inner._fire; }, get _caps() { return inner && inner._caps; }, get _hint() { return inner && inner._hint; }, get _power() { return inner && inner._power; } };
+  }
+
   function start(cfg) {
     const v = cfg.villain;
-    if (!v.endless && !cfg.room) { if (cfg.tier === 2) return startRun(cfg); if (cfg.tier === 3) return startMaze(cfg); }
-    return root.DuiXBattle.start(cfg);
+    if (!v.endless && !cfg.room) { if (cfg.tier === 2) return withTutorial(cfg, 'run', startRun); if (cfg.tier === 3) return withTutorial(cfg, 'maze', startMaze); }
+    return withTutorial(cfg, 'shoot', (c2) => root.DuiXBattle.start(c2));
   }
-  root.DuiXGames = { start, GAMES, startRun, startMaze };
+  root.DuiXGames = { start, GAMES, startRun, startMaze, withTutorial, TUT };
 })(window);

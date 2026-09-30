@@ -64,13 +64,31 @@
       { const x = CHEST.x, y = CHEST.y; ctx.fillStyle = '#000'; ctx.fillRect(x - 2, y + 8, CHEST.w + 4, CHEST.h - 4); ctx.fillStyle = '#b3701f'; ctx.fillRect(x, y + 10, CHEST.w, CHEST.h - 8); ctx.fillStyle = '#ffd23f'; ctx.fillRect(x, y + 18, CHEST.w, 3); ctx.fillRect(x + CHEST.w / 2 - 3, y + 16, 6, 8); ctx.fillStyle = '#8a5414'; if (chestOpen > 0) { ctx.fillRect(x - 2, y - 6 - chestOpen * 6, CHEST.w + 4, 12); } else { ctx.fillRect(x - 2, y, CHEST.w + 4, 12); ctx.fillStyle = '#ffd23f'; ctx.fillRect(x - 2, y + 6, CHEST.w + 4, 2); } if (!chestUsed) { ctx.globalAlpha = 0.5 + 0.5 * Math.sin(t * 4); ctx.fillStyle = '#fff'; ctx.fillRect(x + 6 + (t * 20) % 26, y + 2, 3, 3); ctx.globalAlpha = 1; } }
     }
     const spriteFor = (look, pose, fr) => { try { return S.heroCanvas(look || {}, pose, fr); } catch (e) { return null; } };
+    const DANCE = {
+      wave: (t) => ({ rot: Math.sin(t * 12) * 0.14, dy: Math.abs(Math.sin(t * 6)) * 2 }),
+      sway: (t) => ({ rot: Math.sin(t * 7) * 0.2, dy: Math.abs(Math.sin(t * 7)) * 8 }),
+      hop: (t) => ({ dy: Math.abs(Math.sin(t * 5)) * 26, sy: 1 + Math.sin(t * 10) * 0.06 }),
+      spin: (t) => ({ sx: Math.cos(t * 9) }),
+      robot: (t) => ({ dx: (Math.floor(t * 4) % 4 - 1.5) * 6, dy: Math.floor(t * 8) % 2 * 4, rot: (Math.floor(t * 4) % 2 ? 0.08 : -0.08) }),
+      floss: (t) => ({ dx: Math.sin(t * 14) * 10, rot: Math.sin(t * 14) * 0.2 }),
+      pulse: (t) => { const k = 1 + Math.pow(Math.abs(Math.sin(t * 5)), 4) * 0.25; return { sx: k, sy: k }; },
+      flip: (t) => { const k = (t * 1.2) % 1; return { rot: -k * 6.283, dy: Math.sin(k * 3.1416) * 40 }; },
+      moon: (t) => ({ dx: Math.sin(t * 2.4) * 22, flip: Math.cos(t * 2.4) > 0 }),
+      tornado: (t) => ({ rot: t * 12, sx: 0.85, sy: 0.85 }),
+      shake: (t) => ({ dx: Math.sin(t * 60) * 4, dy: Math.cos(t * 47) * 2 }),
+      king: (t) => { const k = (t * 0.7) % 1; return { rot: Math.sin(k * 12.5) * 0.2, sx: Math.cos(k * 6.283 * 2), dy: Math.abs(Math.sin(k * 6.283 * 2)) * 24 }; },
+      sigma: (t) => ({ rot: t * 8, dy: Math.abs(Math.sin(t * 4)) * 20, sx: 1 + Math.sin(t * 6) * 0.15, sy: 1 + Math.sin(t * 6) * 0.15 }),
+    };
     function drawPlayer(pl, look, name, x, y, f, moving, emo, isMe, t) {
+      let dz = null;
+      if (typeof emo === 'string' && emo.startsWith('dance:')) { const it = root.DuiXData.ITEM_BY_ID[emo.slice(6)]; if (it && DANCE[it.anim]) { dz = DANCE[it.anim](t); if (Math.random() < 0.06) floats.push({ x: x + (Math.random() - 0.5) * 30, y: y - 50, text: it.fx || '♪', c: '#ffd23f', t: 0, life: 1.1, size: 16 }); } emo = ''; }
       const sc = 0.95 + (y - FLOOR_Y) / (LH - FLOOR_Y) * 0.6, hw = S.HERO_W * sc, hh = S.HERO_H * sc;
       const dancing = emo === '💃' || party, fr = moving ? Math.floor(t * 10) % 4 : dancing ? Math.floor(t * 6) % 4 : 0;
       const spr = spriteFor(look, 'idle', fr); if (!spr) return;
       const bob = moving ? Math.abs(Math.sin(t * 12)) * 3 * sc : dancing ? Math.abs(Math.sin(t * 8)) * 6 * sc : Math.sin(t * 2 + x) * 0.8;
       ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.beginPath(); ctx.ellipse(x, y, 16 * sc, 4.5 * sc, 0, 0, 6.283); ctx.fill();
-      ctx.translate(x, y); const fl = dancing && !moving ? (Math.floor(t * 4) % 2 ? -1 : 1) : f; if (fl < 0) ctx.scale(-1, 1);
+      ctx.translate(x, y); const fl = dz ? (dz.flip ? -f : f) : dancing && !moving ? (Math.floor(t * 4) % 2 ? -1 : 1) : f; if (fl < 0) ctx.scale(-1, 1);
+      if (dz) { ctx.translate((dz.dx || 0) * sc, -(dz.dy || 0) * sc); ctx.translate(0, -hh / 2); ctx.rotate(dz.rot || 0); ctx.scale(dz.sx == null ? 1 : dz.sx, dz.sy == null ? 1 : dz.sy); ctx.translate(0, hh / 2); }
       ctx.imageSmoothingEnabled = false; ctx.drawImage(spr, -hw / 2, -hh + 4 * sc - bob, hw, hh); ctx.restore();
       // nombre
       ctx.font = `800 9px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const nm = String(name || '').slice(0, 10), w = ctx.measureText(nm).width + 8;
@@ -108,7 +126,7 @@
       const list = [];
       Object.keys(players).forEach((id) => { const pl = players[id]; if (id === o.pid) list.push({ y: me.y, id, pl, x: me.x, f: me.f, mv: me.moving, me: true }); else if (others[id] && pl.online !== false) list.push({ y: others[id].y, id, pl, x: others[id].x, f: others[id].f, mv: others[id].moving }); });
       if (!players[o.pid]) list.push({ y: me.y, id: o.pid, pl: { name: 'Tú', look: o.getLook() }, x: me.x, f: me.f, mv: me.moving, me: true });
-      list.sort((a, b) => a.y - b.y).forEach((e) => { const q = pos[e.id]; const emo = q && q.e && q.et && (o.now() - q.et) < 3200 ? q.e : ''; drawPlayer(e.pl, e.me ? o.getLook() : e.pl.look, e.pl.name, e.x, e.y, e.f, e.mv, emo, !!e.me, t); });
+      list.sort((a, b) => a.y - b.y).forEach((e) => { const q = pos[e.id]; const emo = q && q.e && q.et && (o.now() - q.et) < (String(q.e).startsWith('dance:') ? 6500 : 3200) ? q.e : ''; drawPlayer(e.pl, e.me ? o.getLook() : e.pl.look, e.pl.name, e.x, e.y, e.f, e.mv, emo, !!e.me, t); });
       parts.forEach((p) => { ctx.globalAlpha = clamp(1 - p.t / p.life, 0, 1); ctx.fillStyle = p.c; ctx.fillRect(Math.round(p.x), Math.round(p.y), p.s, p.s); }); ctx.globalAlpha = 1;
       floats.forEach((f) => { ctx.globalAlpha = clamp(1 - f.t / f.life, 0, 1); ctx.font = `${f.size}px Bangers, ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 3; ctx.strokeStyle = '#1a1033'; ctx.strokeText(f.text, f.x, f.y); ctx.fillStyle = f.c; ctx.fillText(f.text, f.x, f.y); }); ctx.globalAlpha = 1;
       ctx.restore();

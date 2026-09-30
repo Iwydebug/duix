@@ -521,6 +521,17 @@
       `La pendiente es ${m} y al reemplazar un punto se obtiene b = ${b}. Entonces y = ${poly([b, m])}.`, 'Halla m y luego despeja b con un punto.');
   });
 
+  def('plano', 3, 'punto-pendiente', () => {
+    const m = nz(-4, 4), x1 = ri(-4, 4), y1 = ri(-5, 5);
+    const b = y1 - m * x1;
+    const eq = (mm, bb) => `y = ${poly([bb, mm])}`;
+    const cor = eq(m, b);
+    return mk('plano', 3, `Una recta tiene pendiente m = ${sgn(m)} y pasa por ${pt(x1, y1)}. Con la forma punto-pendiente y − y₁ = m(x − x₁), ¿cuál es su ecuación?`, cor,
+      [eq(m, -b), eq(-m, b), eq(m, y1), eq(m, b + m), eq(m, y1 + m * x1)].filter((w) => w !== cor),
+      `y − ${sgn(y1)} = ${sgn(m)}(x − ${sgn(x1)}) ⇒ y = ${sgn(m)}x + ${sgn(b)}. Se despeja y y se reduce.`,
+      'Sustituye m, x₁ y y₁ en y − y₁ = m(x − x₁) y despeja y.');
+  });
+
   /* ============================================================
    * 6. DESIGUALDADES
    * ============================================================ */
@@ -1082,9 +1093,105 @@
   });
 
   /* ============================================================
+   * 15. LÍMITES  (concepto intuitivo, tabulación y cálculo básico)
+   * ============================================================ */
+  const dec = (v) => { const s = String(Math.round(v * 1e6) / 1e6).replace('.', ','); return s.startsWith('-') ? MINUS + s.slice(1) : s; };
+  const limTbl = (a, fx) => {
+    const d = [0.1, 0.01, 0.001];
+    const xl = d.map((e) => a - e), xr = d.map((e) => a + e).reverse();
+    const xs = xl.concat(['a'], xr);
+    return { head: ['x'].concat(xs.map((x) => (x === 'a' ? sgn(a) : dec(x)))), rows: [['f(x)'].concat(xs.map((x) => (x === 'a' ? '¿?' : dec(fx(x)))))] };
+  };
+  const numWrongs = (L) => [sgn(L + 1), sgn(L - 1), sgn(-L), sgn(L + 2), sgn(L * 2), '0', 'No existe'];
+  def('limites', 1, 'tabulacion', () => {
+    const a = nz(-5, 5), m = nz(-4, 4), b = ri(-6, 6), L = m * a + b;
+    return mk('limites', 1, `La tabla muestra f(x) cuando x se acerca a ${sgn(a)} por ambos lados. ¿Cuánto vale lím(x→${sgn(a)}) f(x)?`, sgn(L),
+      numWrongs(L).filter((w) => w !== sgn(L)),
+      `Al acercarse x a ${sgn(a)} por izquierda y derecha, f(x) se acerca a ${sgn(L)}. Ese valor es el límite (no importa lo que pase justo en x = ${sgn(a)}).`,
+      'Mira hacia dónde se acercan los valores de f(x) desde los dos lados.', { table: limTbl(a, (x) => m * x + b) });
+  });
+  def('limites', 1, 'hueco', () => {
+    const a = nz(-5, 5), L = 2 * a;
+    return mk('limites', 1, `Sea f(x) = (x² − ${a * a}) / (x ${a < 0 ? '+' : MINUS} ${Math.abs(a)}). f(${sgn(a)}) no existe (queda 0/0). ¿Cuánto vale lím(x→${sgn(a)}) f(x)?`.replace('x² − ' + a * a, a * a < 0 ? '' : 'x² − ' + a * a), sgn(L),
+      ['No existe', '0', sgn(a), sgn(-L), sgn(L + 1), sgn(a * a)].filter((w) => w !== sgn(L)),
+      `Para x ≠ ${sgn(a)}: (x² − ${a * a})/(x − ${sgn(a)}) = x + ${sgn(a)}. Al acercarse x a ${sgn(a)}, el valor se acerca a ${sgn(L)}. El límite existe aunque f(${sgn(a)}) no esté definida.`,
+      'Aunque la función no esté definida en el punto, el límite mira lo que ocurre CERCA de él. Factoriza el numerador.');
+  });
+  def('limites', 1, 'concepto', () => {
+    const a = nz(-4, 4), L = nz(-6, 6), t = ri(0, 2);
+    if (a === L) return null;
+    const S = [
+      [`lím(x→${sgn(a)}) f(x) = ${sgn(L)} significa que f(x) se acerca a ${sgn(L)} cuando x se acerca a ${sgn(a)}`,
+        [`f(${sgn(a)}) siempre vale ${sgn(L)}`, `f(x) se acerca a ${sgn(a)} cuando x se acerca a ${sgn(L)}`, `x vale ${sgn(L)} cuando f(x) vale ${sgn(a)}`]],
+    ];
+    const [cor, wr] = S[0];
+    return mk('limites', 1, `¿Qué significa lím(x→${sgn(a)}) f(x) = ${sgn(L)}?`, cor.split(' significa que ')[1].replace(/^f\(x\)/, 'f(x)').replace(/^/, 'Que '), wr.map((w) => (w.startsWith('f(') || w.startsWith('x') ? 'Que ' + w : w)).concat([`Que f(x) es igual a ${sgn(a)} siempre`]),
+      `El límite describe hacia qué valor se acerca f(x) cuando x se acerca a ${sgn(a)}; no exige que f(${sgn(a)}) valga ${sgn(L)} ni que esté definida.`,
+      'x es la variable que se acerca; f(x) es el valor al que se aproxima.');
+  });
+  def('limites', 1, 'sustitucion', () => {
+    const f = rp(2, -4, 4), a = nz(-4, 4), L = peval(f, a);
+    return mk('limites', 1, `Calcula lím(x→${sgn(a)}) (${poly(f)})`, sgn(L),
+      [sgn(L + 1), sgn(L - 1), sgn(peval(f, -a)), sgn(f[0]), 'No existe', sgn(L * 2)],
+      `Como es un polinomio (continuo), basta sustituir: f(${sgn(a)}) = ${sgn(L)}.`, 'En un polinomio, el límite es el valor de la función: sustituye x.');
+  });
+  def('limites', 2, 'factorizar 0/0', () => {
+    const a = nz(-5, 5), b = nz(-5, 5);
+    if (a === b) return null;
+    const L = a - b, S = a + b, P = a * b;
+    const num = poly([P, -S, 1]);
+    return mk('limites', 2, `Calcula lím(x→${sgn(a)}) (${num}) / (x ${a < 0 ? '+' : MINUS} ${Math.abs(a)})`, sgn(L),
+      ['No existe', '0', sgn(-L), sgn(a + b), sgn(a), sgn(L + 1)].filter((w) => w !== sgn(L)),
+      `Al sustituir queda 0/0 (indeterminado). Factoriza: ${num} = (x ${a < 0 ? '+' : MINUS} ${Math.abs(a)})(x ${b < 0 ? '+' : MINUS} ${Math.abs(b)}). Se cancela (x ${a < 0 ? '+' : MINUS} ${Math.abs(a)}) y queda x ${b < 0 ? '+' : MINUS} ${Math.abs(b)}, que en x = ${sgn(a)} vale ${sgn(L)}.`,
+      'Si al sustituir sale 0/0, factoriza el numerador y simplifica antes de sustituir.');
+  });
+  def('limites', 2, 'tabla lateral', () => {
+    const a = nz(-4, 4), L1 = ri(-5, 5), L2 = L1 + nz(-4, 4), d = [0.1, 0.01, 0.001];
+    const xs = d.map((e) => a - e).concat(d.map((e) => a + e).reverse());
+    const ys = [L1 - 0.1, L1 - 0.01, L1 - 0.001, L2 + 0.001, L2 + 0.01, L2 + 0.1];
+    const t = { head: ['x'].concat(xs.map(dec)), rows: [['f(x)'].concat(ys.map(dec))] };
+    return mk('limites', 2, `Según la tabla, ¿existe lím(x→${sgn(a)}) f(x)?`, 'No existe: los lados tienden a valores distintos',
+      [`Sí, vale ${sgn(L1)}`, `Sí, vale ${sgn(L2)}`, `Sí, vale ${dec((L1 + L2) / 2)}`],
+      `Por la izquierda f(x) → ${sgn(L1)} y por la derecha f(x) → ${sgn(L2)}. Para que el límite exista, ambos lados deben acercarse al MISMO valor; aquí no ocurre.`,
+      'Compara hacia dónde van los valores por la izquierda y por la derecha.', { table: t });
+  });
+  def('limites', 2, 'forma indeterminada', () => {
+    const a = nz(-5, 5);
+    return mk('limites', 2, `Al calcular un límite por sustitución directa obtienes 0/0. ¿Qué debes hacer?`, 'Simplificar (factorizar o racionalizar) y volver a sustituir',
+      ['Concluir que el límite es 0', 'Concluir que el límite no existe', 'Concluir que el límite es 1', 'Dividir el numerador entre cero'],
+      `0/0 es una forma indeterminada: no dice nada sobre el límite. Se factoriza (o racionaliza) para eliminar el factor que se anula y luego se sustituye. Ejemplo con x → ${sgn(a)}.`,
+      'Recuerda: 0/0 es “indeterminado”, no es 0 ni “no existe”.');
+  });
+  def('limites', 3, 'racionalizar', () => {
+    const r = ri(2, 4), c = ri(-4, 5), a = r * r - c;
+    if (a === 0) return null;
+    const L = F(1, 2 * r);
+    const den = `x ${a < 0 ? '+' : MINUS} ${Math.abs(a)}`;
+    return mk('limites', 3, `Calcula lím(x→${sgn(a)}) (√(x ${c < 0 ? MINUS : '+'} ${Math.abs(c)}) ${MINUS} ${r}) / (${den})`.replace(/x \+ 0/, 'x'), fs(L),
+      [fs(F(1, r)), fs(F(1, 4 * r)), fs(F(2, r)), '0', 'No existe', fs(F(r, 2))].filter((w) => w !== fs(L)),
+      `Da 0/0. Multiplica por el conjugado (√(x${c < 0 ? MINUS : '+'}${Math.abs(c)}) + ${r}): el numerador queda (x ${MINUS} ${sgn(a)}) y se cancela con el denominador. Queda 1/(√(x${c < 0 ? MINUS : '+'}${Math.abs(c)}) + ${r}) → 1/(${r} + ${r}) = ${fs(L)}.`,
+      'Multiplica numerador y denominador por el conjugado del numerador.');
+  });
+  def('limites', 3, 'al infinito', () => {
+    const p = nz(-6, 6), r = nz(-5, 5), q = ri(-5, 5), s = ri(-5, 5), L = F(p, r);
+    return mk('limites', 3, `Calcula lím(x→∞) (${poly([q, p])}) / (${poly([s, r])})`, fs(L),
+      [fs(F(r, p)), '0', '∞', fs(F(p + 1, r)), fs(F(q, s === 0 ? 1 : s)), fs(F(-p, r))].filter((w) => w !== fs(L)),
+      `Cuando x es muy grande, los números sueltos (${sgn(q)} y ${sgn(s)}) pesan poco. Divide todo entre x: el límite es el cociente de los coeficientes de x: ${sgn(p)}/${sgn(r)} = ${fs(L)}.`,
+      'Divide numerador y denominador entre x y observa qué pasa con los términos constantes.');
+  });
+  def('limites', 3, 'infinito lateral', () => {
+    const a = nz(-4, 4), t = ri(0, 1);
+    const cor = t === 0 ? '+∞' : '−∞';
+    return mk('limites', 3, `Piensa en f(x) = ${t === 0 ? '1' : MINUS + '1'} / (x ${a < 0 ? '+' : MINUS} ${Math.abs(a)})². ¿Qué ocurre con f(x) cuando x → ${sgn(a)}?`, `Crece sin límite: tiende a ${cor}`,
+      [`Tiende a ${t === 0 ? '−∞' : '+∞'}`, 'Tiende a 0', `Tiende a ${sgn(a)}`],
+      `Cerca de x = ${sgn(a)} el denominador (al cuadrado) es un número positivo muy pequeño, así que 1/(…)² es enorme. Con el signo del numerador, tiende a ${cor}. El límite “no existe” como número finito.`,
+      'Un cuadrado nunca es negativo: fíjate solo en el signo del numerador.');
+  });
+
+  /* ============================================================
    * API pública
    * ============================================================ */
-  const TOPICS = ['intervalos', 'fracciones', 'factorizacion', 'polinomios', 'plano', 'desigualdades', 'funciones', 'desplazamientos', 'tabulaciones', 'potenciacion', 'composicion', 'radicales', 'logaritmos', 'trigonometria'];
+  const TOPICS = ['intervalos', 'fracciones', 'factorizacion', 'polinomios', 'plano', 'desigualdades', 'funciones', 'desplazamientos', 'tabulaciones', 'potenciacion', 'composicion', 'radicales', 'logaritmos', 'trigonometria', 'limites'];
   const recent = [];
 
   function generate(topic, level, opts) {
