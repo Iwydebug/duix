@@ -103,7 +103,7 @@ Así nadie puede listar todas las salas: solo entra quien conoce el código. Las
 - **Pantalla completa en cualquier dispositivo** (Mac, PC, iPhone, Android): el juego ocupa toda la altura, sin franjas vacías.
 - **Pregunta grande**: se quitó el 3‑2‑1. La pregunta sale grande con una barra de tiempo, luego se acomoda en su recuadro y ahí caen las respuestas (más lentas; suben un poco de velocidad con el nivel).
 - **Mapa en camino** estilo mapa de niveles: niveles numerados en zigzag, camino que se ilumina al avanzar, tu héroe marca dónde vas.
-- **3 juegos por distrito**: Nivel 1 *Disparo*, Nivel 2 *Carrera* (elige la puerta correcta corriendo por carriles), Nivel 3 *Pares* (une problema con resultado contra reloj). Puedes elegir cualquiera desbloqueado; el siguiente se abre al superar el anterior.
+- **3 juegos por distrito**: Nivel 1 *Disparo*, Nivel 2 *Carrera* (elige el cartel correcto corriendo por carriles), Nivel 3 *Pares* (une problema con resultado contra reloj). Puedes elegir cualquiera desbloqueado; el siguiente se abre al superar el anterior.
 - Tarjetas de nivel a todo color. Las salas siguen usando el juego de disparo.
 
 ## Novedades 1.8.0 (rúbrica del profesor)
@@ -115,3 +115,11 @@ Así nadie puede listar todas las salas: solo entra quien conoce el código. Las
 - **Salas:** los 3 juegos seguidos y **modo Impostor** (sabotajes: turbo, niebla, robo; votación cada 3 preguntas). No requiere cambiar las reglas de Firebase.
 - Héroe más grande (título y mapa), botón 💃 Emotes en el mapa, emotes Baile y Salto gratis.
 - La app ahora se actualiza sola (red primero + recarga al detectar versión nueva).
+
+## Novedades 1.8.1
+- **Práctica dentro del juego**: ya no hay popup; el primer intento de cada juego es una mini-ronda de práctica en la misma pantalla, con una tira-guía arriba y botón *Omitir*.
+- **Carrera**: la pregunta sale al centro y vuelve a su lugar en cada pregunta; al acertar los carteles caen rápido y sigue la siguiente; minas visibles y siempre lejos de los carteles; instrucciones corregidas (cartel, no puerta).
+- **Laberinto**: fantasmas más lentos e impredecibles (cada uno con personalidad y errores), y transición clara «¡PREGUNTA 2 DE N!» con la pregunta en el centro.
+- **Disparo**: cada pregunta repite la animación centro → recuadro.
+- Retroalimentación solo al final. Avatares corregidos. Créditos con el tema del juego, «Deiwy Mondragon» y citas de Precálculo y Cálculo (Stewart).
+- Salas: impostores con Ninguno / Auto / 1 / 2 / 3 y casilla numérica.

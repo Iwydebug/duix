@@ -28,10 +28,21 @@
   let cur = { name: null, params: null }, cleanups = [], liveList = [], liveTimer = 0, battle = null, amb = null;
 
   /* ---------- héroe animado ---------- */
+  // centra horizontalmente el cuerpo del héroe dentro de su lienzo (las alas/mascotas dejan huecos desiguales)
+  const cxCache = {};
+  function bodyShift(look) {
+    const key = JSON.stringify([look.gender, look.wings, look.pet, look.weapon, look.hair, look.cape]);
+    if (cxCache[key] !== undefined) return cxCache[key];
+    let sh = 0;
+    try { const c = S.heroCanvas(look, 'idle', 0), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let a = 1e9, z = -1;
+      for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 10) { if (x < a) a = x; if (x > z) z = x; }
+      if (z >= a) sh = Math.round(c.width / 2 - (a + z) / 2); } catch (e) { sh = 0; }
+    return (cxCache[key] = sh);
+  }
   function liveHero(cv, getLook, o) {
     o = o || {}; const sc = o.scale || 4, w = S.HERO_W, hh = S.HERO_H;
     cv.width = w * sc; cv.height = hh * sc; const ctx = cv.getContext('2d'); ctx.imageSmoothingEnabled = false;
-    const entry = { draw(t) { const look = getLook(); const fr = Math.floor(t / 150) % 4; ctx.clearRect(0, 0, cv.width, cv.height); ctx.drawImage(S.heroCanvas(look, o.pose ? o.pose() : 'idle', fr), 0, Math.round(Math.sin(t / 220) * sc * 0.6), cv.width, cv.height); } };
+    const entry = { draw(t) { const look = getLook(); const fr = Math.floor(t / 150) % 4; ctx.clearRect(0, 0, cv.width, cv.height); ctx.drawImage(S.heroCanvas(look, o.pose ? o.pose() : 'idle', fr), bodyShift(look) * sc, Math.round(Math.sin(t / 220) * sc * 0.6), cv.width, cv.height); } };
     entry.draw(0); liveList.push(entry);
     if (!liveTimer && !St.settings().reduceMotion) liveTimer = setInterval(() => { const t = Date.now(); liveList.forEach((e) => e.draw(t)); }, 140);
     return cv;
@@ -99,8 +110,8 @@
   const SCREENS = {}, NAVSCREENS = ['hub', 'wardrobe', 'rooms', 'goals', 'notebook', 'settings', 'credits'];
   const MUSIC = { title: 'menu', profiles: 'menu', creator: 'menu', hub: 'map', district: 'map', wardrobe: 'menu', rooms: 'menu', goals: 'menu', notebook: 'menu', settings: 'menu', results: 'menu', wheel: 'menu' };
   function teardown() { stopLive(); cleanups.forEach((f) => { try { f(); } catch (e) { /* ok */ } }); cleanups = []; if (battle) { battle.destroy(); battle = null; } setAmbient(false); $('#modal').hidden = true; $('#modal').innerHTML = ''; $('#toasts').innerHTML = ''; }
-  const AMB_SCREENS = ['hub', 'district', 'rooms', 'roomCreate', 'room', 'wardrobe', 'goals', 'notebook', 'settings', 'results', 'profiles', 'creator', 'wheel'];
-  const AMB_HUE = { hub: 0, district: 0, rooms: 40, roomCreate: 40, room: 40, wardrobe: 300, goals: 150, notebook: 190, settings: 260, results: 20, profiles: 330, creator: 300, wheel: 45 };
+  const AMB_SCREENS = ['hub', 'district', 'rooms', 'roomCreate', 'room', 'wardrobe', 'goals', 'notebook', 'settings', 'results', 'profiles', 'creator', 'wheel', 'credits'];
+  const AMB_HUE = { hub: 0, district: 0, rooms: 40, roomCreate: 40, room: 40, wardrobe: 300, goals: 150, notebook: 190, settings: 260, results: 20, profiles: 330, creator: 300, wheel: 45, credits: 45 };
   function setAmbient(on, seed, opts) {
     if (amb) { amb.destroy(); amb = null; }
     const sc = screenEl(); if (sc) sc.classList.toggle('amb', !!on);
@@ -358,7 +369,7 @@
     const repaso = h('div', { class: 'repaso', hidden: true }, h('h3', { text: 'Repaso rápido: ' + v.tema }), repasoList(v.topic));
     const tiers = h('div', { class: 'tiers' });
     const MUL = ['×1', '×1,5', '×2'];
-    const GM = [['🎯', 'Disparo', 'Dispara a la cápsula con la respuesta correcta antes de que caiga.'], ['🏃', 'Carrera', 'Corre sin parar, esquiva minas, recoge monedas y poderes, y cruza la puerta con la respuesta.'], ['👾', 'Laberinto', 'Guía a tu héroe por el laberinto, come la respuesta correcta y huye de los secuaces.']];
+    const GM = [['🎯', 'Disparo', 'Dispara a la cápsula con la respuesta correcta antes de que caiga.'], ['🏃', 'Carrera', 'Corre sin parar, esquiva minas, recoge monedas y poderes, y cruza el cartel con la respuesta.'], ['👾', 'Laberinto', 'Guía a tu héroe por el laberinto, come la respuesta correcta y huye de los secuaces.']];
     function renderTiers() {
       tiers.innerHTML = '';
       [1, 2, 3].forEach((t) => {
@@ -438,6 +449,8 @@
       h('div', { class: 'rw' }, img('star', 3), h('b', { text: acc + '%' }), h('small', { text: 'precisión' })),
       h('div', { class: 'rw' }, img('heart', 3), h('b', { text: String(res.bestStreak) }), h('small', { text: 'mejor racha' })));
     const mist = res.mistakes.length ? h('div', { class: 'mist' }, h('h3', { class: 'h3', text: `Para repasar (${res.mistakes.length})` }), res.mistakes.map(mistakeCard)) : h('p', { class: 'hint', text: res.answered ? '¡Ni un error para repasar!' : '' });
+    const goodCard = (m) => { const c = h('div', { class: 'mcard good' }, h('div', { class: 'mq', text: m.text })); if (m.table) c.appendChild(h('div', { class: 'mtable', html: '<table><tr>' + m.table.head.map((x, i) => (i ? '<td>' : '<th>') + esc(x) + (i ? '</td>' : '</th>')).join('') + '</tr>' + m.table.rows.map((r) => '<tr>' + r.map((x, i) => (i ? '<td>' : '<th>') + esc(x) + (i ? '</td>' : '</th>')).join('') + '</tr>').join('') + '</table>' })); c.appendChild(h('div', { class: 'mans' }, h('span', { class: 'ok', text: '✔ Correcta: ' + m.correctText }))); c.appendChild(h('div', { class: 'mexp', text: '💡 ' + m.explain })); return c; };
+    const goods = res.goods && res.goods.length ? h('details', { class: 'acc goodlist' }, h('summary', null, h('b', { text: `✅ Lo que acertaste y por qué (${res.goods.length})` })), res.goods.map(goodCard)) : null;
     const resHero = (() => { const cv = h('canvas', { class: 'px' }); liveHero(cv, () => p.look, { scale: 3, pose: () => 'idle' }); const box = h('div', { class: 'rhero' }, cv); const em = D.ITEM_BY_ID[p.look.emote]; if (res.win && em && em.anim !== 'none') later(() => playEmoteOn(cv, box, em, 4200), 700); return box; })();
     const nextV = V[V.indexOf(v) + 1];
     const canNext = res.win && nextV && St.unlocked(nextV);
@@ -450,7 +463,7 @@
       res.endless ? null : h('button', { class: 'scorebar', onclick: () => { sfx('select'); go('credits'); }, 'aria-label': 'Ver puntaje total' }, h('span', { class: 'sb-l', text: 'PUNTAJE' }), h('b', { text: fmtPts(P.scAfter) + ' / 100' }), P.scAfter > P.scBefore ? h('span', { class: 'sb-d', text: '+' + fmtPts(P.scAfter - P.scBefore) }) : h('small', { text: res.win ? 'Ya tenías estos puntos: sube de dificultad o de estrellas para ganar más' : 'Gana el tablero para sumar puntos' })),
       P.ups && P.ups.length ? h('div', { class: 'levelup' }, h('b', { text: '¡Subiste al nivel ' + P.ups[P.ups.length - 1].level + '!' }), h('small', { text: P.ups.map((u) => `Nivel ${u.level}: +${u.coins} monedas${u.item ? ' · ' + D.ITEM_BY_ID[u.item].name : ''}`).join(' · ') })) : null,
       P.chest && P.chest.ok ? h('div', { class: 'levelup chest' }, img('chest', 3), h('b', { text: '¡Cofre de botín!' }), h('small', { text: P.chest.item ? `Conseguiste: ${P.chest.item.name} (${D.RARITY[P.chest.item.rarity].name})` : `+${P.chest.coins} monedas extra` })) : null,
-      mist,
+      mist, goods,
       h('div', { class: 'rbtns' },
         canNext ? h('button', { class: 'btn big', onclick: () => { sfx('select'); go('district', { id: nextV.id }); } }, 'Siguiente distrito') : null,
         h('button', { class: 'btn' + (canNext ? '' : ' big'), onclick: () => { sfx('select'); go('district', { id: v.id, tier: P.tier }); } }, res.win ? 'Volver a luchar' : 'Reintentar'),
@@ -712,18 +725,23 @@
   const fmtPts = (n) => (Math.round(n * 10) / 10).toString().replace('.', ',');
   SCREENS.credits = (P, sc) => {
     const p = St.profile(), A0 = D.AUTHOR, sco = St.score();
-    const pct = sco.total / sco.max;
+    const pct = Math.max(0, Math.min(1, sco.total / sco.max));
     const grade = pct >= 0.9 ? '¡Héroe legendario!' : pct >= 0.6 ? '¡Gran defensor de la ciudad!' : pct >= 0.3 ? 'Vas por buen camino' : 'Tu aventura apenas comienza';
-    const rows = sco.rows.map((r) => h('tr', { class: r.pts >= r.max - 0.01 ? 'full' : r.pts > 0 ? 'part' : '' },
-      h('td', { class: 'cr-n', text: r.boss ? '👑 ' + r.name : r.name }), h('td', { class: 'cr-t', text: r.tema }),
-      h('td', { class: 'cr-p' }, h('b', { text: fmtPts(r.pts) }), h('small', { text: ' / ' + r.max }))));
+    const R0 = 70, C0 = 2 * Math.PI * R0;
+    const ring = h('div', { class: 'cr-ring', role: 'img', 'aria-label': `Puntaje ${fmtPts(sco.total)} de ${sco.max}`, html: `<svg viewBox="0 0 170 170"><circle cx="85" cy="85" r="${R0}" class="rb"/><circle cx="85" cy="85" r="${R0}" class="rf" stroke-dasharray="${C0.toFixed(1)}" stroke-dashoffset="${C0.toFixed(1)}" transform="rotate(-90 85 85)"/></svg>` });
+    const num = h('b', { class: 'cr-num', text: '0' }); ring.appendChild(h('div', { class: 'cr-ringtxt' }, num, h('span', { text: '/ ' + sco.max })));
+    later(() => { const f = ring.querySelector('.rf'); if (f) f.style.strokeDashoffset = (C0 * (1 - pct)).toFixed(1); }, 120);
+    { let t0 = 0; const dur = 1100; const step = (ts) => { if (!t0) t0 = ts; const k = Math.min(1, (ts - t0) / dur), e = 1 - Math.pow(1 - k, 3); num.textContent = fmtPts(sco.total * e); if (k < 1 && num.isConnected) requestAnimationFrame(step); else num.textContent = fmtPts(sco.total); }; requestAnimationFrame(step); }
+    const hcv = h('canvas', { class: 'px cr-hcv' }); liveHero(hcv, () => p.look, { scale: 4, pose: () => 'idle' });
+    const rows = sco.rows.map((r) => { const v = Vby(r.id), full = r.pts >= r.max - 0.01;
+      return h('div', { class: 'cr-row' + (full ? ' full' : r.pts > 0 ? ' part' : '') }, villainEl(v, 38),
+        h('div', { class: 'cr-mid' }, h('b', { text: r.name }), h('small', { text: r.tema }), h('div', { class: 'cr-mbar' }, h('i', { style: `width:${Math.round(r.pts / r.max * 100)}%` }))),
+        h('div', { class: 'cr-p' }, h('b', { text: fmtPts(r.pts) }), h('small', { text: '/ ' + r.max }))); });
     sc.appendChild(h('div', { class: 'credits' }, topbar(),
       h('h1', { class: 'h1', text: P && P.final ? '¡Misión cumplida!' : 'Créditos y puntaje' }),
-      h('div', { class: 'cr-score' }, h('small', { text: 'PUNTAJE FINAL DE ' + p.name.toUpperCase() }), h('div', { class: 'cr-big' }, h('b', { text: fmtPts(sco.total) }), h('span', { text: ' / ' + sco.max })), h('p', { text: grade }),
-        h('div', { class: 'cr-bar' }, h('i', { style: `width:${Math.round(pct * 100)}%` }))),
-      h('div', { class: 'cr-card' }, h('h3', { text: 'Créditos' }),
-        h('p', { class: 'cr-au' }, h('span', { text: 'Juego creado por' }), h('b', { text: A0.full }), h('span', { text: `Estudiante de ${A0.career}` })),
-        h('p', { class: 'cr-sm', text: `Proyecto de ${A0.course} · Basado en ${A0.book} · ${A0.year}` })),
+      h('div', { class: 'cr-stage' }, stageDeco(), h('div', { class: 'cr-top' }, h('div', { class: 'cr-hero' }, hcv, h('span', { class: 'lhero-sh' })), h('div', { class: 'cr-score' }, h('small', { text: 'PUNTAJE FINAL' }), ring, h('b', { class: 'cr-who', text: p.name }), h('p', { text: grade })))),
+      h('div', { class: 'cr-card cr-auth' }, h('small', { text: 'JUEGO CREADO POR' }), h('b', { class: 'cr-name', text: A0.full }), h('span', { text: `Estudiante de ${A0.career} · Proyecto de ${A0.course}` }),
+        h('div', { class: 'cr-refs' }, h('small', { text: 'Basado en:' }), A0.books.map((b) => h('span', { class: 'cr-ref', text: '📖 ' + b })))),
       h('div', { class: 'cr-card' }, h('h3', { text: 'Cómo se calcula el puntaje (máx. 100)' }),
         h('ul', { class: 'cr-rules' },
           h('li', { text: '15 tableros de tema × 6 puntos = 90 puntos.' }),
@@ -731,7 +749,7 @@
           h('li', { text: 'Cada tablero tiene 3 dificultades: Fácil (1 pt), Medio (2 pts) y Difícil (3 pts). En el jefe: 2, 3 y 5 pts.' }),
           h('li', { text: 'Puntos de una dificultad = su valor × (estrellas ÷ 3). Con 3 estrellas se gana completo.' }),
           h('li', { text: 'Duinity (modo sin fin) es un extra: no suma al puntaje.' }))),
-      h('div', { class: 'cr-card' }, h('h3', { text: 'Puntos por tablero' }), h('table', { class: 'cr-tab' }, h('tbody', null, rows)),
+      h('div', { class: 'cr-card' }, h('h3', { text: 'Puntos por tablero' }), h('div', { class: 'cr-list' }, rows),
         h('div', { class: 'cr-tot' }, h('span', { text: 'TOTAL' }), h('b', { text: fmtPts(sco.total) + ' / ' + sco.max }))),
       h('div', { class: 'rbtns' }, h('button', { class: 'btn big', onclick: () => { sfx('back'); go('hub', { scrollTo: true }); } }, 'Volver al mapa'))));
   };

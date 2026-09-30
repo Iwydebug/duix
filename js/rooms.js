@@ -26,6 +26,19 @@
     const draw = () => { box.innerHTML = ''; opts.forEach(([v, label]) => box.appendChild(h('button', { type: 'button', class: 'segb' + (get() === v ? ' on' : ''), role: 'radio', 'aria-checked': get() === v ? 'true' : 'false', onclick: () => { set(v); sfx('click'); draw(); } }, label))); };
     draw(); return box;
   }
+  // Impostores: Ninguno / Auto / 1 / 2 / 3 y un cuadro numérico para cualquier otro número
+  function impRow(c) {
+    const box = h('div', { class: 'seg', role: 'radiogroup' });
+    const num = h('input', { type: 'number', inputmode: 'numeric', pattern: '[0-9]*', min: '1', max: '30', class: 'input impnum', placeholder: 'Otro nº', 'aria-label': 'Otro número de impostores' });
+    const PRE = [[0, 'Ninguno'], [-1, 'Auto'], [1, '1'], [2, '2'], [3, '3']];
+    const draw = () => { box.innerHTML = ''; PRE.forEach(([v, label]) => box.appendChild(h('button', { type: 'button', class: 'segb' + ((c.imp || 0) === v ? ' on' : ''), role: 'radio', 'aria-checked': (c.imp || 0) === v ? 'true' : 'false', onclick: () => { c.imp = v; num.value = ''; sfx('click'); draw(); } }, label)));
+      const custom = (c.imp || 0) > 3; num.classList.toggle('on', custom); if (custom) num.value = String(c.imp); };
+    num.addEventListener('input', () => { const v = Math.max(0, Math.min(30, parseInt(num.value, 10) || 0)); if (num.value === '') return; c.imp = v; draw(); });
+    draw();
+    return h('div', { class: 'set col' }, h('div', null, h('b', { text: '🕵️ Impostores' }), h('small', { text: 'Juegan normal pero sabotean (turbo, niebla, robo). Cada 3 preguntas todos votan quién es. Necesitas 3+ jugadores; el máximo real es la mitad menos 1.' })),
+      h('div', { class: 'improw' }, box, num),
+      h('small', { class: 'hint imphelp', html: '<b>Auto</b> = 1 impostor por cada 5 jugadores (equilibrado):<br>3–7 jug. → 1 · 8–12 → 2 · 13–17 → 3 · 20 → 4 · 30 → 6 · 40 → 8 · 60 → 12.<br>Con más impostores el juego es más caótico; con menos, más difícil de ganar para ellos.' }));
+  }
   function switchRow(label, desc, get, set) {
     return h('label', { class: 'set' }, h('div', null, h('b', { text: label }), desc ? h('small', { text: desc }) : null), h('input', { type: 'checkbox', checked: get() ? true : null, onchange: (e) => { set(e.target.checked); sfx('click'); } }), h('span', { class: 'sw2' }));
   }
@@ -135,7 +148,7 @@
         h('small', { class: 'hint', text: 'Con un solo tema pelean contra su villano; con varios, contra El Indeterminado.' })),
       h('div', { class: 'set-block' }, h('h3', { text: 'Modo de juego' }),
         switchRow('Mezclar los 3 juegos', 'Disparo → Carrera → Laberinto Pac-Man (las preguntas se reparten entre los tres)', () => c.mix !== false, (v) => { c.mix = v; }),
-        h('div', { class: 'set col' }, h('div', null, h('b', { text: '🕵️ Impostores' }), h('small', { text: 'Juegan normal pero pueden sabotear (turbo, niebla, robar puntos). Cada 3 preguntas todos votan quién es. Se necesitan 3+ jugadores.' })), seg([[0, 'Ninguno'], [1, '1'], [2, '2']], () => (c.imp || 0), (v) => { c.imp = v; }))),
+        impRow(c)),
       h('div', { class: 'set-block' }, secsRow(c),
         switchRow('Yo también juego', 'Apágalo si solo vas a proyectar el ranking', () => c.hostPlays, (v) => { c.hostPlays = v; })));
   }
@@ -154,12 +167,12 @@
     });
     sc.appendChild(h('div', { class: 'rooms' }, K.topbar(), h('h1', { class: 'h1', text: 'Nueva sala' }),
       blocks,
-      msg, btn, h('button', { class: 'btn ghost', type: 'button', onclick: () => { sfx('back'); go('rooms'); } }, 'Volver')));
+      h('div', { class: 'actbar' }, msg, btn, h('button', { class: 'btn ghost', type: 'button', onclick: () => { sfx('back'); go('rooms'); } }, 'Volver'))));
   };
   async function createRoom(c) {
     const p = St.profile();
     await N.ready();
-    const cfg = { n: c.n, level: c.level, topics: Array.from(c.topics), secs: Math.max(15, Math.min(60, c.secs || 30)), hostPlays: !!c.hostPlays, mix: c.mix !== false, imp: c.imp || 0, seed: Math.floor(Math.random() * 4294967295), v: 4 };
+    const cfg = { n: c.n, level: c.level, topics: Array.from(c.topics), secs: Math.max(15, Math.min(60, c.secs || 30)), hostPlays: !!c.hostPlays, mix: c.mix !== false, imp: c.imp === undefined ? 0 : c.imp, seed: Math.floor(Math.random() * 4294967295), v: 4 };
     let code = '', ok = false;
     for (let i = 0; i < 10 && !ok; i++) { code = newCode(); ok = (await N.get('rooms/' + code + '/state')) === null; }
     if (!ok) throw new Error('No se pudo crear un código libre. Inténtalo otra vez.');
@@ -247,7 +260,7 @@
     async function hostStart() {
       const n = Object.keys(R.players).length;
       if (!n) { toast('Aún no hay jugadores.', 'warn'); sfx('deny'); return; }
-      const ids = Object.keys(R.players).filter((id) => R.players[id].online !== false), want = Math.min((R.cfg && R.cfg.imp) || 0, Math.floor((ids.length - 1) / 2)), imps = {};
+      const ids = Object.keys(R.players).filter((id) => R.players[id].online !== false), cfgImp = (R.cfg && R.cfg.imp) || 0, want = Math.min(cfgImp < 0 ? Math.max(1, Math.round(ids.length / 5)) : cfgImp, Math.floor((ids.length - 1) / 2)), imps = {};
       if (ids.length >= 3) { const pool = ids.slice(); for (let k = 0; k < want; k++) { const i = Math.floor(Math.random() * pool.length); imps[pool.splice(i, 1)[0]] = true; } }
       try { sfx('go'); await N.update(P, { state: { phase: 'countdown', t0: N.TS, round: round(), imps: Object.keys(imps).length ? imps : null }, votes: null, sab: null }); } catch (e) { toast(netErr(e), 'warn'); }
     }
@@ -286,7 +299,7 @@
     // ¿quién ya fue descubierto? (se calcula igual en todos los celulares a partir de los votos)
     function expelledMap() {
       const out = {}, ids = Object.keys(imps()); if (!ids.length) return out;
-      const crew = Math.max(1, Object.keys(R.players).length - ids.length), need = Math.max(2, Math.ceil(crew / 2)), hits = {};
+      const crew = Math.max(1, Object.keys(R.players).length - ids.length), need = Math.max(2, Math.ceil(crew * 0.4)), hits = {};
       Object.values(R.votes || {}).forEach((cp) => Object.keys(cp || {}).forEach((voter) => { const t = cp[voter]; if (imps()[t] && !imps()[voter]) { hits[t] = hits[t] || {}; hits[t][voter] = 1; } }));
       ids.forEach((t) => { if (hits[t] && Object.keys(hits[t]).length >= need) out[t] = true; });
       return out;
@@ -314,7 +327,7 @@
       if (left || my.finished || !seg) return;
       const [kind, count] = seg.plan[seg.i], off = seg.off, cfg = R.cfg;
       const bcfg = {
-        container: holder, villain: roomVillain(cfg), tier: cfg.level || 2, look: p.look, perks: {}, lockSettings: true, fallSecs: cfg.secs || (cfg.more ? 40 : 30), extraTop: rankEl, speedMul,
+        container: holder, villain: roomVillain(cfg), tier: cfg.level || 2, look: p.look, perks: {}, noTutorial: true, lockSettings: true, fallSecs: cfg.secs || (cfg.more ? 40 : 30), extraTop: rankEl, speedMul,
         room: { total: count, getQuestion: (i) => questions[off + i], hp: sharedHp, noHearts: true },
         onProgress: (snap) => onSnap(snap),
         onEnd: (rep) => { setTimeout(() => segDone(rep), 0); },

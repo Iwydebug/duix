@@ -1,5 +1,5 @@
 /* DuiX — Juegos 2 y 3 de cada distrito.
- *   Nivel 2 «Carrera»: corres por 4 carriles hacia 4 puertas; eliges la puerta con la respuesta.
+ *   Nivel 2 «Carrera»: corres por 4 carriles hacia 4 carteles; eliges el cartel con la respuesta.
  *   Nivel 3 «Pares»:   unes cada problema con su resultado antes de que se acabe el tiempo.
  * Misma interfaz que Battle.start(cfg): {container, villain, tier, look, perks, onEnd(report), onQuit()}.
  */
@@ -8,7 +8,6 @@
   const D = root.DuiXData, S = root.DuiXSprites, A = root.DuiXAudio, Q = root.DuiXQ, St = root.DuiXStore;
   const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "DejaVu Sans", Arial, sans-serif';
   const LANE_COL = ['#ff7a59', '#ffd23f', '#5ce1e6', '#c58bff'];
-  const FB = root.DuiXFB;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
   const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
@@ -40,7 +39,7 @@
     const api = { wrap, $, st, v, perks, tier, destroyed: false, raf: 0, last: 0, onTick: null, onResume: null };
     const mult = () => 1 + Math.min(2, Math.floor(Math.max(0, st.streak - 1) / 3) * 0.5);
     api.mult = mult;
-    api.hearts = () => { const h = $('.bt-hearts'); h.innerHTML = ''; if (room && room.noHearts) { h.textContent = '⚔ Sala'; h.className = 'bt-hearts room'; return; } for (let i = 0; i < st.maxHearts; i++) { const im = new Image(); im.alt = ''; im.src = S.icon(i < st.hearts ? 'heart' : 'heartEmpty', 3); h.appendChild(im); } if (st.shield > 0) h.appendChild(el('span', 'bt-shield', '🛡')); };
+    api.hearts = () => { const h = $('.bt-hearts'); h.innerHTML = ''; if (room && room.noHearts) { h.textContent = (room.label || '⚔ Sala'); h.className = 'bt-hearts room'; return; } for (let i = 0; i < st.maxHearts; i++) { const im = new Image(); im.alt = ''; im.src = S.icon(i < st.hearts ? 'heart' : 'heartEmpty', 3); h.appendChild(im); } if (st.shield > 0) h.appendChild(el('span', 'bt-shield', '🛡')); };
     api.hud = (frac, text) => {
       $('.bt-score').textContent = String(Math.round(st.score));
       $('.bt-coins b').textContent = String(St.profile() ? St.profile().coins + st.coins : st.coins);
@@ -61,10 +60,11 @@
       const cg = Math.round((clean ? 3 + (st.streak >= 5 ? 2 : 0) : 1) * (1 + (perks.coins || 0))); st.coins += cg; return { g, cg };
     };
     api.log = (q, chosenIdx, options, correctIdx) => { st.mistakes.push({ topic: q.topic, text: q.text, options: options || q.options, correct: correctIdx != null ? correctIdx : q.correct, chosen: chosenIdx, explain: q.explain, table: q.table || null }); };
+    api.good = (q) => { (st.goods = st.goods || []).push({ topic: q.topic, text: q.text, correctText: q.options[q.correct], explain: q.explain, table: q.table || null }); };
     api.banner = (text, cls, ms) => { let b = $('.bt-banner'); if (!b) { b = el('div', 'bt-banner'); wrap.appendChild(b); } b.textContent = text; b.className = 'bt-banner gmb ' + (cls || ''); b.hidden = false; b.style.animation = 'none'; void b.offsetWidth; b.style.animation = ''; if (ms) setTimeout(() => { if (!api.destroyed) b.hidden = true; }, ms); };
     api.report = () => {
       const acc = st.answered ? st.correct / st.answered : 0; let stars = 0; if (st.win) stars = st.heartsLost === 0 ? 3 : (st.heartsLost === 1 || acc >= 0.75) ? 2 : 1;
-      return { win: !!st.win, stars, correct: st.correct, answered: st.answered, bestStreak: st.bestStreak, mistakes: st.mistakes, score: Math.round(st.score), coins: st.coins, heartsLost: st.heartsLost, hintsUsed: st.hintsUsed, tier, time: Math.round(st.time), endless: false };
+      return { win: !!st.win, stars, correct: st.correct, answered: st.answered, bestStreak: st.bestStreak, mistakes: st.mistakes, goods: st.goods || [], score: Math.round(st.score), coins: st.coins, heartsLost: st.heartsLost, hintsUsed: st.hintsUsed, tier, time: Math.round(st.time), endless: false };
     };
     api.toggle = (p) => { if (st.over) return; if (room) { const show = p === undefined ? $('.bt-pausemenu').hidden : p; $('.bt-pausemenu').hidden = !show; return; } st.paused = p === undefined ? !st.paused : p; $('.bt-pausemenu').hidden = !st.paused; A.sfx('pause'); if (!st.paused) { api.last = 0; api.onResume && api.onResume(); } };
     // música / efectos
@@ -162,12 +162,24 @@
       const gates = q.options.map((t, i) => { const lay = wrapLines(t, GW - 10); return { lane: i, x: LW / 4 * i + 3, w: GW, h: Math.max(50, lay.lines.length * lay.fs * 1.22 + 18), lines: lay.lines, fs: lay.fs, text: t, ok: i === q.correct, gone: false, crossed: false, mark: 0 }; });
       walls.push({ q, idx, y, gates, resolved: false, wrong: false });
     }
-    function spawnFiller(y) {
-      const r = Math.random(); const lane = () => Math.floor(Math.random() * 4);
-      if (r < 0.34) { const l = lane(); for (let k = 0; k < 5; k++) items.push({ t: 'coin', x: LW / 4 * (l + 0.5) + Math.sin(k * 0.9) * 26, y: y - k * 26, got: false }); }
-      else if (r < 0.66) { const a = lane(); let b = lane(); while (b === a) b = lane(); [a, b].forEach((l) => items.push({ t: 'mine', x: LW / 4 * (l + 0.5) + (Math.random() - 0.5) * 30, y: y - Math.random() * 20, got: false })); if (Math.random() < 0.5) items.push({ t: 'mine', x: LW / 4 * (lane() + 0.5), y: y - 60, got: false }); }
-      else if (r < 0.84) { const kind = ['shield', 'slow', 'heart', 'shield'][Math.floor(Math.random() * 4)]; items.push({ t: kind === 'heart' && st.hearts >= st.maxHearts ? 'shield' : kind, x: LW / 4 * (lane() + 0.5), y, got: false }); const l2 = lane(); for (let k = 0; k < 3; k++) items.push({ t: 'coin', x: LW / 4 * (l2 + 0.5), y: y - 40 - k * 24, got: false }); }
-      else { items.push({ t: 'sigma', x: LW / 4 * (lane() + 0.5), y, got: false }); items.push({ t: 'coin', x: LW / 4 * (lane() + 0.5), y: y - 50, got: false }); }
+    // relleno entre la pared y el héroe: las minas quedan siempre lejos de los carteles (>= 140 px)
+    function spawnFiller(wall) {
+      const lane = () => Math.floor(Math.random() * 4), cx = (l) => LW / 4 * (l + 0.5);
+      const top = wall.y + Math.max.apply(null, wall.gates.map((g) => g.h)) + 150, bot = hero.y - 70; let nm = 0;
+      for (let y = top; y < bot; y += 66) {
+        const r = Math.random(), l = lane();
+        if (r < 0.36 && nm < 3) { nm++; items.push({ t: 'mine', x: cx(l), y, got: false }); if (Math.random() < 0.35 && y + 66 < bot) { let l2 = lane(); while (l2 === l) l2 = lane(); items.push({ t: 'coin', x: cx(l2), y, got: false }); } }
+        else if (r < 0.68) { for (let k = 0; k < 3; k++) items.push({ t: 'coin', x: cx(l), y: y + k * 20, got: false }); }
+        else if (r < 0.80) { const kind = ['shield', 'slow', 'heart', 'shield'][Math.floor(Math.random() * 4)]; items.push({ t: kind === 'heart' && st.hearts >= st.maxHearts ? 'shield' : kind, x: cx(l), y, got: false }); }
+        else if (r < 0.88) items.push({ t: 'sigma', x: cx(l), y, got: false });
+      }
+      if (!nm) items.push({ t: 'mine', x: cx(lane()), y: (top + bot) / 2, got: false });
+    }
+    function beginRead() {
+      const q = makeQ(); st.nextQ = q; fillQ(c, q, topicTag(v, q)); state = 'read'; sT = 0; $('.bt-explain').hidden = true;
+      const len = q.text.length + (q.table ? 30 : 0) + q.options.reduce((a, o) => a + o.length, 0) * 0.4;
+      readFor = Math.min(room ? 6 : 10, Math.max(room ? 3 : 4, 2 + len * 0.06)); if (spawned > 0) readFor = Math.max(room ? 2.5 : 3, readFor * 0.75);
+      intro.show(q, readFor, topicTag(v, q));
     }
     const bad = { text: '' };
     function showQ(q) { fillQ(c, q, topicTag(v, q)); const qb = $('.bt-q'); qb.classList.remove('flip'); void qb.offsetWidth; qb.classList.add('flip'); A.sfx('tick'); }
@@ -178,8 +190,7 @@
     function answerWall(w, g) {
       w.resolved = true; st.answered++; const x = g ? g.x + g.w / 2 : hero.x, y = g ? w.y + g.h / 2 : hero.y;
       if (g && g.ok) {
-        FB.right(c.wrap, w.q, !w.wrong);
-        const clean = !w.wrong; if (clean) { st.correct++; st.streak++; st.bestStreak = Math.max(st.bestStreak, st.streak); } else st.streak = 0;
+        const clean = !w.wrong; if (clean) { st.correct++; st.streak++; st.bestStreak = Math.max(st.bestStreak, st.streak); c.good(w.q); } else st.streak = 0;
         const r = c.gain(clean, 0); g.mark = 1; burst(x, y, ['#ffe14a', '#fff', LANE_COL[g.lane]], 26, 200, 0.7); fl(x, y - 16, '+' + r.g, '#ffe14a', 24);
         w.gates.forEach((o) => { if (o !== g) o.gone = true; });
         A.sfx('correct'); A.sfx('hit'); setTimeout(() => A.sfx('coin'), 90); shake = 6; if (st.streak >= 3 && clean) A.sfx('combo', st.streak);
@@ -187,7 +198,7 @@
       } else {
         st.streak = 0; w.wrong = true; c.log(w.q, g ? g.lane : -1); c.damage(); burst(x, y, ['#ff3b5c', '#7a6aa8'], 20, 160, 0.6); fl(x, y - 16, g ? '✖' : '¡Se pasó!', '#ff4d4d', g ? 30 : 20);
         shake = 10; flash = 0.35; if (g) g.gone = true; w.gates.forEach((o) => { if (o.ok) o.mark = 2; });
-        explainBox(c, 'La correcta era «' + w.q.options[w.q.correct] + '». ' + w.q.explain); FB.reveal(c.wrap, w.q, g ? g.lane : -1, g ? '' : '¡Se pasó!');
+        explainBox(c, 'La correcta era «' + w.q.options[w.q.correct] + '». ' + w.q.explain);
         if (st.hearts <= 0) return finish(false);
         if (st.answered >= N) return finish(true);
       }
@@ -220,19 +231,17 @@
       const sp = 250; let kx = 0, ky = 0; if (keys.arrowleft || keys.a) kx -= 1; if (keys.arrowright || keys.d) kx += 1; if (keys.arrowup || keys.w) ky -= 1; if (keys.arrowdown || keys.s) ky += 1;
       if (kx || ky) { hero.tx = clamp(hero.tx + kx * sp * dt, 20, LW - 20); hero.ty = clamp(hero.ty + ky * sp * dt, LH * 0.3, LH - 40); }
       if (stun <= 0) { const dx = hero.tx - hero.x; hero.x += dx * Math.min(1, dt * 12); hero.y += (hero.ty - hero.y) * Math.min(1, dt * 12); if (Math.abs(dx) > 1.5) hero.face = dx > 0 ? 1 : -1; }
-      if (state === 'intro') { if (sT > 0.1 && !st.said) { st.said = true; c.banner('¡A CORRER!', 'go', 1200); } if (sT > 1.3) { const q = makeQ(); st.nextQ = q; fillQ(c, q, topicTag(v, q)); state = 'read'; sT = 0; const len = q.text.length + (q.table ? 30 : 0) + q.options.reduce((a, o) => a + o.length, 0) * 0.4; readFor = Math.min(room ? 6 : 10, Math.max(room ? 3 : 4, 2 + len * 0.06)); intro.show(q, readFor, topicTag(v, q)); } }
+      if (state === 'intro') { if (sT > 0.1 && !st.said) { st.said = true; c.banner('¡A CORRER!', 'go', 1200); } if (sT > 1.3) beginRead(); }
+      else if (state === 'clear') { const vv = baseV() * 4.5, dy2 = vv * dt; scroll += dy2; walls.forEach((w) => { w.y += dy2; }); items.forEach((it) => { it.y += dy2; }); if (sT >= 0.75) { walls.length = 0; items.length = 0; beginRead(); } }
       else if (state === 'read') { if (sT >= readFor) { state = 'settle'; sT = 0; intro.settle(); A.sfx('tick'); } }
-      else if (state === 'settle') { if (sT >= 0.55) { intro.end(); state = 'play'; sT = 0; A.sfx('go'); c.banner('¡YA!', 'go', 550); spawnWall(SPAWN_Y); curIdx = 0; prog(); } }
+      else if (state === 'settle') { if (sT >= 0.55) { intro.end(); state = 'play'; sT = 0; A.sfx('go'); c.banner('¡YA!', 'go', 550); spawnWall(SPAWN_Y); curIdx = walls[walls.length - 1].idx; spawnFiller(walls[walls.length - 1]); prog(); } }
       else if (state === 'play') {
-        const vv = baseV(), dy = vv * dt; scroll += dy;
+        const lw0 = walls.find((w) => !w.resolved), vv = baseV() * (lw0 && lw0.y < LH * 0.22 ? 2.4 : 1), dy = vv * dt; scroll += dy;
         walls.forEach((w) => { w.y += dy; }); items.forEach((it) => { it.y += dy; });
         // generar la siguiente pared + relleno entre paredes
-        const last = walls[walls.length - 1];
-        if (spawned < N && last && last.y >= SPAWN_Y + D) { spawnFiller(SPAWN_Y + D / 2 + 30); spawnWall(SPAWN_Y); }
         // pregunta actual = la primera pared sin resolver
         const cw = walls.find((w) => !w.resolved);
-        if (cw && cw.idx !== curIdx) { curIdx = cw.idx; showQ(cw.q); }
-        if (cw && cw.idx + 1 < N && !st.nextQ && spawned === cw.idx + 1) st.nextQ = makeQ();
+        if (!cw && !ended) { state = 'clear'; sT = 0; }
         // colisiones del héroe
         const hx0 = hero.x - 13, hx1 = hero.x + 13, hy0 = hero.y - 34, hy1 = hero.y + 2;
         for (const w of walls) { if (w.resolved) continue; for (const g of w.gates) { if (g.gone) continue; if (hx1 > g.x && hx0 < g.x + g.w && hy1 > w.y && hy0 < w.y + g.h) { answerWall(w, g); break; } } if (w.resolved) continue; if (w.y > hero.y + 6) answerWall(w, null); if (ended) break; }
@@ -268,7 +277,12 @@
     function drawItem(it, t) {
       const b = Math.sin(t * 6 + it.x) * 2; ctx.save(); ctx.translate(it.x, it.y + b); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       if (it.t === 'coin') { ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(0, 0, 9, 0, 6.283); ctx.fill(); ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(0, 0, 7, 0, 6.283); ctx.fill(); ctx.fillStyle = '#b07a00'; ctx.fillRect(-1, -4, 2, 8); }
-      else if (it.t === 'mine') { ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(0, 0, 15, 0, 6.283); ctx.fill(); ctx.fillStyle = '#4a3a6a'; ctx.beginPath(); ctx.arc(0, 0, 12, 0, 6.283); ctx.fill(); ctx.fillStyle = '#ff3b3b'; ctx.globalAlpha = 0.6 + 0.4 * Math.sin(t * 8); ctx.beginPath(); ctx.arc(0, 0, 5, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1; ctx.strokeStyle = '#000'; ctx.lineWidth = 3; for (let k = 0; k < 8; k++) { const a = k * 0.785; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 12, Math.sin(a) * 12); ctx.lineTo(Math.cos(a) * 18, Math.sin(a) * 18); ctx.stroke(); } }
+      else if (it.t === 'mine') {
+        const pu = 0.5 + 0.5 * Math.sin(t * 7); ctx.fillStyle = `rgba(255,60,40,${0.18 + 0.18 * pu})`; ctx.beginPath(); ctx.arc(0, 0, 27 + pu * 4, 0, 6.283); ctx.fill();
+        ctx.strokeStyle = '#000'; ctx.lineWidth = 7; for (let k = 0; k < 10; k++) { const a = k * 0.6283; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 12, Math.sin(a) * 12); ctx.lineTo(Math.cos(a) * 24, Math.sin(a) * 24); ctx.stroke(); }
+        ctx.strokeStyle = '#ffb347'; ctx.lineWidth = 3.5; for (let k = 0; k < 10; k++) { const a = k * 0.6283; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 12, Math.sin(a) * 12); ctx.lineTo(Math.cos(a) * 22, Math.sin(a) * 22); ctx.stroke(); }
+        ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(0, 0, 17, 0, 6.283); ctx.fill(); ctx.fillStyle = '#3a2f55'; ctx.beginPath(); ctx.arc(0, 0, 14, 0, 6.283); ctx.fill();
+        ctx.fillStyle = '#ff2d2d'; ctx.globalAlpha = 0.6 + 0.4 * pu; ctx.beginPath(); ctx.arc(0, 0, 7, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1; ctx.fillStyle = '#fff'; ctx.font = `800 12px ${FONT}`; ctx.fillText('!', 0, 1); }
       else { const col = it.t === 'sigma' ? '#c58bff' : it.t === 'shield' ? '#5ce1e6' : it.t === 'slow' ? '#9dffef' : '#ff5c7a', ico = it.t === 'sigma' ? 'Σ' : it.t === 'shield' ? '🛡' : it.t === 'slow' ? '⏳' : '❤'; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(0, 0, 17, 0, 6.283); ctx.fill(); ctx.fillStyle = col; ctx.beginPath(); ctx.arc(0, 0, 14, 0, 6.283); ctx.fill(); ctx.fillStyle = it.t === 'sigma' ? '#1a1033' : '#fff'; ctx.font = `800 ${it.t === 'sigma' ? 20 : 15}px ${FONT}`; ctx.fillText(ico, 0, 1); ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, 20 + Math.sin(t * 5) * 2, 0, 6.283); ctx.stroke(); }
       ctx.restore();
     }
@@ -366,6 +380,12 @@
     const posOf = (e) => ({ x: px(e.i + (e.ni - e.i) * e.p), y: py(e.j + (e.nj - e.j) * e.p) });
     const prog = () => c.hud(1 - st.answered / N, st.answered + '/' + N);
     function newQuestion(first) { q = makeQ(); qn++; if (first) fillQ(c, q, topicTag(v, q)); else { fillQ(c, q, topicTag(v, q)); const qb = $('.bt-q'); qb.classList.remove('flip'); void qb.offsetWidth; qb.classList.add('flip'); A.sfx('tick'); } placePills(); }
+    function beginRead() {
+      newQuestion(true); if (qn > 1) respawn(); state = 'read'; sT = 0; $('.bt-explain').hidden = true;
+      const len = q.text.length + (q.table ? 30 : 0) + q.options.reduce((a, o) => a + o.length, 0) * 0.4;
+      readFor = Math.min(room ? 6 : 10, Math.max(room ? 3 : 4, 2 + len * 0.06)); if (qn > 1) readFor = Math.max(room ? 2.5 : 3, readFor * 0.8);
+      intro.show(q, readFor, topicTag(v, q));
+    }
     function finish(win) { if (ended) return; ended = true; st.over = true; st.win = win; state = 'end'; sT = 0; if (win) { A.sfx('levelup'); c.banner(room ? '¡LISTO!' : '¡VICTORIA!', 'go'); } else { A.sfx('lose'); c.banner('¡DERROTA!', 'lose'); } }
     function respawn() { invul = 2.2; hero.i = hero.ni = Math.floor(COLS / 2) | 1; hero.j = hero.nj = ROWS - 2; hero.p = 1; hero.dir = [0, 0]; hero.want = [0, 0]; }
     function eatPill(pl) {
@@ -373,16 +393,14 @@
       if (pl.gone) return; const p = posOf(hero);
       if (pl.ok) {
         pl.gone = true; st.answered += 1;
-        FB.right(c.wrap, q, !q.wrong);
-        const clean = !q.wrong; if (clean) { st.correct++; st.streak++; st.bestStreak = Math.max(st.bestStreak, st.streak); } else st.streak = 0;
+        const clean = !q.wrong; if (clean) { st.correct++; st.streak++; st.bestStreak = Math.max(st.bestStreak, st.streak); c.good(q); } else st.streak = 0;
         const r = c.gain(clean, 0); burst(p.x, p.y, ['#ffe14a', '#fff', '#3ddc97'], 30, 210, 0.8); fl(p.x, p.y - 20, '+' + r.g, '#ffe14a', 24); A.sfx('correct'); A.sfx('hit'); setTimeout(() => A.sfx('coin'), 90); shake = 6; if (st.streak >= 3 && clean) A.sfx('combo', st.streak);
         if (st.answered >= N) return finish(true);
-        prog(); newQuestion(false);
+        prog(); pills.forEach((o) => { if (!o.ok) { o.gone = true; const gp = posOf(o); burst(gp.x, gp.y, ['#c58bff', '#fff'], 10, 120, 0.6); } }); state = 'between'; sT = 0; c.banner('¡PREGUNTA ' + (st.answered + 1) + ' DE ' + N + '!', 'go', 1600);
       } else if (fright > 0) {
         pl.jail = 5; pl.i = pl.ni = pl.home[0]; pl.j = pl.nj = pl.home[1]; pl.p = 1; st.score += 150; A.sfx('hit'); const cp = posOf(pl); burst(cp.x, cp.y, ['#c58bff', '#fff'], 22, 180, 0.7); fl(cp.x, cp.y - 10, '¡A la cárcel! +150', '#e2b8ff', 16);
       } else if (invul <= 0) {
         st.streak = 0; q.wrong = true; c.log(q, pl.k); c.damage(); burst(p.x, p.y, ['#ff3b5c', '#7a6aa8'], 22, 170, 0.6); fl(p.x, p.y - 20, '✖ ¡Ese no era!', '#ff4d4d', 22); shake = 10; flash = 0.35; A.sfx('boom');
-        FB.wrong(c.wrap, q, pl.k);
         explainBox(c, 'Ese no era. ' + (q.hint ? '💡 ' + q.hint : 'Sigue buscando la respuesta correcta.'));
         if (st.hearts <= 0) return finish(false);
         pl.jail = 3; pl.i = pl.ni = pl.home[0]; pl.j = pl.nj = pl.home[1]; pl.p = 1; respawn();
@@ -413,11 +431,21 @@
       }
     };
     const heroChoose = (e) => { const w = e.want, d = e.dir; if ((w[0] || w[1]) && pass(e.i + w[0], e.j + w[1])) return w; if ((d[0] || d[1]) && pass(e.i + d[0], e.j + d[1])) return d; return [0, 0]; };
+    // Fantasmas torpes e impredecibles: cada uno tiene "personalidad", casi siempre deambulan al azar y se equivocan seguido.
     const chaserChoose = (ch) => {
-      const opts = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([a, b]) => pass(ch.i + a, ch.j + b) && !(a === -ch.dir[0] && b === -ch.dir[1] && (ch.dir[0] || ch.dir[1])));
-      if (!opts.length) return [-ch.dir[0], -ch.dir[1]];
-      const chase = fright > 0 ? 0.75 : 0.42;
-      if (Math.random() > chase) return opts[Math.floor(Math.random() * opts.length)];
+      if (ch.pers == null) { ch.pers = Math.floor(Math.random() * 3); ch.spd = 0.8 + Math.random() * 0.35; }
+      const fwd = (ch.dir[0] || ch.dir[1]) ? [ch.dir[0], ch.dir[1]] : null;
+      const all = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([a, b]) => pass(ch.i + a, ch.j + b));
+      let opts = all.filter(([a, b]) => !(fwd && a === -fwd[0] && b === -fwd[1]));
+      if (!opts.length) return all[0] || [0, 0];
+      if (fwd && all.length > 1 && Math.random() < 0.05) return [-fwd[0], -fwd[1]];   // media vuelta caprichosa
+      ch.spd = clamp(ch.spd + (Math.random() - 0.5) * 0.12, 0.7, 1.15);               // ritmo cambiante
+      const chase = fright > 0 ? 0.5 : [0.06, 0.16, 0.10][ch.pers] + Math.min(0.08, qn * 0.02);
+      if (Math.random() > chase) {
+        if (ch.pers === 2 && fwd && opts.some(([a, b]) => a === fwd[0] && b === fwd[1]) && Math.random() < 0.7) return fwd;  // patrullero: sigue recto
+        return opts[Math.floor(Math.random() * opts.length)];
+      }
+      if (Math.random() < 0.3) return opts[Math.floor(Math.random() * opts.length)];  // error frecuente al perseguir
       const d = bfs(hero.ni, hero.nj); let best = null, bv = fright > 0 ? -1 : 1e9; opts.forEach(([a, b]) => { const val = d[ch.j + b][wrapI(ch.i + a)]; if (fright > 0 ? val > bv : val < bv) { bv = val; best = [a, b]; } }); return best || opts[0];
     };
     c.onTick = (dt) => {
@@ -426,7 +454,8 @@
       parts.forEach((p) => { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 260 * dt; }); for (let i = parts.length - 1; i >= 0; i--) if (parts[i].t >= parts[i].life) parts.splice(i, 1);
       floats.forEach((f) => { f.t += dt; f.y -= 26 * dt; }); for (let i = floats.length - 1; i >= 0; i--) if (floats[i].t >= floats[i].life) floats.splice(i, 1);
       shake = Math.max(0, shake - dt * 30); flash = Math.max(0, flash - dt); fright = Math.max(0, fright - dt); invul = Math.max(0, invul - dt); hintT = Math.max(0, hintT - dt);
-      if (state === 'intro') { if (sT > 0.1 && !st.said) { st.said = true; c.banner('¡AL LABERINTO!', 'go', 1200); } if (sT > 1.3) { newQuestion(true); state = 'read'; sT = 0; const len = q.text.length + (q.table ? 30 : 0) + q.options.reduce((a, o) => a + o.length, 0) * 0.4; readFor = Math.min(room ? 6 : 10, Math.max(room ? 3 : 4, 2 + len * 0.06)); intro.show(q, readFor, topicTag(v, q)); } }
+      if (state === 'intro') { if (sT > 0.1 && !st.said) { st.said = true; c.banner('¡AL LABERINTO!', 'go', 1200); } if (sT > 1.3) beginRead(); }
+      else if (state === 'between') { if (sT >= 1.7) beginRead(); }
       else if (state === 'read') { if (sT >= readFor) { state = 'settle'; sT = 0; intro.settle(); A.sfx('tick'); } }
       else if (state === 'settle') { if (sT >= 0.55) { intro.end(); state = 'play'; sT = 0; A.sfx('go'); c.banner('¡YA!', 'go', 550); prog(); } }
       else if (state === 'play') {
@@ -439,7 +468,7 @@
           if (pl.gone || ended) continue;
           if (pl.sigma) { if (Math.abs(pl.i - (hero.i + (hero.ni - hero.i) * hero.p)) < 0.6 && Math.abs(pl.j - (hero.j + (hero.nj - hero.j) * hero.p)) < 0.6) eatPill(pl); continue; }
           if (pl.jail > 0) { pl.jail -= dt; continue; }
-          stepEnt(pl, dt, (fright > 0 ? 1.7 : 2.4 + Math.min(1, cfg.tier * 0.1 + qn * 0.2)) * (room && cfg.fallSecs ? Math.max(0.6, Math.min(1.35, 27 / cfg.fallSecs)) : 1) * c.speedMul(), chaserChoose);
+          stepEnt(pl, dt, (fright > 0 ? 1.0 : 1.35 + Math.min(0.45, cfg.tier * 0.05 + qn * 0.1)) * (pl.spd || 1) * (room && cfg.fallSecs ? Math.max(0.6, Math.min(1.35, 27 / cfg.fallSecs)) : 1) * c.speedMul(), chaserChoose);
           const cp = posOf(pl); if (Math.hypot(cp.x - hp.x, cp.y - hp.y) < T * 0.66) eatPill(pl);
         }
         c.hud(1 - st.answered / N, st.answered + '/' + N);
@@ -503,7 +532,7 @@
     ] },
     run: { name: 'Carrera', pages: [
       ['👆', 'Mueve a tu héroe', 'Arrastra el dedo por la pantalla y tu héroe te sigue (en compu: flechas o WASD).'],
-      ['🚪', 'Cruza la puerta correcta', 'Cada puerta lleva una respuesta. Atraviesa SOLO la correcta. Esquiva las minas 💣.'],
+      ['🪧', 'Cruza el cartel correcto', 'Cada carril trae un cartel con una respuesta. Atraviesa SOLO el correcto y esquiva las minas 💣.'],
       ['🪙', 'Recoge extras', 'Las monedas 🪙 suman puntos y Σ te da poderes. Si te equivocas, verás la explicación para aprender.'],
     ] },
     maze: { name: 'Laberinto', pages: [
@@ -512,28 +541,32 @@
       ['⇄', 'Túneles y poder Σ', 'Los túneles de los lados te teletransportan al otro extremo. La píldora Σ asusta a los fantasmas: ¡puedes mandarlos a la cárcel!'],
     ] },
   };
+  /* Práctica dentro del mismo juego: una mini-ronda con 1 pregunta fácil, sin vidas ni puntaje, con una tira-guía arriba. Se puede omitir. */
   function withTutorial(cfg, kind, startFn) {
     const key = 'duix.tut.' + kind; let seen = false;
     try { seen = localStorage.getItem(key) === '1'; } catch (e) { /* ok */ }
-    if (seen || cfg.noTutorial || root.__noTutorial) return startFn(cfg);
-    const T = TUT[kind]; let i = 0, inner = null, dead = false, remember = false;
-    const ov = el('div', 'tut'); ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-label', 'Cómo se juega ' + T.name);
-    function draw() {
-      const pg = T.pages[i], last = i === T.pages.length - 1;
-      ov.innerHTML = `<button class="tut-skip" data-a="skip">Omitir ✕</button>
-        <div class="tut-card"><small class="tut-game">CÓMO SE JUEGA · ${esc(T.name.toUpperCase())}</small>
-          <div class="tut-ico" aria-hidden="true">${pg[0]}</div><h2>${esc(pg[1])}</h2><p>${esc(pg[2])}</p>
-          <div class="tut-dots">${T.pages.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join('')}</div>
-          <label class="tut-rem"><input type="checkbox" ${remember ? 'checked' : ''}> No volver a mostrar</label>
-          <div class="tut-btns">${i > 0 ? '<button class="btn ghost" data-a="prev">Atrás</button>' : ''}<button class="btn big" data-a="next">${last ? '¡A jugar!' : 'Siguiente'}</button></div></div>`;
+    if (seen || cfg.noTutorial || cfg.room || root.__noTutorial) return startFn(cfg);
+    const T = TUT[kind]; let inner = null, dead = false, tip = 0, timer = 0, switched = false;
+    const strip = el('div', 'coach'); strip.setAttribute('role', 'status');
+    const draw = () => { const pg = T.pages[tip % T.pages.length]; strip.innerHTML = `<div class="coach-ico" aria-hidden="true">${pg[0]}</div><div class="coach-tx"><small>PRÁCTICA · ${esc(T.name.toUpperCase())} · sin puntaje</small><b>${esc(pg[1])}</b><span>${esc(pg[2])}</span></div><button class="coach-skip" data-a="skip">Omitir ⏭</button>`; };
+    draw(); timer = setInterval(() => { tip++; draw(); }, 7000);
+    const seenNow = () => { try { localStorage.setItem(key, '1'); } catch (e) { /* ok */ } };
+    let pq; try { pq = Q.generate(cfg.villain.topic === 'mix' || cfg.villain.endless ? 'fracciones' : cfg.villain.topic, 1); } catch (e) { pq = Q.generate('fracciones', 1); }
+    function toReal() {
+      if (switched || dead) return; switched = true; clearInterval(timer); seenNow();
+      if (inner) inner.destroy(); strip.remove();
+      inner = startFn(cfg);
+      const go = el('div', 'coach-go'); go.textContent = '¡Ahora sí: el juego de verdad!'; cfg.container.appendChild(go); setTimeout(() => go.remove(), 1900);
     }
-    function finish() { if (dead) return; try { if (remember) localStorage.setItem(key, '1'); } catch (e) { /* ok */ } dead = true; ov.remove(); dead = false; inner = startFn(cfg); }
-    ov.addEventListener('change', (e) => { if (e.target.type === 'checkbox') remember = e.target.checked; });
-    ov.addEventListener('click', (e) => { const b = e.target.closest('[data-a]'); if (!b) return; A.sfx('click'); const a = b.dataset.a; if (a === 'skip') finish(); else if (a === 'prev') { i = Math.max(0, i - 1); draw(); } else if (i >= T.pages.length - 1) finish(); else { i++; draw(); } });
-    draw(); cfg.container.appendChild(ov);
+    strip.addEventListener('click', (e) => { if (e.target.closest('[data-a=skip]')) { A.sfx('click'); toReal(); } });
+    const pcfg = Object.assign({}, cfg, { extraTop: strip, onProgress: null, speedMul: () => 0.75, fallSecs: 42,
+      room: { total: 1, getQuestion: () => pq, hp: () => ({ frac: 1, text: 'Práctica' }), noHearts: true, label: '🎓 Práctica' },
+      onEnd: () => { setTimeout(toReal, 0); },
+      onQuit: () => { clearInterval(timer); dead = true; cfg.onQuit && cfg.onQuit(); }, onRestart: null });
+    inner = startFn(pcfg);
     const none = { mistakes: [], score: 0, correct: 0, answered: 0, bestStreak: 0, hearts: 3 };
-    return { destroy() { dead = true; ov.remove(); if (inner) inner.destroy(); }, refresh() { if (inner && inner.refresh) inner.refresh(); }, pause() { if (inner && inner.pause) inner.pause(); },
-      get state() { return inner ? inner.state : none; }, get _mz() { return inner && inner._mz; }, get _fire() { return inner && inner._fire; }, get _caps() { return inner && inner._caps; }, get _hint() { return inner && inner._hint; }, get _power() { return inner && inner._power; } };
+    return { destroy() { dead = true; clearInterval(timer); strip.remove(); if (inner) inner.destroy(); }, refresh() { if (inner && inner.refresh) inner.refresh(); }, pause() { if (inner && inner.pause) inner.pause(); },
+      get state() { return inner ? inner.state : none; }, get _mz() { return inner && inner._mz; }, get _run() { return inner && inner._run; }, get _fire() { return inner && inner._fire; }, get _caps() { return inner && inner._caps; }, get _hint() { return inner && inner._hint; }, get _power() { return inner && inner._power; } };
   }
 
   function start(cfg) {

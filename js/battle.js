@@ -60,7 +60,7 @@
     const hpBar = $('.bt-hpbar i');
 
     function renderHearts() {
-      const h = $('.bt-hearts'); h.innerHTML = ''; if (room && room.noHearts) { h.textContent = '⚔ Sala'; h.className = 'bt-hearts room'; return; }
+      const h = $('.bt-hearts'); h.innerHTML = ''; if (room && room.noHearts) { h.textContent = (room.label || '⚔ Sala'); h.className = 'bt-hearts room'; return; }
       for (let i = 0; i < st.maxHearts; i++) { const im = new Image(); im.alt = ''; im.src = S.icon(i < st.hearts ? 'heart' : 'heartEmpty', 3); h.appendChild(im); }
       if (st.shield > 0) { const b = el('span', 'bt-shield', '🛡'); h.appendChild(b); }
     }
@@ -143,14 +143,10 @@
         caps.push({ lane: i, x: LANE_W * (i + 0.5), y: (st.qIndex === 1 ? 126 - h - i * 12 : -h - 6 - i * 16), h, w: LANE_W - 8, lines: lay.lines, fs: lay.fs, ok: i === q.correct, state: 'fall', vy: speed * (0.94 + ((i * 7 + st.qIndex * 3) % 5) * 0.03), wob: Math.random() * 6, t: 0, text: t, targeted: false });
       });
       st.spawnT = 0;
-      if (st.qIndex === 1) {
-        st.state = 'read'; st.stateT = 0;
-        const more = cfg.moreTime ? 1.7 : 1, len = q.text.length + (q.table ? 30 : 0) + q.options.reduce((a, o) => a + o.length, 0) * 0.4;
-        st.readFor = Math.min(10, Math.max(4, 2 + len * 0.06)) * more;
-        showBig(q);
-      } else { // flujo continuo: la pregunta cambia con un golpe y las cápsulas ya vienen cayendo
-        st.state = 'play'; st.stateT = 0; const qb = $('.bt-q'); qb.classList.remove('flip'); void qb.offsetWidth; qb.classList.add('flip'); A.sfx('tick');
-      }
+      st.state = 'read'; st.stateT = 0;
+      { const more = cfg.moreTime ? 1.7 : 1, len = q.text.length + (q.table ? 30 : 0) + q.options.reduce((a, o) => a + o.length, 0) * 0.4;
+        st.readFor = Math.min(room ? 6 : 10, Math.max(room ? 3 : 4, 2 + len * 0.06)) * more; if (st.qIndex > 1) st.readFor = Math.max(room ? 2.5 : 3, st.readFor * 0.75); }
+      showBig(q);
       renderHud();
     }
 
@@ -177,8 +173,8 @@
     }
     function onCorrect(c) {
       const clean = !st.qWrong && !st.qMiss;
-      c.state = 'dead'; st.answered++; FB.right(wrap, st.q, clean);
-      if (clean) { st.correct++; st.streak++; st.bestStreak = Math.max(st.bestStreak, st.streak); } else st.streak = 0;
+      c.state = 'dead'; st.answered++;
+      if (clean) { st.correct++; st.streak++; st.bestStreak = Math.max(st.bestStreak, st.streak); (st.goods = st.goods || []).push({ topic: st.q.topic, text: st.q.text, correctText: st.q.options[st.q.correct], explain: st.q.explain, table: st.q.table || null }); } else st.streak = 0;
       const mult = clean ? multOf() : 1, tb = clamp(1 - c.y / FLOOR(), 0, 1) * 40;
       const gain = Math.round((clean ? 100 : 40) * mult * (st.goldQ ? 2 : 1) + (clean ? tb : 0));
       st.score += gain; const cg = clean ? 3 + (st.streak >= 5 ? 2 : 0) + (st.goldQ ? 2 : 0) : 1; st.coins += Math.round(cg * (1 + (perks.coins || 0)));
@@ -190,7 +186,7 @@
       setTimeout(() => A.sfx('coin'), 90);
       banner(PRAISE[Math.floor(Math.random() * PRAISE.length)], 'good', 700);
       if (!endless && st.hp <= 0) return victory();
-      st.state = 'between'; st.stateT = 0; st.wait = 0.22; renderHud();
+      st.state = 'between'; st.stateT = 0; st.wait = 0.55; renderHud();
     }
     function damageHero() {
       if (st.shield > 0) { st.shield--; float(hero.x, LH - 130, '¡ESCUDO!', '#8fe6ff', 16); A.sfx('power'); renderHearts(); return false; }
@@ -205,14 +201,13 @@
       c.state = 'dead'; st.qWrong = true; st.streak = 0; st.power = Math.floor(st.power * 0.5); st.qLogged = false; logMistake(c.lane);
       A.sfx('wrong'); float(c.x, c.y, '✖', '#ff4d4d', 30);
       damageHero(); renderHud();
-      if (st.hearts <= 0) FB.reveal(wrap, st.q, c.lane); else FB.wrong(wrap, st.q, c.lane);
       if (st.hearts <= 0) { explain('Elegiste «' + st.q.options[c.lane] + '». La correcta era «' + st.q.options[st.q.correct] + '». ' + st.q.explain); return defeat(); }
     }
     function onMiss(c) {
       // la respuesta correcta tocó el suelo
       st.qMiss = true; st.streak = 0; st.answered++; st.qLogged = false; logMistake(-1); c.state = 'good'; c.goldT = 0;
       caps.forEach((o) => { if (o !== c && o.state === 'fall') { o.state = 'dead'; burst(o.x, o.y + o.h / 2, '#7a6aa8', 8, 80, 0.4); } });
-      A.sfx('wrong'); damageHero(); FB.reveal(wrap, st.q, -1, '⏱ Se acabó el tiempo'); explain('Se acabó el tiempo. La respuesta era «' + st.q.options[st.q.correct] + '». ' + st.q.explain); renderHud();
+      A.sfx('wrong'); damageHero(); explain('Se acabó el tiempo. La respuesta era «' + st.q.options[st.q.correct] + '». ' + st.q.explain); renderHud();
       if (st.hearts <= 0) return defeat();
       st.state = 'between'; st.stateT = 0; st.wait = 1.2;
     }
@@ -243,7 +238,7 @@
     function report() {
       const acc = st.answered ? st.correct / st.answered : 0;
       let stars = 0; if (st.win) stars = st.heartsLost === 0 ? 3 : (st.heartsLost === 1 || acc >= 0.75) ? 2 : 1;
-      return { win: !!st.win && !endless, stars, correct: st.correct, answered: st.answered, bestStreak: st.bestStreak, mistakes: st.mistakes, score: Math.round(st.score), coins: st.coins, heartsLost: st.heartsLost, hintsUsed: st.hintsUsed, tier, time: Math.round(st.time), endless };
+      return { win: !!st.win && !endless, stars, correct: st.correct, answered: st.answered, bestStreak: st.bestStreak, mistakes: st.mistakes, goods: st.goods || [], score: Math.round(st.score), coins: st.coins, heartsLost: st.heartsLost, hintsUsed: st.hintsUsed, tier, time: Math.round(st.time), endless };
     }
 
     /* ---------- bucle ---------- */
@@ -417,26 +412,5 @@
   }
 
 
-  /* ---------- Retroalimentación pedagógica (rúbrica 8): explica el porqué al acertar y al fallar ---------- */
-  const FB = (() => {
-    const esc2 = (t) => String(t).replace(/[&<>]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[m]);
-    let timer = null;
-    function show(host, kind, title, body, ms) {
-      if (!host) return;
-      let e = host.querySelector('.bt-fb');
-      if (!e) { e = document.createElement('div'); e.className = 'bt-fb'; e.setAttribute('role', 'status'); e.setAttribute('aria-live', 'polite'); host.appendChild(e); }
-      e.className = 'bt-fb ' + kind; e.innerHTML = '<b>' + esc2(title) + '</b><span>' + esc2(body) + '</span>';
-      e.style.animation = 'none'; void e.offsetWidth; e.style.animation = '';
-      clearTimeout(timer); timer = setTimeout(() => { e.classList.add('out'); }, ms || Math.min(9000, 3800 + body.length * 28));
-    }
-    const opt = (q, i) => (i >= 0 && q.options[i] !== undefined ? '«' + q.options[i] + '»' : '');
-    return {
-      right(host, q, clean) { show(host, 'ok', clean ? '✅ ¡Correcto!' : '✅ ¡Ahora sí! Ya diste con la respuesta', q.explain); },
-      wrong(host, q, chosen) { show(host, 'bad', '❌ ' + (opt(q, chosen) ? opt(q, chosen) + ' no es la respuesta' : 'Esa no es la respuesta'), q.hint ? '💡 ' + q.hint : 'Léelo con calma y descarta opciones.', 4200); },
-      reveal(host, q, chosen, why) { show(host, 'bad', '❌ ' + (why || (opt(q, chosen) ? 'Elegiste ' + opt(q, chosen) : 'No respondiste')) + ' · La correcta: «' + q.options[q.correct] + '»', q.explain); },
-      clear(host) { const e = host && host.querySelector('.bt-fb'); if (e) e.remove(); },
-    };
-  })();
-  root.DuiXFB = FB;
   root.DuiXBattle = { start };
 })(typeof window !== 'undefined' ? window : globalThis);

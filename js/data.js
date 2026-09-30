@@ -178,6 +178,7 @@
       'Ejemplo: f(x) = x² − 3x → f(4) = 16 − 12 = 4.',
       'Ejemplo: dominio de f(x) = √(x − 2)/(x − 5): x − 2 ≥ 0 y x ≠ 5, o sea [2, 5) ∪ (5, ∞).',
       '📖 Stewart, Precálculo §2.1 “¿Qué es una función?” (p. 142), §2.2 (p. 152) y §2.6 “Combinación de funciones” (p. 190).',
+      '📖 Stewart, Cálculo (7.ª ed.) §1.1 “Cuatro maneras de representar una función” (p. 10) y §1.3 “Nuevas funciones a partir de funciones viejas” (p. 36).',
     ],
     desplazamientos: [
       'FUERA de la función, el movimiento es vertical y “tal cual”: f(x) + c sube c unidades; f(x) − c baja c unidades.',
@@ -187,6 +188,7 @@
       'Para mover un punto (x, y): derecha suma a x, izquierda resta a x, arriba suma a y, abajo resta a y.',
       'Ejemplo: y = (x + 2)² − 3 es y = x² movida 2 a la izquierda y 3 hacia abajo; su vértice es (−2, −3).',
       '📖 Stewart, Precálculo §2.5 “Transformaciones de funciones”: desplazamientos verticales y horizontales (p. 179).',
+      '📖 Stewart, Cálculo (7.ª ed.) §1.3: desplazamientos, estiramientos y reflexiones de gráficas (p. 36).',
     ],
     tabulaciones: [
       'Tabular es evaluar f en varios valores de x y ordenar los resultados en una tabla (x | y).',
@@ -195,6 +197,7 @@
       'Para hallar la fórmula desde una tabla: mira f(0) (ese es b) y luego cuánto cambia y por cada paso de x.',
       'Ejemplo: f(x) = 2x − 1 con x = −1, 0, 1, 2 da y = −3, −1, 1, 3 (sube de 2 en 2).',
       '📖 Stewart, Precálculo §2.1: representar una función de forma numérica (tablas) y algebraica (p. 142) y §2.2 (p. 152).',
+      '📖 Stewart, Cálculo (7.ª ed.) §1.1: representar una función numéricamente con una tabla (p. 10).',
     ],
     potenciacion: [
       'Misma base al multiplicar: se SUMAN los exponentes:  xᵐ · xⁿ = xᵐ⁺ⁿ.',
@@ -213,6 +216,7 @@
       'Para descomponer h(x): pregúntate qué se le hace primero a x; eso es g. Lo que se hace después es f.',
       'Ejemplo: f(x) = x² y g(x) = x + 1 → (f ∘ g)(x) = (x + 1)² = x² + 2x + 1, pero (g ∘ f)(x) = x² + 1.',
       '📖 Stewart, Precálculo §2.6 “Combinación de funciones”: Composición de funciones (p. 190).',
+      '📖 Stewart, Cálculo (7.ª ed.) §1.3: composición de funciones (p. 36).',
     ],
     radicales: [
       'ⁿ√a = a^(1/n)  y  ⁿ√(aᵐ) = a^(m/n): el exponente va arriba y el índice de la raíz abajo.',
@@ -232,6 +236,7 @@
       'La inversa de bˣ es log_b x, y f(f⁻¹(x)) = x.',
       'Ejemplo: log₂ 8 + log₂ 4 = 3 + 2 = 5 = log₂ 32.',
       '📖 Stewart, Precálculo §2.7 “Funciones uno a uno y sus inversas” (p. 199), §4.3 (p. 315), §4.4 “Leyes de logaritmos” (p. 325) y §4.5 (p. 331).',
+      '📖 Stewart, Cálculo (7.ª ed.) §1.5 “Funciones exponenciales” (p. 51) y §1.6 “Funciones inversas y logaritmos” (p. 58).',
     ],
     trigonometria: [
       'Radianes y grados: 180° = π rad. De grados a radianes multiplica por π/180; de radianes a grados, por 180/π.',
@@ -251,7 +256,7 @@
       'Cálculo básico: si f es un polinomio, sustituye x = a. Si sale 0/0 (indeterminado), factoriza y simplifica (o racionaliza con el conjugado) y luego sustituye.',
       'Límites al infinito: en (px + q)/(rx + s) con x → ∞, el límite es p/r (los términos constantes pesan cada vez menos).',
       'Ejemplo: lím(x→3) (x² − 9)/(x − 3) = lím(x→3) (x + 3) = 6.',
-      '📖 Stewart, Precálculo, Cap. 13 “Límites: una mirada previa al cálculo” §13.1 “Hallar límites numérica y gráficamente” y §13.2 “Hallar límites algebraicamente”.',
+      '📖 Stewart, Cálculo (7.ª ed.) Cap. 2 “Límites y derivadas”: §2.2 “Límite de una función” (p. 87), §2.3 “Cálculo de límites usando las leyes de los límites” (p. 99) y §2.6 “Límites al infinito” (p. 130). También Stewart, Precálculo, Cap. 13 (§13.1 y §13.2).',
     ],
     mix: [
       'Aquí entran TODOS los temas: intervalos, fracciones, factorización, polinomios, plano, desigualdades, funciones, desplazamientos, tablas, potencias, composición, radicales, logaritmos, trigonometría.',
@@ -439,7 +444,7 @@
     { id: 'm-districts2', name: 'Juega 2 distritos distintos', goal: 2, stat: 'districts', reward: 35 },
   ];
 
-  const AUTHOR = { name: 'Deiwy', full: 'Deiwy', career: 'Estadística', course: 'Cálculo Diferencial', book: 'Stewart, Precálculo', year: 2026 }; // ← pon aquí tu nombre completo
+  const AUTHOR = { name: 'Deiwy', full: 'Deiwy Mondragon', career: 'Estadística', course: 'Cálculo Diferencial', books: ['Stewart, J. Precálculo (Matemáticas para el cálculo).', 'Stewart, J. Cálculo de una variable: Trascendentes tempranas, 7.ª ed., Cap. 1–2 (Funciones y modelos; Límites y derivadas).'], year: 2026 };
   const DATA = { AUTHOR, VILLAINS, REPASO, RARITY, CATS, ITEMS, ITEM_BY_ID, SKINS, HAIR_COLORS, BASE_SUITS, FREE_HAIR, ACH, MISSIONS };
   if (typeof module !== 'undefined' && module.exports) module.exports = DATA; else root.DuiXData = DATA;
 })(typeof window !== 'undefined' ? window : globalThis);
