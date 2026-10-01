@@ -884,3 +884,26 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:var(--safe-t,
 .coach-dots{display:flex;gap:5px;margin-top:3px}
 .coach-dots i{width:18px;height:5px;border-radius:3px;background:#ffffff40}
 .coach-dots i.on{background:#ffd23f}.coach-dots i.done{background:#fff}
+
+/* v1.8.3: el nombre del villano va al costado del nodo, no encima de héroe/otros nodos */
+.lnode.board .lrib{top:50%!important;bottom:auto!important;transform:translateY(-50%)!important;max-width:112px!important;padding:2px 8px 3px!important}
+.lnode.board.rrgt .lrib{left:calc(100% + 6px)!important;right:auto!important}
+.lnode.board.rlft .lrib{right:calc(100% + 6px)!important;left:auto!important}
+.lnode.board .lrib b{font-size:13px!important}
+/* v1.8.3: menú de ayudas (50/50 · Pista) */
+.bt{position:relative}
+.hmenu{position:absolute;z-index:60;width:250px;max-width:calc(100% - 12px);display:flex;flex-direction:column;gap:6px;padding:8px;background:#1a1033;border:3px solid #000;border-radius:14px;box-shadow:0 0 0 2px #7b4dff,0 6px 0 #000;animation:hmpop .14s ease-out}
+@keyframes hmpop{from{transform:translateY(8px) scale(.94);opacity:0}to{transform:none;opacity:1}}
+.hm-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;border:2px solid #000;background:linear-gradient(#ffd23f,#ffb020);color:#1a1033;text-align:left;cursor:pointer;min-height:48px;font-family:inherit}
+.hm-item.off{background:#3a3260;color:#b9b2dc;cursor:not-allowed}
+.hm-ico{flex:none;width:30px;height:30px;border-radius:50%;background:#1a1033;color:#ffd23f;display:grid;place-items:center;font:900 16px system-ui}
+.hm-tx{flex:1;display:flex;flex-direction:column;line-height:1.15}.hm-tx b{font:800 15px system-ui}.hm-tx small{font:700 11px system-ui;opacity:.85}
+.hm-cost{flex:none;font:800 13px system-ui}
+.bt-explain.dismiss{cursor:pointer}
+/* v1.8.3: botón de reunión de emergencia (todos) */
+.emg-btn{position:absolute;left:10px;bottom:calc(150px + env(safe-area-inset-bottom,0px));z-index:45;width:58px;height:58px;border-radius:50%;border:3px solid #000;background:linear-gradient(180deg,#ffd23f,#e08a00);color:#1a1033;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 0 #000;animation:emgp 1.6s ease-in-out infinite}
+.emg-btn .ib-i{font-size:24px;line-height:1}.emg-btn small{font:900 9px system-ui;margin-top:-1px}
+.emg-btn.cd{filter:grayscale(1);opacity:.55;animation:none}
+@keyframes emgp{50%{transform:scale(1.07)}}
+.rov.emg{z-index:90;background:rgba(40,0,10,.92)}
+.emgbox{border-color:#ff4d6d!important}

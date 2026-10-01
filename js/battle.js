@@ -11,6 +11,34 @@
   const TAUNTS = ['¡Jajaja!', '¡Fallaste!', '¡Muy lento!', '¡Ni cerca!', '¡Auch!', '¡Piensa mejor!', '¡Otra vez!'];
   const PRAISE = ['¡POW!', '¡BAM!', '¡ZAP!', '¡CRASH!', '¡BOOM!', '¡WHAM!'];
 
+  /* ---------- menú de ayudas tipo "¿Quién quiere ser millonario?" (50/50 · Pista), compartido por los 3 juegos ---------- */
+  function helpMenu(wrap, btn, getInfo) {
+    let box = null;
+    const close = () => { if (box) { box.remove(); box = null; } document.removeEventListener('pointerdown', away, true); };
+    const away = (e) => { if (box && !box.contains(e.target) && !btn.contains(e.target)) close(); };
+    function open() {
+      if (box) return close();
+      const inf = getInfo(); if (!inf) return;
+      box = el('div', 'hmenu'); box.setAttribute('role', 'menu');
+      const row = (ico, name, desc, o, fn) => { const b = el('button', 'hm-item' + (o.ok ? '' : ' off'), `<span class="hm-ico">${ico}</span><span class="hm-tx"><b>${name}</b><small>${o.ok ? desc : o.why}</small></span><span class="hm-cost">🪙 ${o.cost}</span>`); b.type = 'button'; b.addEventListener('click', () => { if (!o.ok) { A.sfx('deny'); return; } close(); fn(); }); return b; };
+      box.appendChild(row('½', '50 / 50', 'Quita dos respuestas incorrectas', inf.fifty, inf.doFifty));
+      box.appendChild(row('💡', 'Pista', 'Una ayuda para pensar el procedimiento', inf.hint, inf.doHint));
+      wrap.appendChild(box);
+      const wr = wrap.getBoundingClientRect(), br = btn.getBoundingClientRect();
+      box.style.left = Math.max(6, Math.min(wr.width - 260, br.left - wr.left)) + 'px'; box.style.bottom = Math.max(6, wr.bottom - br.top + 6) + 'px';
+      setTimeout(() => document.addEventListener('pointerdown', away, true), 0);
+    }
+    btn.addEventListener('click', () => { A.unlock(); open(); });
+    return { close, open };
+  }
+  // texto de pista: se puede cerrar tocándolo y se esconde solo
+  function showHintText(e, text, ms) {
+    e.textContent = text + '  ✕'; e.hidden = false; e.classList.add('dismiss'); clearTimeout(e._t);
+    const hide = () => { e.hidden = true; e.classList.remove('dismiss'); e.onclick = null; clearTimeout(e._t); };
+    e.onclick = hide; e._t = setTimeout(hide, ms || 9000);
+  }
+  root.DuiXHelp = { helpMenu, showHintText };
+
   function start(cfg) {
     const v = cfg.villain, tier = cfg.tier, look = cfg.look, perks = cfg.perks || {}, endless = !!v.endless;
     const root_ = cfg.container;
@@ -47,7 +75,7 @@
       <div class="bt-field"><canvas></canvas><div class="bt-bubble" hidden></div><div class="bt-banner" hidden></div></div>
       <div class="bt-big" hidden><div class="bt-bigtag"></div><div class="bt-bigtext"></div><div class="bt-bigtab"></div><div class="bt-bigbar"><i></i></div></div>
       <div class="bt-ctl">
-        <button class="bt-btn bt-hint"><img alt="" src="${S.icon('bulb', 3)}"><span>Pista</span><em></em></button>
+        <button class="bt-btn bt-hint"><img alt="" src="${S.icon('bulb', 3)}"><span>Ayuda</span><em></em></button>
         <div class="bt-keys">Toca una respuesta para dispararle<br><small>Teclado: 1-4 · H pista · Espacio poder</small></div>
         <button class="bt-btn bt-super" disabled><img alt="" src="${S.icon('bolt', 3)}"><span>Poder</span><i class="bt-pw"><b></b></i></button>
       </div>
@@ -213,14 +241,18 @@
     }
 
     /* ---------- ayudas ---------- */
-    function useHint() {
-      if (st.state !== 'play' || st.paused) return;
-      const wrong = caps.filter((c) => c.state === 'fall' && !c.ok);
-      if (wrong.length < 2) { A.sfx('deny'); return; }
-      const cost = hintCost(); if (!St.spend(cost)) { A.sfx('deny'); const b = $('.bt-hint'); b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); float(hero.x, LH - 140, '¡Faltan monedas!', '#ff9a9a', 14); return; }
-      const c = wrong[Math.floor(Math.random() * wrong.length)]; c.state = 'dead'; burst(c.x, c.y + c.h / 2, ['#ffe14a', '#fff'], 18, 120, 0.5); st.hintsUsed++; A.sfx('hint'); float(c.x, c.y, 'Descartada', '#ffe14a', 13); if (st.q.hint) explain('💡 Pista: ' + st.q.hint); renderHud();
-      persistCoinsHint(-cost);
+    const fiftyCost = () => hintCost(), hintTxtCost = () => Math.max(1, Math.round(hintCost() / 2));
+    function hintInfo() {
+      if (st.state !== 'play' || st.paused) return null;
+      const wrong = caps.filter((c) => c.state === 'fall' && !c.ok), q = st.q, coins = St.profile().coins;
+      return {
+        fifty: { cost: fiftyCost(), ok: !q._f && wrong.length >= 2 && coins >= fiftyCost(), why: q._f ? 'Ya la usaste en esta pregunta' : wrong.length < 2 ? 'Ya quedan pocas respuestas' : 'Te faltan monedas' },
+        hint: { cost: hintTxtCost(), ok: !q._h && coins >= hintTxtCost(), why: q._h ? 'Ya la usaste en esta pregunta' : 'Te faltan monedas' },
+        doFifty() { const w = caps.filter((c) => c.state === 'fall' && !c.ok); if (!q._f && w.length >= 2 && St.spend(fiftyCost())) { q._f = 1; for (let k = 0; k < Math.min(2, w.length - 1); k++) { const c = w.splice(Math.floor(Math.random() * w.length), 1)[0]; c.state = 'dead'; burst(c.x, c.y + c.h / 2, ['#ffe14a', '#fff'], 18, 120, 0.5); float(c.x, c.y, 'Descartada', '#ffe14a', 13); } st.hintsUsed++; A.sfx('hint'); renderHud(); } },
+        doHint() { if (!q._h && St.spend(hintTxtCost())) { q._h = 1; st.hintsUsed++; A.sfx('hint'); showHintText($('.bt-explain'), '💡 Pista: ' + (q.hint || 'Relee con calma y descarta las respuestas que no tienen sentido.')); renderHud(); } },
+      };
     }
+    function useHint() { if (hmenu) hmenu.open(); }
     function persistCoinsHint() { /* las monedas ya se descuentan en Store.spend */ }
     function usePower() {
       if (st.state !== 'play' || st.paused || st.power < 100) return;
@@ -391,7 +423,7 @@
       else if (k === 's' || k === 'S') usePower();
     }
     root.addEventListener('keydown', onKey);
-    $('.bt-hint').addEventListener('click', () => { A.unlock(); useHint(); });
+    const hmenu = helpMenu(wrap, $('.bt-hint'), hintInfo);
     $('.bt-super').addEventListener('click', () => { A.unlock(); usePower(); });
     function togglePause(force) {
       if (st.over) return; const p = force === undefined ? !(room ? !$('.bt-pausemenu').hidden : st.paused) : force; if (room) { $('.bt-pausemenu').hidden = !p; return; } st.paused = p; $('.bt-pausemenu').hidden = !p; A.sfx('pause'); if (!p) last = 0;

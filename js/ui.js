@@ -324,7 +324,7 @@
       let el;
       if (nd.kind === 'board') {
         const size = v.boss ? 104 : 88, secret = v.boss && !nd.unl;
-        el = h('button', { class: `lnode board${nd.unl ? '' : ' locked'}${nd.done ? ' cleared' : ''}${v.boss ? ' boss' : ''}${isNext ? ' next' : ''}`, style: `left:${px(i)}%;top:${py(i)}px;--sz:${size}px;--glow:${v.glow || '#7b4dff'}`, 'aria-label': `Tablero ${v.n}: ${secret ? 'secreto' : v.district}${nd.unl ? '' : ', bloqueado'}`,
+        el = h('button', { class: `${px(i) > 50 ? 'rlft' : 'rrgt'} lnode board${nd.unl ? '' : ' locked'}${nd.done ? ' cleared' : ''}${v.boss ? ' boss' : ''}${isNext ? ' next' : ''}`, style: `left:${px(i)}%;top:${py(i)}px;--sz:${size}px;--glow:${v.glow || '#7b4dff'}`, 'aria-label': `Tablero ${v.n}: ${secret ? 'secreto' : v.district}${nd.unl ? '' : ', bloqueado'}`,
           onclick: () => { if (!nd.unl) { sfx('deny'); toast(secret ? 'Supera todos los tableros anteriores para descubrir este.' : 'Supera los 3 niveles del tablero anterior.', 'warn'); return; } sfx('select'); go('district', { id: v.id, tier: v.endless ? 2 : undefined }); } },
           h('span', { class: 'lcircle' }, villainEl(v, size - 18, !nd.unl), !nd.unl ? img('lock', 3, null, 'nlock') : null),
           v.endless ? null : h('span', { class: 'lnum', text: 'T' + v.n }),
@@ -469,6 +469,7 @@
     const resHero = (() => { const cv = h('canvas', { class: 'px' }); liveHero(cv, () => p.look, { scale: 3, pose: () => 'idle' }); const box = h('div', { class: 'rhero' }, cv); const em = D.ITEM_BY_ID[p.look.emote]; if (res.win && em && em.anim !== 'none') later(() => playEmoteOn(cv, box, em, 4200), 700); return box; })();
     const nextV = V[V.indexOf(v) + 1];
     const canNext = res.win && nextV && St.unlocked(nextV);
+    const nextTier = (res.win && !res.endless && P.tier < 3) ? P.tier + 1 : P.tier;
     sc.appendChild(h('div', { class: 'results ' + (win ? 'win' : 'lose') },
       h('div', { class: 'rhead' }, h('div', { class: 'rvil', style: `--glow:${v.glow}` }, villainEl(v, 96)), h('div', { class: 'rbubble' }, h('p', { text: '“' + (res.win ? v.defeat : v.intro.split('.')[0] + '…') + '”' }))),
       h('h1', { class: 'h1 rtitle', text: title }),
@@ -482,7 +483,7 @@
       mist, goods,
       h('div', { class: 'rbtns' },
         canNext ? h('button', { class: 'btn big', onclick: () => { sfx('select'); go('district', { id: nextV.id }); } }, 'Siguiente distrito') : null,
-        h('button', { class: 'btn' + (canNext ? '' : ' big'), onclick: () => { sfx('select'); go('district', { id: v.id, tier: P.tier }); } }, res.win ? 'Volver a luchar' : 'Reintentar'),
+        h('button', { class: 'btn' + (canNext ? '' : ' big'), onclick: () => { A.unlock(); sfx('select'); startBattle(v, nextTier); } }, res.endless ? 'Jugar otra vez' : res.win ? (nextTier > P.tier ? `Seguir luchando · Nivel ${nextTier}` : 'Volver a luchar') : 'Reintentar'),
         v.boss && res.win ? h('button', { class: 'btn gold big', onclick: () => { sfx('select'); go('credits', { final: true }); } }, '🏆 Créditos y puntaje final') : null,
         res.win ? h('button', { class: 'btn gold', onclick: () => { sfx('select'); go('wheel'); } }, '🎡 ¡Girar ruleta!') : null,
         h('button', { class: 'btn ghost', onclick: () => { sfx('back'); go('hub', { scrollTo: true }); } }, 'Volver al mapa'))));
@@ -673,7 +674,7 @@
       refresh();
     }
     sc.appendChild(h('div', { class: 'wheelscr' },
-      h('h1', { class: 'h1', text: '🎡 Ruleta de la Fortuna' }), bal, status, h('p', { class: 'hint', text: 'Las 8 casillas tienen la misma probabilidad (12,5 % cada una).' }),
+      h('h1', { class: 'h1', text: '🎡 Ruleta de la Fortuna' }), bal, status,
       h('div', { class: 'wh-stage' }, h('div', { class: 'wh-pointer', text: '▼' }), cv), spinBtn, qBox, shop,
       h('button', { class: 'btn ghost', onclick: () => { sfx('back'); go('hub'); } }, 'Volver al mapa')));
     refresh();

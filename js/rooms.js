@@ -203,6 +203,7 @@
     const subs = [], timers = [];
     let viewKey = '', left = false, offline = false, battle = null, questions = null, lastWrite = 0, writeT = 0, pending = null, lastRank = 0, renderT = 0, cdTimer = 0, plaza = null, refs = {};
     let waitEl = null, waitIdx = -1, waitKey = '';
+    let usedEmg = false, lastMeetId = '', meetEl = null, meetIv = 0;
     let seg = null, fx = { speedUntil: 0 }, impCd = 0, lastCp = 0, voteOpen = false, lastSabId = '', announced = {}, cdTick = 0;
     const box = h('div', { class: 'room' });
     const holder = h('div', { class: 'btholder', hidden: true });
@@ -336,7 +337,7 @@
     }
     const adjScore = (d) => { if (battle && battle.state) battle.state.score = Math.max(0, (battle.state.score || 0) + d); else if (seg) seg.base.score = Math.max(0, seg.base.score + d); };
     const overlay = (cls, html, ms) => { const e = h('div', { class: 'rov ' + cls, html }); holder.appendChild(e); if (ms) setTimeout(() => { e.classList.add('out'); setTimeout(() => e.remove(), 350); }, ms); return e; };
-    const clearOverlays = () => { holder.querySelectorAll('.rov,.imp-ui').forEach((e) => e.remove()); holder.classList.remove('fog'); waitEl = null; waitIdx = -1; waitKey = ''; };
+    const clearOverlays = () => { clearInterval(meetIv); meetEl = null; holder.querySelectorAll('.rov,.imp-ui').forEach((e) => e.remove()); holder.classList.remove('fog'); waitEl = null; waitIdx = -1; waitKey = ''; };
     function startBattle() {
       if (battle || my.finished || left || !R.cfg) return;
       killPlaza(); questions = buildRoomQuestions(R.cfg);
@@ -344,7 +345,7 @@
       A.play('battle'); updateRank();
       seg = { plan: segPlan(R.cfg), i: 0, off: 0, base: { score: 0, correct: 0, answered: 0 }, agg: { mistakes: [], bestStreak: 0 } };
       fx = { speedUntil: 0 }; impCd = 0; lastCp = 0; voteOpen = false; announced = {}; lastSabId = ((R.sab && R.sab.id) || '');
-      clearOverlays(); setupImpUI();
+      usedEmg = false; lastMeetId = ''; clearOverlays(); setupImpUI(); setupEmgUI();
       const first = () => startSeg();
       if (nImps() && playing()) roleCard(first); else first();
     }
@@ -468,6 +469,61 @@
       holder.appendChild(btn); holder.appendChild(menu);
       cdTick = setInterval(() => { const left2 = Math.max(0, impCd - Date.now()), dead = !!expelledMap()[pid]; btn.classList.toggle('cd', left2 > 0 || dead); btn.classList.toggle('dead', dead); btn.querySelector('.ib-cd').style.setProperty('--p', dead ? 1 : left2 / 22000); }, 250); timers.push(cdTick);
     }
+    /* ----- reunión de emergencia (como Among Us): la convoca cualquiera y se aplica a TODOS, aunque estén a mitad de un juego ----- */
+    const MEET_SECS = 22;
+    function setupEmgUI() {
+      if (!nImps() || !playing()) return;
+      const b = h('button', { type: 'button', class: 'imp-ui emg-btn', 'aria-label': 'Reunión de emergencia' }, h('span', { class: 'ib-i', text: '🚨' }), h('small', { text: 'Reunión' }));
+      b.addEventListener('click', () => {
+        if (usedEmg) { toast('Ya usaste tu reunión de emergencia.', 'warn'); sfx('deny'); return; }
+        if (meetEl || waitEl || (R.meet && N.now() - (R.meet.t || 0) < (MEET_SECS + 6) * 1000)) { toast('Ya hay una reunión en curso.', 'warn'); sfx('deny'); return; }
+        usedEmg = true; b.classList.add('cd'); const m = { id: Math.random().toString(36).slice(2, 8), by: pid, t: N.now() };
+        N.set(P + '/meet', m).catch(() => {}); sfx('boom'); onMeet(m);
+      });
+      holder.appendChild(b);
+    }
+    function onMeet(v) {
+      R.meet = v; if (!v || v.id === lastMeetId || left || my.finished || !seg || meetEl) return;
+      if (!nImps() || !playing()) return;
+      const remain = (v.t || 0) + MEET_SECS * 1000 - N.now(); if (remain < 3000) return;   // ya terminó
+      lastMeetId = v.id; if (waitEl) { /* ya estás en sala de espera/votación: se mantiene */ }
+      const st0 = battle && battle.state; if (st0) st0.paused = true;
+      const key = 'e' + v.id, caller = (R.players[v.by] && R.players[v.by].name) || 'Alguien';
+      const others = Object.keys(R.players).filter((id) => id !== pid && R.players[id].online !== false && !R.players[id].done);
+      let myV = null, resolved = false;
+      meetEl = h('div', { class: 'rov vote emg' });
+      holder.appendChild(meetEl); sfx('boom'); try { if (navigator.vibrate) navigator.vibrate([120, 60, 120]); } catch (e) { /* ok */ }
+      const render = () => {
+        if (!meetEl || resolved) return; const secs = Math.max(0, Math.ceil(((v.t || 0) + MEET_SECS * 1000 - N.now()) / 1000));
+        const vs = (R.votes && R.votes[key]) || {}, act = Object.keys(R.players).filter((id) => R.players[id].online !== false && !R.players[id].done);
+        const tick = meetEl.querySelector('.vtimer');
+        if (tick && meetEl.dataset.built) { tick.textContent = '⏱ ' + secs + ' s · votaron ' + act.filter((id) => vs[id]).length + ' de ' + act.length; return; }
+        meetEl.dataset.built = '1'; meetEl.innerHTML = '';
+        meetEl.appendChild(h('div', { class: 'vbox emgbox' }, h('small', { class: 'vt', text: '🚨 REUNIÓN DE EMERGENCIA' }), h('h2', { text: caller + (v.by === pid ? ' (tú)' : '') + ' convocó una reunión' }),
+          h('p', { class: 'vsub', text: 'El juego está en pausa para todos. ¿Quién creen que es el impostor? Acertar da +100 y fallar −40.' }),
+          h('div', { class: 'vgrid' }, others.map((id) => h('button', { type: 'button', class: 'vopt' + (myV === id ? ' sel' : ''), onclick: () => cast(id) }, K.headThumb(R.players[id].look || {}, ''), h('b', { text: String(R.players[id].name || '?').slice(0, 10) })))),
+          h('button', { type: 'button', class: 'btn ghost small', onclick: () => cast('-') }, myV === '-' ? '✓ No voto (cambiar)' : 'No sé · no votar'),
+          h('small', { class: 'vtimer', text: '' })));
+        render();
+      };
+      const cast = (id) => { if (resolved) return; myV = id; sfx(id === '-' ? 'back' : 'select'); N.set(P + '/votes/' + key + '/' + pid, id).catch(() => {}); R.votes = R.votes || {}; (R.votes[key] = R.votes[key] || {})[pid] = id; if (meetEl) { delete meetEl.dataset.built; } render(); };
+      const finish = () => {
+        if (resolved) return; resolved = true; clearInterval(meetIv);
+        const vs = (R.votes && R.votes[key]) || {}, tally = {}; Object.keys(vs).forEach((vv) => { const t = vs[vv]; if (t && t !== '-') tally[t] = (tally[t] || 0) + 1; });
+        const top = Object.keys(tally).sort((a, b) => tally[b] - tally[a])[0];
+        if (myV && myV !== '-' && !amImp()) { const ok = !!imps()[myV]; adjScore(ok ? +100 : -40); toast(ok ? '🎯 ¡Acertaste! ' + ((R.players[myV] || {}).name || '') + ' ES impostor (+100)' : '❌ ' + ((R.players[myV] || {}).name || '') + ' es inocente (−40)', ok ? 'ach' : 'warn'); }
+        const html = top ? '<b class="vres">Más votado: ' + esc2((R.players[top] || {}).name || '?') + ' (' + tally[top] + ')</b><small>' + (imps()[top] ? '¡Era IMPOSTOR!' : 'No era impostor…') + '</small>' : '<b class="vres">Nadie votó</b><small>El impostor sigue libre…</small>';
+        if (meetEl) meetEl.innerHTML = '<div class="vbox"><small class="vt">RESULTADO DE LA REUNIÓN</small><h2>🗳️</h2>' + html + '</div>';
+        checkExpelled();
+        later(() => { if (meetEl) { meetEl.remove(); meetEl = null; } const s1 = battle && battle.state; if (s1) s1.paused = false; }, 2600);
+      };
+      render();
+      meetIv = setInterval(() => {
+        if (resolved) return; const now = N.now(), end = (v.t || 0) + MEET_SECS * 1000, vs = (R.votes && R.votes[key]) || {}, act = Object.keys(R.players).filter((id) => R.players[id].online !== false && !R.players[id].done);
+        render(); if (now >= end || (act.length && act.every((id) => vs[id]) && now > (v.t || 0) + 6000)) finish();
+      }, 500); timers.push(meetIv);
+    }
+    subs.push(N.on(P + '/meet', onMeet));
     function doSabotage(k) {
       impCd = Date.now() + 22000; sfx('power');
       N.set(P + '/sab', { k, by: pid, id: Math.random().toString(36).slice(2, 8), t: N.now() }).catch(() => {});

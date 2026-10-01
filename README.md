@@ -124,6 +124,16 @@ Así nadie puede listar todas las salas: solo entra quien conoce el código. Las
 - Retroalimentación solo al final. Avatares corregidos. Créditos con el tema del juego, «Deiwy Mondragon» y citas de Precálculo y Cálculo (Stewart).
 - Salas: impostores con Ninguno / Auto / 1 / 2 / 3 y casilla numérica.
 
+## Novedades 1.8.3
+- **Feedback más puntual**: las explicaciones de las 104 familias de preguntas ahora muestran el procedimiento paso a paso con los números de cada ejercicio y el error común.
+- **Ruleta**: se quitó el texto de probabilidades (sigue siendo equiprobable).
+- **Carrera tipo Subway Surfers**: el héroe corre en línea fija y se mueve exactamente donde pones el dedo; **saltas** minas con el botón *Saltar*, deslizando hacia arriba o con Espacio. Se quitó el botón de saltar pregunta.
+- **Pac-Man**: al comer la respuesta correcta se muestra la respuesta y su porqué varios segundos antes de la siguiente fase; al ganar siguen los fantasmas hasta comer todos los puntos; los portales ya no tienen puntos y son 4 (izquierda↔derecha y arriba↔abajo).
+- **Ayudas tipo "Quién quiere ser millonario"**: botón *Ayuda* con 50/50 (quita 2 respuestas) y Pista (texto que se cierra al tocarlo o solo).
+- **Seguir luchando** arranca directo el siguiente nivel.
+- **Mapa**: los nombres de los villanos van al costado del nodo y ya no tapan nada.
+- **Salas**: 🚨 reunión de emergencia (una por jugador) que pausa el juego de TODOS y abre la votación al mismo tiempo, como en Among Us.
+
 ## Novedades 1.8.2
 - **Victoria justa**: hay que acertar al menos la mitad de las preguntas a la primera; en Pac-Man además hay que comer TODOS los puntitos.
 - **Pac-Man**: el tablero ya no cambia a mitad de partida; el aviso «Ese no era» es breve (la explicación completa está al final).

@@ -130,16 +130,16 @@
     const v = cfg.villain, room = cfg.room || null, N = room ? room.total : v.boss ? 4 : 3;
     const body = `<div class="bt-q"><div class="bt-qtag"></div><div class="bt-qtext"></div><div class="bt-qtable"></div><div class="bt-explain" hidden></div></div>
       <div class="bt-field"><canvas></canvas><div class="bt-banner" hidden></div></div>${BIGHTML}`;
-    const ctl = `<button class="bt-btn bt-hint"><img alt="" src="${S.icon('bulb', 3)}"><span>Pista</span><em></em></button>
-      <div class="bt-keys">Arrastra el dedo para mover a tu héroe en cualquier dirección<br><small>Teclado: flechas o WASD · H pista · X saltar</small></div>
-      <button class="bt-btn bt-skip"><span>⏭</span><span>Saltar</span></button>`;
+    const ctl = `<button class="bt-btn bt-hint"><img alt="" src="${S.icon('bulb', 3)}"><span>Ayuda</span><em></em></button>
+      <div class="bt-keys">Arrastra el dedo a los lados · desliza hacia ARRIBA (o toca Saltar) para saltar las minas<br><small>Teclado: ← → o A D · Espacio saltar · H pista</small></div>
+      <button class="bt-btn bt-skip bt-jump"><span>⤒</span><span>Saltar</span></button>`;
     const c = core(cfg, 'run', body, ctl), st = c.st, $ = c.$, cv = $('.bt-field canvas'), ctx = cv.getContext('2d');
     st.sigma = 0; st.needClean = room ? 0 : Math.ceil(N * 0.5);
     const intro = qIntro(c); let LW = 360, GW = LW / 4 - 6;
     let W = 0, H = 0, dpr = 1, LH = 560, state = 'intro', sT = 0, readFor = 3, scroll = 0, spawned = 0, curIdx = -1, slowT = 0;
     const walls = [], items = [], parts = [], floats = [];
     let shake = 0, flash = 0, stun = 0, ended = false;
-    const hero = { x: LW / 2, y: 0, tx: LW / 2, ty: 0, vx: 0, vy: 0, face: 1, blink: 0 };
+    const hero = { x: LW / 2, y: 0, tx: LW / 2, ty: 0, vx: 0, vy: 0, face: 1, blink: 0, jt: 0, z: 0, jumps: 0 }; const JT = 1.2, JBOOST = 2.2;
     const keys = {}; let drag = false;
     const hintCost = () => Math.max(1, Math.round(20 * ((cfg.perks || {}).hintCost || 1)));
     const villain = S.villainCanvas(v);
@@ -205,24 +205,28 @@
       }
       prog();
     }
-    function skipQ() {
-      const w = walls.find((q) => !q.resolved); if (!w || state !== 'play') return;
-      w.resolved = true; w.wrong = true; st.answered++; st.streak = 0; c.log(w.q, -1); w.gates.forEach((o) => { if (o.ok) o.mark = 2; else o.gone = true; }); A.sfx('deny'); fl(hero.x, hero.y - 50, 'Saltada', '#ffd23f', 18);
-      if (st.answered >= N) return endRun(); prog();
+    function jump() { if (state !== 'play' || hero.jt > 0 || stun > 0) return; hero.jt = JT; hero.jumps++; A.sfx('hint'); burst(hero.x, hero.y, '#fff', 8, 90, 0.35); }
+    $('.bt-jump').addEventListener('click', () => { A.unlock(); jump(); });
+    const H_ = root.DuiXHelp, fiftyCost = () => hintCost(), hintTxtCost = () => Math.max(1, Math.round(hintCost() / 2));
+    function hintInfo() {
+      const w = walls.find((q) => !q.resolved); if (!w || state !== 'play') return null; const q = w.q, coins = St.profile().coins, wr = () => w.gates.filter((g) => !g.ok && !g.crossed && !g.gone);
+      return {
+        fifty: { cost: fiftyCost(), ok: !q._f && wr().length >= 2 && coins >= fiftyCost(), why: q._f ? 'Ya la usaste en esta pregunta' : wr().length < 2 ? 'Ya quedan pocas respuestas' : 'Te faltan monedas' },
+        hint: { cost: hintTxtCost(), ok: !q._h && coins >= hintTxtCost(), why: q._h ? 'Ya la usaste en esta pregunta' : 'Te faltan monedas' },
+        doFifty() { const a = wr(); if (!q._f && a.length >= 2 && St.spend(fiftyCost())) { q._f = 1; for (let k = 0; k < Math.min(2, a.length - 1); k++) a.splice(Math.floor(Math.random() * a.length), 1)[0].crossed = true; st.hintsUsed++; A.sfx('hint'); prog(); } },
+        doHint() { if (!q._h && St.spend(hintTxtCost())) { q._h = 1; st.hintsUsed++; A.sfx('hint'); H_.showHintText($('.bt-explain'), '💡 Pista: ' + (q.hint || 'Relee con calma y descarta los carteles que no tienen sentido.')); prog(); } },
+      };
     }
-    $('.bt-skip').addEventListener('click', () => { A.unlock(); skipQ(); });
-    function hint() {
-      const w = walls.find((q) => !q.resolved); if (!w || state !== 'play') return; const wr = w.gates.filter((g) => !g.ok && !g.crossed && !g.gone); if (wr.length < 2) { A.sfx('deny'); return; }
-      if (!St.spend(hintCost())) { A.sfx('deny'); fl(hero.x, hero.y - 50, '¡Faltan monedas!', '#ff9a9a', 15); return; }
-      wr[Math.floor(Math.random() * wr.length)].crossed = true; st.hintsUsed++; A.sfx('hint'); if (w.q.hint) explainBox(c, '💡 Pista: ' + w.q.hint); prog();
-    }
-    $('.bt-hint em').textContent = hintCost(); $('.bt-hint').addEventListener('click', () => { A.unlock(); hint(); });
+    const hmenu = H_.helpMenu(c.wrap, $('.bt-hint'), hintInfo); const hint = () => hmenu.open();
+    $('.bt-hint em').textContent = fiftyCost();
     const toL = (e) => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * LW, y: (e.clientY - r.top) / r.width * LW }; };
-    const aim = (e) => { const p = toL(e); hero.tx = clamp(p.x, 20, LW - 20); hero.ty = clamp(p.y - 44, LH * 0.3, LH - 40); };
-    cv.addEventListener('pointerdown', (e) => { e.preventDefault(); A.unlock(); drag = true; try { cv.setPointerCapture(e.pointerId); } catch (x) { /* ok */ } aim(e); });
-    cv.addEventListener('pointermove', (e) => { if (drag) aim(e); });
+    // el héroe queda EXACTAMENTE debajo del dedo (sin suavizado ni desfase) y solo se mueve a los lados
+    let sy = 0;
+    const aim = (e) => { const p = toL(e); hero.tx = hero.x = clamp(p.x, 20, LW - 20); };
+    cv.addEventListener('pointerdown', (e) => { e.preventDefault(); A.unlock(); drag = true; sy = e.clientY; try { cv.setPointerCapture(e.pointerId); } catch (x) { /* ok */ } aim(e); });
+    cv.addEventListener('pointermove', (e) => { if (!drag) return; aim(e); if (e.clientY > sy) sy = e.clientY; else if (sy - e.clientY > 34) { jump(); sy = e.clientY; } });
     const up = () => { drag = false; }; cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
-    c.keys = (e) => { const k = e.key.toLowerCase(); if (k === 'h') hint(); else if (k === 'x') skipQ(); };
+    c.keys = (e) => { const k = e.key.toLowerCase(); if (k === 'h') hint(); else if (k === ' ' || k === 'x' || k === 'arrowup' || k === 'w') jump(); };
     const kd = (e) => { keys[e.key.toLowerCase()] = true; if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', ' '].includes(e.key.toLowerCase())) e.preventDefault(); }, ku = (e) => { keys[e.key.toLowerCase()] = false; };
     root.addEventListener('keydown', kd); root.addEventListener('keyup', ku);
     root.addEventListener('resize', resize); const ro = root.ResizeObserver ? new ResizeObserver(resize) : null; if (ro) ro.observe($('.bt-field'));
@@ -234,16 +238,18 @@
       parts.forEach((p) => { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 260 * dt; }); for (let i = parts.length - 1; i >= 0; i--) if (parts[i].t >= parts[i].life) parts.splice(i, 1);
       floats.forEach((f) => { f.t += dt; f.y -= 26 * dt; }); for (let i = floats.length - 1; i >= 0; i--) if (floats[i].t >= floats[i].life) floats.splice(i, 1);
       shake = Math.max(0, shake - dt * 30); flash = Math.max(0, flash - dt); stun = Math.max(0, stun - dt); slowT = Math.max(0, slowT - dt);
-      // movimiento libre del héroe (dedo o teclado)
-      const sp = 250; let kx = 0, ky = 0; if (keys.arrowleft || keys.a) kx -= 1; if (keys.arrowright || keys.d) kx += 1; if (keys.arrowup || keys.w) ky -= 1; if (keys.arrowdown || keys.s) ky += 1;
-      if (kx || ky) { hero.tx = clamp(hero.tx + kx * sp * dt, 20, LW - 20); hero.ty = clamp(hero.ty + ky * sp * dt, LH * 0.3, LH - 40); }
-      if (stun <= 0) { const dx = hero.tx - hero.x; hero.x += dx * Math.min(1, dt * 12); hero.y += (hero.ty - hero.y) * Math.min(1, dt * 12); if (Math.abs(dx) > 1.5) hero.face = dx > 0 ? 1 : -1; }
+      // movimiento lateral del héroe (dedo directo o teclado) + salto
+      const sp = 250; let kx = 0; if (keys.arrowleft || keys.a) kx -= 1; if (keys.arrowright || keys.d) kx += 1;
+      if (kx) { hero.tx = clamp(hero.tx + kx * sp * dt, 20, LW - 20); }
+      hero.ty = hero.y = LH - 60;
+      if (stun <= 0) { const dx = hero.tx - hero.x; hero.x += dx * Math.min(1, dt * (drag ? 60 : 14)); if (Math.abs(dx) > 1.5) hero.face = dx > 0 ? 1 : -1; }
+      if (hero.jt > 0) { hero.jt = Math.max(0, hero.jt - dt); const ph = 1 - hero.jt / JT; hero.z = Math.sin(Math.PI * ph) * 58; } else hero.z = 0;
       if (state === 'intro') { if (sT > 0.1 && !st.said) { st.said = true; c.banner('¡A CORRER!', 'go', 1200); } if (sT > 1.3) beginRead(); }
       else if (state === 'clear') { const vv = baseV() * 4.5, dy2 = vv * dt; scroll += dy2; walls.forEach((w) => { w.y += dy2; }); items.forEach((it) => { it.y += dy2; }); if (sT >= 0.75) { walls.length = 0; items.length = 0; beginRead(); } }
       else if (state === 'read') { if (sT >= readFor) { state = 'settle'; sT = 0; intro.settle(); A.sfx('tick'); } }
       else if (state === 'settle') { if (sT >= 0.55) { intro.end(); state = 'play'; sT = 0; A.sfx('go'); c.banner('¡YA!', 'go', 550); spawnWall(SPAWN_Y); curIdx = walls[walls.length - 1].idx; spawnFiller(walls[walls.length - 1]); prog(); } }
       else if (state === 'play') {
-        const lw0 = walls.find((w) => !w.resolved), vv = baseV() * (lw0 && lw0.y < LH * 0.22 ? 1.8 : 1), dy = vv * dt; scroll += dy;
+        const lw0 = walls.find((w) => !w.resolved), vv = baseV() * (lw0 && lw0.y < LH * 0.22 ? 1.8 : 1) * (hero.jt > 0 ? JBOOST : 1), dy = vv * dt; scroll += dy;
         walls.forEach((w) => { w.y += dy; }); items.forEach((it) => { it.y += dy; });
         // generar la siguiente pared + relleno entre paredes
         // pregunta actual = la primera pared sin resolver
@@ -254,7 +260,7 @@
         for (const w of walls) { if (w.resolved) continue; for (const g of w.gates) { if (g.gone) continue; if (hx1 > g.x && hx0 < g.x + g.w && hy1 > w.y && hy0 < w.y + g.h) { answerWall(w, g); break; } } if (w.resolved) continue; if (w.y > hero.y + 6) answerWall(w, null); if (ended) break; }
         if (!ended) for (const it of items) {
           if (it.got) continue; const dx = Math.abs(it.x - hero.x), dyy = Math.abs(it.y - (hero.y - 16));
-          if (dx < 20 && dyy < 26) {
+          const airborne = hero.jt > 0 && hero.jt < JT * 0.95 && hero.jt > JT * 0.05; if (it.t === 'mine' ? (!airborne && dx < 18 && dyy < 15) : (dx < 20 && dyy < 26 + (hero.z > 0 ? 30 : 0))) {
             it.got = true;
             if (it.t === 'coin') { st.coins += 1; st.score += 10; A.sfx('coin'); fl(it.x, it.y - 8, '+1¢', '#ffd23f', 14); }
             else if (it.t === 'sigma') { st.sigma++; A.sfx('levelup'); burst(it.x, it.y, ['#c58bff', '#fff', '#5ce1e6'], 20, 170, 0.7); fl(it.x, it.y - 10, '+1 Σ', '#e2b8ff', 22); }
@@ -310,8 +316,8 @@
       walls.forEach((w) => { if (w.y > -120 && w.y < LH + 20) w.gates.forEach((gt) => drawGate(w, gt)); });
       // héroe
       { const hs = 2, hc = S.heroCanvas(cfg.look, 'idle', Math.floor(t * 8) % 4), hw = S.HERO_W * hs, hh = S.HERO_H * hs, bob = Math.abs(Math.sin(t * 10)) * 3, blink = stun > 0 && Math.floor(stun * 16) % 2 === 0;
-        ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.beginPath(); ctx.ellipse(hero.x, hero.y + 2, 24, 6, 0, 0, 6.283); ctx.fill(); if (blink) ctx.globalAlpha = 0.35; ctx.translate(hero.x, hero.y); if (hero.face < 0) ctx.scale(-1, 1); ctx.drawImage(hc, Math.round(-hw / 2), Math.round(-hh - bob + 6), hw, hh); ctx.restore();
-        if (st.shield > 0) { ctx.strokeStyle = 'rgba(143,230,255,.85)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(hero.x, hero.y - 26, 38, 0, 6.283); ctx.stroke(); } }
+        ctx.save(); ctx.fillStyle = 'rgba(0,0,0,' + (0.4 - hero.z / 220) + ')'; ctx.beginPath(); ctx.ellipse(hero.x, hero.y + 2, 24 - hero.z / 8, 6, 0, 0, 6.283); ctx.fill(); if (blink) ctx.globalAlpha = 0.35; ctx.translate(hero.x, hero.y - hero.z); if (hero.face < 0) ctx.scale(-1, 1); ctx.drawImage(hc, Math.round(-hw / 2), Math.round(-hh - bob + 6), hw, hh); ctx.restore();
+        if (st.shield > 0) { ctx.strokeStyle = 'rgba(143,230,255,.85)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(hero.x, hero.y - 26 - hero.z, 38, 0, 6.283); ctx.stroke(); } }
       parts.forEach((p) => { ctx.globalAlpha = clamp(1 - p.t / p.life, 0, 1); ctx.fillStyle = p.c; ctx.fillRect(Math.round(p.x), Math.round(p.y), p.s, p.s); }); ctx.globalAlpha = 1;
       floats.forEach((f) => { ctx.globalAlpha = clamp(1 - f.t / f.life, 0, 1); ctx.font = `${f.size}px Bangers, ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 4; ctx.strokeStyle = '#1a1033'; ctx.strokeText(f.text, f.x, f.y); ctx.fillStyle = f.c; ctx.fillText(f.text, f.x, f.y); }); ctx.globalAlpha = 1;
       if (slowT > 0) { ctx.fillStyle = 'rgba(157,255,239,.08)'; ctx.fillRect(0, 0, LW, LH); }
@@ -320,7 +326,7 @@
     };
     const dl = (ts) => { if (c.destroyed || !c.wrap.parentNode) return; dr = requestAnimationFrame(dl); draw(ts / 1000); }; dr = requestAnimationFrame(dl);
     c.hud(1, '0/' + N); c.start(); resize();
-    return { destroy: c.destroy, refresh: prog, pause: () => c.toggle(true), state: st, _run: { go: (x, y) => { hero.tx = x; hero.ty = y == null ? hero.ty : y; }, get walls() { return walls; }, get hero() { return hero; }, get st() { return state; }, get LH() { return LH; } } };
+    return { destroy: c.destroy, refresh: prog, pause: () => c.toggle(true), state: st, _run: { go: (x, y) => { hero.tx = x; }, jump, get walls() { return walls; }, get hero() { return hero; }, get st() { return state; }, get LH() { return LH; } } };
   }
 
   /* ------------------------------------------------------------------
@@ -341,7 +347,7 @@
     const v = cfg.villain, room = cfg.room || null, N = room ? room.total : v.boss ? 3 : 2;
     const body = `<div class="bt-q"><div class="bt-qtag"></div><div class="bt-qtext"></div><div class="bt-qtable"></div><div class="bt-explain" hidden></div></div>
       <div class="bt-field"><canvas></canvas><div class="bt-banner" hidden></div></div>${BIGHTML}`;
-    const ctl = `<button class="bt-btn bt-hint"><img alt="" src="${S.icon('bulb', 3)}"><span>Pista</span><em></em></button>
+    const ctl = `<button class="bt-btn bt-hint"><img alt="" src="${S.icon('bulb', 3)}"><span>Ayuda</span><em></em></button>
       <div class="bt-keys">¡Cómete al fantasma con la respuesta correcta!<br><small>Desliza o usa flechas/WASD · Σ = poder · H pista</small></div>`;
     const c = core(cfg, 'maze', body, ctl), st = c.st, $ = c.$, cv = $('.bt-field canvas'), ctx = cv.getContext('2d');
     st.sigma = 0; st.needClean = room ? 0 : Math.ceil(N * 0.5);
@@ -353,9 +359,9 @@
     const villain = S.villainCanvas(v);
     const rnd = (() => { let s = (Date.now() ^ 0x9e3779b9) >>> 0; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; })();
     function resize() { const f = $('.bt-field'); const w = f.clientWidth, h = f.clientHeight; if (w < 10 || h < 10) return; dpr = Math.min(2.5, root.devicePixelRatio || 1); W = w; H = h; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.width = W + 'px'; cv.style.height = H + 'px'; { const sc0 = Math.min(W / 360, H / 320); LW = W / sc0; LH = H / sc0; } let nc = Math.round(LW / T0); nc = clamp(nc % 2 ? nc : nc + 1, 11, 33); T = LW / nc; const r = clamp(Math.floor(LH / T), 9, 21); const nr = r % 2 ? r : r - 1; if (!grid || ((nr !== ROWS || nc !== COLS) && (state === 'intro' || state === 'read' || state === 'settle'))) { ROWS = nr; COLS = nc; build(); if (q && grid) placePills(); } T = LW / COLS; oy = Math.max(0, (LH - ROWS * T) / 2); }
-    let tun = [];
-    const pass = (i, j) => (j >= 0 && j < ROWS && (i === -1 || i === COLS) && tun.indexOf(j) >= 0) || (i >= 0 && j >= 0 && i < COLS && j < ROWS && grid[j][i] === 0);
-    const wrapI = (i) => (i < 0 ? COLS - 1 : i >= COLS ? 0 : i);
+    let tun = [], tunV = [];
+    const pass = (i, j) => (j >= 0 && j < ROWS && (i === -1 || i === COLS) && tun.indexOf(j) >= 0) || (i >= 0 && i < COLS && (j === -1 || j === ROWS) && tunV.indexOf(i) >= 0) || (i >= 0 && j >= 0 && i < COLS && j < ROWS && grid[j][i] === 0);
+    const wrapI = (i) => (i < 0 ? COLS - 1 : i >= COLS ? 0 : i), wrapJ = (j) => (j < 0 ? ROWS - 1 : j >= ROWS ? 0 : j);
     function build() {
       grid = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
       const stack = [[1, 1]]; grid[1][1] = 0;
@@ -365,12 +371,14 @@
         const [x, y, hx, hy] = nb[Math.floor(rnd() * nb.length)]; grid[cj + hy][ci + hx] = 0; grid[y][x] = 0; stack.push([x, y]);
       }
       for (let j = 1; j < ROWS - 1; j++) for (let i = 1; i < COLS - 1; i++) if (grid[j][i] === 1 && ((i % 2 === 0) !== (j % 2 === 0)) && rnd() < 0.32) grid[j][i] = 0;
-      // túneles laterales (como Pac-Man): filas impares abiertas en ambos bordes
-      tun = []; { const rows = []; for (let j = 3; j < ROWS - 2; j += 2) if (grid[j][1] === 0 && grid[j][COLS - 2] === 0) rows.push(j); rows.sort(() => rnd() - 0.5); rows.slice(0, ROWS >= 15 ? 2 : 1).forEach((j) => { grid[j][0] = 0; grid[j][COLS - 1] = 0; tun.push(j); }); if (!tun.length) { const j = Math.floor(ROWS / 2) | 1; grid[j][1] = 0; grid[j][COLS - 2] = 0; grid[j][0] = 0; grid[j][COLS - 1] = 0; tun.push(j); } }
-      dotSet.clear(); for (let j = 0; j < ROWS; j++) for (let i = 0; i < COLS; i++) if (grid[j][i] === 0) dotSet.set(i + ',' + j, true);
+      // 4 portales: un túnel izquierda↔derecha y otro arriba↔abajo (sin puntitos dentro de los portales)
+      tun = []; tunV = []; const si0 = Math.floor(COLS / 2) | 1;
+      { const rows = []; for (let j = 3; j < ROWS - 2; j += 2) if (grid[j][1] === 0 && grid[j][COLS - 2] === 0) rows.push(j); if (!rows.length) rows.push(Math.floor(ROWS / 2) | 1); const j = rows[Math.floor(rnd() * rows.length)]; grid[j][1] = 0; grid[j][COLS - 2] = 0; grid[j][0] = 0; grid[j][COLS - 1] = 0; tun.push(j);
+        const cols = []; for (let i2 = 3; i2 < COLS - 2; i2 += 2) if (Math.abs(i2 - si0) >= 4 && grid[1][i2] === 0 && grid[ROWS - 2][i2] === 0) cols.push(i2); if (!cols.length) cols.push(1); const i3 = cols[Math.floor(rnd() * cols.length)]; grid[0][i3] = 0; grid[ROWS - 1][i3] = 0; grid[1][i3] = 0; grid[ROWS - 2][i3] = 0; tunV.push(i3); }
+      dotSet.clear(); for (let j = 0; j < ROWS; j++) for (let i = 0; i < COLS; i++) if (grid[j][i] === 0 && !(i === 0 || i === COLS - 1 || j === 0 || j === ROWS - 1)) dotSet.set(i + ',' + j, true);
       const si = Math.floor(COLS / 2) | 1, sj = ROWS - 2; hero.i = hero.ni = si; hero.j = hero.nj = sj; hero.p = 1; hero.dir = [0, 0]; hero.want = [0, 0]; dotSet.delete(si + ',' + sj); dots0 = dotSet.size;
     }
-    function bfs(fi, fj) { const d = Array.from({ length: ROWS }, () => Array(COLS).fill(-1)); const qu = [[fi, fj]]; d[fj][fi] = 0; for (let h = 0; h < qu.length; h++) { const [x, y] = qu[h]; [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([a, b]) => { if (pass(x + a, y + b)) { const nx = wrapI(x + a), ny = y + b; if (d[ny][nx] < 0) { d[ny][nx] = d[y][x] + 1; qu.push([nx, ny]); } } }); } return d; }
+    function bfs(fi, fj) { const d = Array.from({ length: ROWS }, () => Array(COLS).fill(-1)); const qu = [[fi, fj]]; d[fj][fi] = 0; for (let h = 0; h < qu.length; h++) { const [x, y] = qu[h]; [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([a, b]) => { if (pass(x + a, y + b)) { const nx = wrapI(x + a), ny = wrapJ(y + b); if (d[ny][nx] < 0) { d[ny][nx] = d[y][x] + 1; qu.push([nx, ny]); } } }); } return d; }
     function placePills() {
       pills.length = 0; const d = bfs(hero.ni, hero.nj), cand = []; for (let j = 1; j < ROWS - 1; j++) for (let i = 1; i < COLS - 1; i++) if (grid[j][i] === 0 && d[j][i] >= 5) cand.push([i, j]);
       cand.sort(() => rnd() - 0.5); const pick = [];
@@ -385,7 +393,7 @@
     const burst = (x, y, col, n, sp, life) => { for (let i = 0; i < n; i++) { const a = Math.random() * 6.283, s = (0.3 + Math.random()) * sp; parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 30, t: 0, life: life * (0.5 + Math.random() * 0.7), c: Array.isArray(col) ? col[i % col.length] : col, s: 2 + Math.floor(Math.random() * 3) }); } };
     const px = (i) => (i + 0.5) * T, py = (j) => oy + (j + 0.5) * T;
     const posOf = (e) => ({ x: px(e.i + (e.ni - e.i) * e.p), y: py(e.j + (e.nj - e.j) * e.p) });
-    let cleanup = false, dots0 = 1;
+    let cleanup = false, dots0 = 1, btw = 3.6, pending = 'next';
     const hudTxt = () => st.answered + '/' + N + (cleanup || dotSet.size < 25 ? ' · ●' + dotSet.size : '');
     const prog = () => c.hud(cleanup ? dotSet.size / Math.max(1, dots0) : 1 - st.answered / N, hudTxt());
     function newQuestion(first) { q = makeQ(); qn++; if (first) fillQ(c, q, topicTag(v, q)); else { fillQ(c, q, topicTag(v, q)); const qb = $('.bt-q'); qb.classList.remove('flip'); void qb.offsetWidth; qb.classList.add('flip'); A.sfx('tick'); } placePills(); }
@@ -396,10 +404,21 @@
       intro.show(q, readFor, topicTag(v, q));
     }
     function finish(win) { if (ended) return; ended = true; st.over = true; st.win = win; state = 'end'; sT = 0; if (win) { A.sfx('levelup'); c.banner(room ? '¡LISTO!' : '¡VICTORIA!', 'go'); } else { A.sfx('lose'); c.banner('¡DERROTA!', 'lose'); } }
+    // fase final: los fantasmas siguen en el laberinto (sin respuestas) y hay que comerse todos los puntitos
+    function startCleanup() {
+      cleanup = true; state = 'play'; sT = 0; invul = 3.2; fright = 0;
+      pills.forEach((o) => { if (o.ghost) { o.gone = false; o.cl = true; o.jail = 2.5; o.i = o.ni = o.home[0]; o.j = o.nj = o.home[1]; o.p = 1; o.dir = [0, 0]; } });
+      c.banner('¡Ahora cómete TODOS los puntitos!', 'go', 2400); { const kk = $('.bt-keys'); if (kk) kk.innerHTML = '¡Cómete TODOS los puntitos y esquiva a los fantasmas!'; } A.sfx('levelup'); prog();
+    }
     function respawn() { invul = 2.2; hero.i = hero.ni = Math.floor(COLS / 2) | 1; hero.j = hero.nj = ROWS - 2; hero.p = 1; hero.dir = [0, 0]; hero.want = [0, 0]; }
     function eatPill(pl) {
       if (pl.sigma) { pl.gone = true; st.sigma++; fright = 7; A.sfx('levelup'); const p = posOf(hero); burst(p.x, p.y, ['#c58bff', '#fff', '#5ce1e6'], 26, 180, 0.8); fl(p.x, p.y - 20, '¡PODER! Los fantasmas huyen', '#e2b8ff', 16); return; }
       if (pl.gone) return; const p = posOf(hero);
+      if (cleanup) {
+        if (fright > 0) { pl.jail = 5; pl.i = pl.ni = pl.home[0]; pl.j = pl.nj = pl.home[1]; pl.p = 1; st.score += 150; A.sfx('hit'); const cp = posOf(pl); burst(cp.x, cp.y, ['#c58bff', '#fff'], 22, 180, 0.7); fl(cp.x, cp.y - 10, '¡A la cárcel! +150', '#e2b8ff', 16); }
+        else if (invul <= 0) { st.streak = 0; c.damage(); burst(p.x, p.y, ['#ff3b5c', '#7a6aa8'], 22, 170, 0.6); fl(p.x, p.y - 20, '¡Te atraparon!', '#ff4d4d', 22); shake = 10; flash = 0.35; A.sfx('boom'); if (st.hearts <= 0) return finish(false); pl.jail = 3; pl.i = pl.ni = pl.home[0]; pl.j = pl.nj = pl.home[1]; pl.p = 1; respawn(); }
+        return;
+      }
       if (pl.ok) {
         pl.gone = true; st.answered += 1;
         const clean = !q.wrong; if (clean) { st.correct++; st.streak++; st.bestStreak = Math.max(st.bestStreak, st.streak); c.good(q); } else st.streak = 0;
@@ -407,9 +426,11 @@
         if (st.answered >= N) {
           if (room) return finish(true);
           if (st.correct < st.needClean) { st.lowAcc = true; return finish(false); }
-          cleanup = true; pills.forEach((o) => { o.gone = true; }); c.banner('¡Último paso: cómete TODOS los puntitos!', 'go', 2400); A.sfx('levelup'); prog(); return;
         }
-        prog(); pills.forEach((o) => { if (!o.ok) { o.gone = true; const gp = posOf(o); burst(gp.x, gp.y, ['#c58bff', '#fff'], 10, 120, 0.6); } }); state = 'between'; sT = 0; c.banner('¡PREGUNTA ' + (st.answered + 1) + ' DE ' + N + '!', 'go', 1600);
+        prog(); pills.forEach((o) => { if (!o.ok && !o.sigma) { o.gone = true; const gp = posOf(o); burst(gp.x, gp.y, ['#c58bff', '#fff'], 10, 120, 0.6); } });
+        // se muestra la respuesta correcta (y por qué) unos segundos antes de la siguiente fase
+        { const txt = '✔ Correcta: ' + q.options[q.correct] + (q.explain ? ' — ' + q.explain : ''); btw = clamp(2.8 + txt.length / 32, 3.6, 8.5); explainBox(c, txt, btw * 1000 - 150); }
+        pending = st.answered >= N ? 'cleanup' : 'next'; state = 'between'; sT = 0;
       } else if (fright > 0) {
         pl.jail = 5; pl.i = pl.ni = pl.home[0]; pl.j = pl.nj = pl.home[1]; pl.p = 1; st.score += 150; A.sfx('hit'); const cp = posOf(pl); burst(cp.x, cp.y, ['#c58bff', '#fff'], 22, 180, 0.7); fl(cp.x, cp.y - 10, '¡A la cárcel! +150', '#e2b8ff', 16);
       } else if (invul <= 0) {
@@ -419,12 +440,18 @@
         pl.jail = 3; pl.i = pl.ni = pl.home[0]; pl.j = pl.nj = pl.home[1]; pl.p = 1; respawn();
       }
     }
-    function hint() {
-      if (state !== 'play') return; const wr = pills.filter((p) => p.ghost && !p.ok && !p.gone); if (wr.length < 2) { A.sfx('deny'); return; }
-      if (!St.spend(hintCost())) { A.sfx('deny'); return; }
-      { const g = wr[Math.floor(rnd() * wr.length)]; g.gone = true; const gp = posOf(g); burst(gp.x, gp.y, ['#ff4d4d', '#fff'], 16, 140, 0.6); } st.hintsUsed++; A.sfx('hint'); hintT = 1; if (q.hint) explainBox(c, '💡 Pista: ' + q.hint); prog();
+    const H_ = root.DuiXHelp, fiftyCost = () => hintCost(), hintTxtCost = () => Math.max(1, Math.round(hintCost() / 2));
+    function hintInfo() {
+      if (state !== 'play' || cleanup) return null; const coins = St.profile().coins, wr = () => pills.filter((p) => p.ghost && !p.ok && !p.gone);
+      return {
+        fifty: { cost: fiftyCost(), ok: !q._f && wr().length >= 2 && coins >= fiftyCost(), why: q._f ? 'Ya la usaste en esta pregunta' : wr().length < 2 ? 'Ya quedan pocos fantasmas' : 'Te faltan monedas' },
+        hint: { cost: hintTxtCost(), ok: !q._h && coins >= hintTxtCost(), why: q._h ? 'Ya la usaste en esta pregunta' : 'Te faltan monedas' },
+        doFifty() { const a = wr(); if (!q._f && a.length >= 2 && St.spend(fiftyCost())) { q._f = 1; for (let k = 0; k < Math.min(2, a.length - 1); k++) { const g = a.splice(Math.floor(rnd() * a.length), 1)[0]; g.gone = true; const gp = posOf(g); burst(gp.x, gp.y, ['#ff4d4d', '#fff'], 16, 140, 0.6); } st.hintsUsed++; A.sfx('hint'); hintT = 1; prog(); } },
+        doHint() { if (!q._h && St.spend(hintTxtCost())) { q._h = 1; st.hintsUsed++; A.sfx('hint'); H_.showHintText($('.bt-explain'), '💡 Pista: ' + (q.hint || 'Relee con calma y descarta los fantasmas que no tienen sentido.')); prog(); } },
+      };
     }
-    $('.bt-hint em').textContent = hintCost(); $('.bt-hint').addEventListener('click', () => { A.unlock(); hint(); });
+    const hmenu = H_.helpMenu(c.wrap, $('.bt-hint'), hintInfo); const hint = () => hmenu.open();
+    $('.bt-hint em').textContent = fiftyCost();
     // entrada: deslizar, tocar (dirección desde el héroe) o teclado
     let sx = 0, sy = 0, sdown = false;
     const setWant = (dx, dy) => { hero.want = Math.abs(dx) > Math.abs(dy) ? [Math.sign(dx), 0] : [0, Math.sign(dy)]; };
@@ -439,7 +466,7 @@
     const stepEnt = (e, dt, speed, chooser) => {
       let rem = speed * dt;
       while (rem > 0) {
-        if (e.p >= 1) { e.i = wrapI(e.ni); e.j = e.nj; e.ni = e.i; e.p = 1; const d = chooser(e); if (!d || (!d[0] && !d[1])) { e.dir = [0, 0]; return; } e.dir = d; e.ni = e.i + d[0]; e.nj = e.j + d[1]; e.p = 0; }
+        if (e.p >= 1) { e.i = wrapI(e.ni); e.j = wrapJ(e.nj); e.ni = e.i; e.nj = e.j; e.p = 1; const d = chooser(e); if (!d || (!d[0] && !d[1])) { e.dir = [0, 0]; return; } e.dir = d; e.ni = e.i + d[0]; e.nj = e.j + d[1]; e.p = 0; }
         const use = Math.min(rem, 1 - e.p); e.p += use; rem -= use;
       }
     };
@@ -460,7 +487,7 @@
         return opts[Math.floor(Math.random() * opts.length)];
       }
       if (Math.random() < 0.3) return opts[Math.floor(Math.random() * opts.length)];  // error frecuente al perseguir
-      const d = bfs(hero.ni, hero.nj); let best = null, bv = fright > 0 ? -1 : 1e9; opts.forEach(([a, b]) => { const val = d[ch.j + b][wrapI(ch.i + a)]; if (fright > 0 ? val > bv : val < bv) { bv = val; best = [a, b]; } }); return best || opts[0];
+      const d = bfs(hero.ni, hero.nj); let best = null, bv = fright > 0 ? -1 : 1e9; opts.forEach(([a, b]) => { const val = d[wrapJ(ch.j + b)][wrapI(ch.i + a)]; if (fright > 0 ? val > bv : val < bv) { bv = val; best = [a, b]; } }); return best || opts[0];
     };
     c.onTick = (dt) => {
       { const f = cv.parentNode; if (f && (Math.abs(f.clientWidth - W) > 1 || Math.abs(f.clientHeight - H) > 1)) resize(); }
@@ -469,7 +496,7 @@
       floats.forEach((f) => { f.t += dt; f.y -= 26 * dt; }); for (let i = floats.length - 1; i >= 0; i--) if (floats[i].t >= floats[i].life) floats.splice(i, 1);
       shake = Math.max(0, shake - dt * 30); flash = Math.max(0, flash - dt); fright = Math.max(0, fright - dt); invul = Math.max(0, invul - dt); hintT = Math.max(0, hintT - dt);
       if (state === 'intro') { if (sT > 0.1 && !st.said) { st.said = true; c.banner('¡AL LABERINTO!', 'go', 1200); } if (sT > 1.3) beginRead(); }
-      else if (state === 'between') { if (sT >= 1.7) beginRead(); }
+      else if (state === 'between') { if (sT >= btw) { $('.bt-explain').hidden = true; if (pending === 'cleanup') startCleanup(); else { c.banner('¡PREGUNTA ' + (st.answered + 1) + ' DE ' + N + '!', 'go', 1100); beginRead(); } } }
       else if (state === 'read') { if (sT >= readFor) { state = 'settle'; sT = 0; intro.settle(); A.sfx('tick'); } }
       else if (state === 'settle') { if (sT >= 0.55) { intro.end(); state = 'play'; sT = 0; A.sfx('go'); c.banner('¡YA!', 'go', 550); prog(); } }
       else if (state === 'play') {
@@ -482,7 +509,7 @@
           if (pl.gone || ended) continue;
           if (pl.sigma) { if (Math.abs(pl.i - (hero.i + (hero.ni - hero.i) * hero.p)) < 0.6 && Math.abs(pl.j - (hero.j + (hero.nj - hero.j) * hero.p)) < 0.6) eatPill(pl); continue; }
           if (pl.jail > 0) { pl.jail -= dt; continue; }
-          stepEnt(pl, dt, (fright > 0 ? 1.0 : 1.35 + Math.min(0.45, cfg.tier * 0.05 + qn * 0.1)) * (pl.spd || 1) * (room && cfg.fallSecs ? Math.max(0.6, Math.min(1.35, 27 / cfg.fallSecs)) : 1) * c.speedMul(), chaserChoose);
+          stepEnt(pl, dt, (fright > 0 ? 1.0 : (1.35 + Math.min(0.45, cfg.tier * 0.05 + qn * 0.1)) * (cleanup ? 0.82 : 1)) * (pl.spd || 1) * (room && cfg.fallSecs ? Math.max(0.6, Math.min(1.35, 27 / cfg.fallSecs)) : 1) * c.speedMul(), chaserChoose);
           const cp = posOf(pl); if (Math.hypot(cp.x - hp.x, cp.y - hp.y) < T * 0.66) eatPill(pl);
         }
         if (cleanup && !ended && dotSet.size === 0) finish(true);
@@ -500,8 +527,9 @@
         ctx.strokeStyle = pal.accent; ctx.globalAlpha = 0.75; ctx.lineWidth = 2;
         ctx.beginPath(); if (!(j > 0 && grid[j - 1][i] === 1)) { ctx.moveTo(x + 1, y + 1); ctx.lineTo(x + T - 1, y + 1); } if (!(j < ROWS - 1 && grid[j + 1][i] === 1)) { ctx.moveTo(x + 1, y + T - 1); ctx.lineTo(x + T - 1, y + T - 1); } if (!(i > 0 && grid[j][i - 1] === 1)) { ctx.moveTo(x + 1, y + 1); ctx.lineTo(x + 1, y + T - 1); } if (!(i < COLS - 1 && grid[j][i + 1] === 1)) { ctx.moveTo(x + T - 1, y + 1); ctx.lineTo(x + T - 1, y + T - 1); } ctx.stroke(); ctx.globalAlpha = 1;
       }
-      // portales de los túneles
-      tun.forEach((j) => [0, COLS - 1].forEach((i) => { const x = px(i), y = py(j), r = T * (0.34 + 0.06 * Math.sin(t * 6 + i)); ctx.save(); ctx.globalAlpha = 0.85; ctx.strokeStyle = '#5ce1e6'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(x, y, r * 0.7, r * 1.25, 0, 0, 6.283); ctx.stroke(); ctx.strokeStyle = '#c58bff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(x, y, r * 0.35, r * 0.8, t * 3, 0, 6.283); ctx.stroke(); ctx.restore(); }));
+      // portales (4): izquierda/derecha y arriba/abajo
+      { const portal = (x, y, vert) => { const r = T * (0.34 + 0.06 * Math.sin(t * 6 + x)); ctx.save(); ctx.translate(x, y); if (vert) ctx.rotate(Math.PI / 2); ctx.globalAlpha = 0.9; ctx.strokeStyle = '#5ce1e6'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(0, 0, r * 0.7, r * 1.25, 0, 0, 6.283); ctx.stroke(); ctx.strokeStyle = '#c58bff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(0, 0, r * 0.35, r * 0.8, t * 3, 0, 6.283); ctx.stroke(); ctx.restore(); };
+        tun.forEach((j) => [0, COLS - 1].forEach((i) => portal(px(i), py(j), false))); tunV.forEach((i) => [0, ROWS - 1].forEach((j) => portal(px(i), py(j), true))); }
       // puntos
       ctx.fillStyle = '#ffe9a8'; dotSet.forEach((_, k) => { const [i, j] = k.split(',').map(Number); ctx.fillRect(Math.round(px(i)) - 2, Math.round(py(j)) - 2, 4, 4); });
       // píldoras de poder y fantasmas-respuesta
@@ -516,6 +544,7 @@
         ctx.beginPath(); ctx.arc(0, -bw * 0.1, bw / 2, Math.PI, 0); const wob = Math.sin(t * 12 + pl.k) * 1.5; ctx.lineTo(bw / 2, bw / 2); for (let k = 0; k < 4; k++) { ctx.lineTo(bw / 2 - (k + 0.5) * (bw / 4), bw / 2 - 5 + (k % 2 ? 0 : wob)); ctx.lineTo(bw / 2 - (k + 1) * (bw / 4), bw / 2); } ctx.closePath(); ctx.fill(); ctx.stroke();
         const ex = pl.dir[0] * 2, ey = pl.dir[1] * 2; [-1, 1].forEach((sg) => { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(sg * bw * 0.2, -bw * 0.15, bw * 0.13, 0, 6.283); ctx.fill(); ctx.fillStyle = fr ? '#ff4d6d' : '#1a1033'; ctx.beginPath(); ctx.arc(sg * bw * 0.2 + ex, -bw * 0.15 + ey, bw * 0.06, 0, 6.283); ctx.fill(); });
         ctx.restore();
+        if (pl.cl) return;
         const lh = pl.fs * 1.15; ctx.font = `800 ${pl.fs}px ${FONT}`; const w = Math.max(...pl.lines.map((l) => ctx.measureText(l).width)) + 12, h = pl.lines.length * lh + 8;
         const lx = clamp(p.x, w / 2 + 2, LW - w / 2 - 2), ly = Math.max(h / 2 + 2, by - bw * 0.62 - h / 2);
         ctx.fillStyle = '#000'; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(lx - w / 2 - 2, ly - h / 2 - 2, w + 4, h + 4, 9) : ctx.rect(lx - w / 2 - 2, ly - h / 2 - 2, w + 4, h + 4); ctx.fill();
@@ -553,7 +582,7 @@
     maze: { name: 'Laberinto', pages: [
       ['👆', 'Desliza para moverte', 'Desliza el dedo (o usa flechas/WASD) y tu héroe avanza por el laberinto comiendo puntitos.'],
       ['👻', 'Cómete al fantasma correcto', 'Cada fantasma lleva una respuesta. Cómete SOLO el de la respuesta correcta. Si tocas otro, pierdes una vida.'],
-      ['⇄', 'Túneles y poder Σ', 'Los túneles de los lados te teletransportan al otro extremo. La píldora Σ asusta a los fantasmas: ¡puedes mandarlos a la cárcel!'],
+      ['⇄', 'Túneles y poder Σ', 'Los portales te teletransportan al lado opuesto (izquierda↔derecha, arriba↔abajo). La píldora Σ asusta a los fantasmas: ¡puedes mandarlos a la cárcel!'],
     ] },
   };
   /* Práctica dentro del mismo juego: una mini-ronda con 1 pregunta fácil, sin vidas ni puntaje, con una tira-guía arriba. Se puede omitir. */
@@ -574,15 +603,16 @@
       ],
       run: [
         { ico: '📖', t: 'Lee la pregunta', d: 'Mira el problema con calma. Cuando termine la barra empiezas a correr.', done: () => playing() },
-        { ico: '👆', t: 'Arrastra el dedo para moverte', d: 'Mueve a tu héroe a izquierda y derecha (en compu: flechas o WASD).', init: () => pos(), done: (b) => { const p = pos(); return Math.abs(p[0] - b[0]) > 45 || Math.abs(p[1] - b[1]) > 45; } },
-        { ico: '💣', t: 'Esquiva las minas, toma monedas', d: 'Las minas 💣 te frenan y quitan puntos; las monedas 🪙 suman. Pruébalo un momento.', done: () => Date.now() - stepT0 > 5500 || inner.state.coins > 0 },
+        { ico: '👆', t: 'Arrastra el dedo para moverte', d: 'Mueve a tu héroe a izquierda y derecha (en compu: flechas o WASD).', init: () => pos(), done: (b) => { const p = pos(); return Math.abs(p[0] - b[0]) > 45; } },
+        { ico: '⤒', t: 'Salta como en Subway Surfers', d: 'Desliza el dedo hacia ARRIBA (o toca Saltar, o Espacio). Mientras estás en el aire, las minas no te tocan.', done: () => (!!inner._run && inner._run.hero.jumps > 0) || Date.now() - stepT0 > 15000 },
+        { ico: '💣', t: 'Esquiva o salta las minas', d: 'Las minas 💣 te frenan y quitan puntos; las monedas 🪙 suman. Muévete a otro carril o salta justo antes de la mina.', done: () => Date.now() - stepT0 > 5500 || inner.state.coins > 0 },
         { ico: '🪧', t: 'Cruza el cartel correcto', d: 'Atraviesa SOLO el cartel con la respuesta correcta.', done: () => inner.state.answered >= 1 },
       ],
       maze: [
         { ico: '📖', t: 'Lee la pregunta', d: 'Mira el problema y las respuestas que lleva cada fantasma. Luego empieza el laberinto.', done: () => playing() },
         { ico: '👆', t: 'Desliza para moverte', d: 'Desliza el dedo (o flechas/WASD) y tu héroe avanza por el laberinto.', init: () => pos(), done: (b) => { const p = pos(); return Math.abs(p[0] - b[0]) + Math.abs(p[1] - b[1]) > 2.2; } },
         { ico: '●', t: 'Come los puntitos', d: 'Cada puntito suma puntos. En el juego real debes comerlos TODOS para ganar.', done: () => inner.state.score > 5 },
-        { ico: '👻', t: 'Cómete el fantasma correcto', d: 'Solo el que lleva la respuesta correcta. Si tocas otro, pierdes. Los túneles de los lados te llevan al otro extremo.', done: () => inner.state.answered >= 1 },
+        { ico: '👻', t: 'Cómete el fantasma correcto', d: 'Solo el que lleva la respuesta correcta. Si tocas otro, pierdes. Los 4 portales (izquierda↔derecha, arriba↔abajo) te llevan al otro extremo.', done: () => inner.state.answered >= 1 },
       ],
     }[kind];
     const draw = () => {
