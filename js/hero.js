@@ -124,7 +124,7 @@
 
   /* ---------- héroe ---------- */
   function drawHero(look, pose, frame) {
-    const b = new Buf(W, H); b.ox = OX; b.oy = OY;
+    let b = new Buf(W, H); b.ox = OX; b.oy = OY; const bodyBuf = b;
     const g = look.gender === 'f' ? 'f' : 'm', fem = g === 'f';
     const su = it(look.suit, 'suit-rojo'), style = su.style || 'hero';
     const skin = D.SKINS[look.skin] || D.SKINS[1], skinSh = darken(skin, 0.14);
@@ -137,6 +137,7 @@
     const boots = darken(acc === '#ffffff' ? shade : acc, acc === '#ffffff' ? 0.2 : 0.15);
     const hi = lighten(main, 0.22);
     const helm = mask === 'mask-caballero';
+    const ad = [0, 1, 0, -1][fr % 4], al = pose === 'shoot' ? 0 : ad, ar = pose === 'shoot' ? 0 : -ad, bl = fr % 4 === 1 ? -1 : 0, br2 = fr % 4 === 3 ? -1 : 0;   // brazos y pies se mueven
 
     // ---- alas (detrás de todo)
     if (wing.wk) drawWings(b, wing.wk, [0, 1, 2, 1][fr % 4], fr);
@@ -164,32 +165,32 @@
       b.rect(12, 28, 16, 2, acc); b.rect(19, 28, 2, 2, lighten(acc, 0.45));
     } else if (fem) {
       b.rect(14, 34, 4, 6, main); b.rect(22, 34, 4, 6, main); b.rect(17, 34, 1, 6, shade); b.rect(25, 34, 1, 6, shade);
-      b.rect(13, 39, 6, 5, boots); b.rect(21, 39, 6, 5, boots); b.rect(13, 39, 6, 1, lighten(boots, 0.25)); b.rect(21, 39, 6, 1, lighten(boots, 0.25));
+      b.rect(13, 39 + bl, 6, 5, boots); b.rect(21, 39 + br2, 6, 5, boots); b.rect(13, 39 + bl, 6, 1, lighten(boots, 0.25)); b.rect(21, 39 + br2, 6, 1, lighten(boots, 0.25));
       b.poly([[13, 19], [27, 19], [26, 25], [27, 30], [13, 30], [14, 25]], main); b.poly([[24, 19], [27, 19], [26, 25], [27, 30], [24, 30]], shade); b.rect(13, 19, 14, 2, hi); b.rect(15, 21, 1, 6, hi);
       b.rect(13, 28, 14, 2, acc); b.rect(19, 28, 2, 2, lighten(acc, 0.45));
       b.poly([[13, 30], [27, 30], [30, 36], [10, 36]], main); b.poly([[23, 30], [27, 30], [30, 36], [23, 36]], shade); b.rect(10, 35, 20, 1, acc);
     } else {
       b.rect(13, 31, 6, 9, main); b.rect(21, 31, 6, 9, main); b.rect(17, 31, 2, 9, shade); b.rect(25, 31, 2, 9, shade);
-      b.rect(12, 39, 7, 5, boots); b.rect(21, 39, 7, 5, boots); b.rect(12, 39, 7, 1, lighten(boots, 0.25)); b.rect(21, 39, 7, 1, lighten(boots, 0.25));
+      b.rect(12, 39 + bl, 7, 5, boots); b.rect(21, 39 + br2, 7, 5, boots); b.rect(12, 39 + bl, 7, 1, lighten(boots, 0.25)); b.rect(21, 39 + br2, 7, 1, lighten(boots, 0.25));
       b.rect(12, 19, 16, 13, main); b.rect(25, 19, 3, 13, shade); b.rect(12, 19, 16, 2, hi); b.rect(14, 21, 1, 7, hi);
       b.rect(12, 29, 16, 2, acc); b.rect(19, 29, 2, 2, lighten(acc, 0.4));
     }
     // ---- brazos
     const aw = fem && style !== 'robe' ? 3 : 4, ax = fem && style !== 'robe' ? 9 : 8, rx = 28;
-    const gy = pose === 'shoot' ? 10 : 30, gx = rx + (aw === 3 ? 1 : 2);
+    const gy = pose === 'shoot' ? 10 : 30 + ar, gx = rx + (aw === 3 ? 1 : 2);
     if (style === 'robe') {
       b.poly([[8, 20], [12, 20], [12, 29], [5, 32]], main); b.rect(8, 20, 1, 8, hi); b.poly([[5, 32], [12, 29], [12, 31], [6, 33]], acc); b.rect(7, 31, 3, 3, skin);
       if (pose === 'shoot') { b.rect(28, 11, 4, 11, main); b.rect(27, 20, 6, 2, acc); b.rect(28, 7, 4, 4, skin); }
       else { b.poly([[28, 20], [32, 20], [35, 32], [28, 29]], main); b.poly([[28, 29], [35, 32], [34, 34], [28, 31]], acc); b.rect(30, 31, 3, 3, skin); }
     } else if (style === 'armor') {
-      b.rect(ax, 22, aw, 8, shade); b.rect(ax - 1, 28, aw + 2, 4, main); b.rect(ax - 1, 28, aw + 2, 1, hi);
+      b.rect(ax, 22 + al, aw, 8, shade); b.rect(ax - 1, 28 + al, aw + 2, 4, main); b.rect(ax - 1, 28 + al, aw + 2, 1, hi);
       if (pose === 'shoot') { b.rect(rx, 11, aw, 11, shade); b.rect(rx - 1, 7, aw + 2, 5, main); b.rect(rx - 1, 7, aw + 2, 1, hi); }
-      else { b.rect(rx, 22, aw, 8, shade); b.rect(rx - 1, 28, aw + 2, 4, main); b.rect(rx - 1, 28, aw + 2, 1, hi); }
+      else { b.rect(rx, 22 + ar, aw, 8, shade); b.rect(rx - 1, 28 + ar, aw + 2, 4, main); b.rect(rx - 1, 28 + ar, aw + 2, 1, hi); }
       [[10, 21], [30, 21]].forEach(([x, y]) => { b.ell(x, y, 4.6, 3.6, main); b.ell(x, y - 1, 3.4, 1.6, hi); b.rect(x - 4, y + 2, 9, 1, acc); });
     } else {
-      b.rect(ax, 20, aw, 9, main); b.rect(ax, 20, 1, 9, hi); b.rect(ax, 28, aw, 4, glove);
+      b.rect(ax, 20 + al, aw, 9, main); b.rect(ax, 20 + al, 1, 9, hi); b.rect(ax, 28 + al, aw, 4, glove);
       if (pose === 'shoot') { b.rect(rx, 10, aw, 12, main); b.rect(rx, 7, aw, 4, glove); b.rect(rx + aw - 1, 20, 1, 2, shade); }
-      else { b.rect(rx, 20, aw, 9, main); b.rect(rx + aw - 1, 20, 1, 9, shade); b.rect(rx, 28, aw, 4, glove); }
+      else { b.rect(rx, 20 + ar, aw, 9, main); b.rect(rx + aw - 1, 20 + ar, 1, 9, shade); b.rect(rx, 28 + ar, aw, 4, glove); }
     }
     // ---- emblema
     if (emb && EMB[emb.shape]) {
@@ -198,6 +199,7 @@
     }
     // ---- cabeza
     b.rect(18, 17, 4, 3, skinSh);
+    { const hb = new Buf(W, H); hb.ox = OX; hb.oy = OY; b = hb; }   // la cabeza va en su propia capa para poder moverla
     const hr = fem ? 8.1 : 8.5;
     b.ell(CX, 10.5, hr, hr, skin); b.ell(CX + 2.5, 12, 6, 6.5, skin); b.rect(CX + 4, 9, 4, 6, skin);
     for (let y = 6; y < 18; y++) for (let x = CX + 5; x < CX + 9; x++) if (b.get(x, y) === col(skin) && x > CX + 6 + (y > 14 ? -1 : 0)) b.px(x, y, skinSh);
@@ -211,6 +213,7 @@
       b.rect(CX - 5, eyeY, 3, 3, '#ffffff'); b.rect(CX + 2, eyeY, 3, 3, '#ffffff'); b.rect(CX - 4, eyeY + 1, 2, 2, INK); b.rect(CX + 3, eyeY + 1, 2, 2, INK);
       if (fem) { b.rect(CX - 6, eyeY - 1, 4, 1, INK); b.px(CX - 6, eyeY, INK); b.rect(CX + 2, eyeY - 1, 4, 1, INK); b.px(CX + 5, eyeY, INK); b.px(CX - 5, 15, '#ff9db5'); b.px(CX + 4, 15, '#ff9db5'); b.rect(CX - 1, 16, 3, 1, '#c2455f'); b.px(CX - 2, 15, '#c2455f'); b.px(CX + 2, 15, '#c2455f'); }
       else { const br = darken(hair, 0.1); b.rect(CX - 5, eyeY - 2, 3, 1, br); b.rect(CX + 2, eyeY - 2, 3, 1, br); b.rect(CX - 2, 16, 5, 1, '#8a2b3a'); b.px(CX - 3, 15, '#8a2b3a'); b.px(CX + 3, 15, '#8a2b3a'); }
+      if (fr % 4 === 2) { b.rect(CX - 5, eyeY, 3, 3, skin); b.rect(CX + 2, eyeY, 3, 3, skin); b.rect(CX - 5, eyeY + 1, 3, 1, INK); b.rect(CX + 2, eyeY + 1, 3, 1, INK); }   // parpadeo
     } else { b.rect(CX - 2, 16, 5, 1, fem ? '#c2455f' : '#8a2b3a'); }
     // ---- máscaras y cascos
     if (mask === 'mask-antifaz') { b.rect(CX - 9, 9, 18, 5, maskColor); b.poly([[CX - 9, 9], [CX - 7, 8], [CX + 7, 8], [CX + 9, 9]], maskColor); b.rect(CX - 6, 10, 4, 2, '#fff'); b.rect(CX + 2, 10, 4, 2, '#fff'); b.rect(CX - 5, 10, 2, 2, INK); b.rect(CX + 3, 10, 2, 2, INK); }
@@ -253,6 +256,7 @@
     if (mask === 'mask-halo') {
       const y = -4 - (fr % 2); b.ring(CX, y, 7.5, 2.6, 1.3, '#ffe066'); b.ring(CX, y, 7.5, 2.6, 0.6, '#fff6b0'); b.px(CX + 8, y - 1, '#fff'); b.px(CX - 8, y + 1, '#fff');
     }
+    { const hb = b, dy = (fr % 4 === 1 || fr % 4 === 3) ? -1 : 0; b = bodyBuf; for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const v = hb.d[y * W + x]; if (v) { const yy = y + dy; if (yy >= 0 && yy < H) b.d[yy * W + x] = v; } } }
     // ---- arma en la mano
     drawHeld(b, wp, gx, gy, fr);
     b.outline(INK);

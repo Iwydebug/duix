@@ -42,9 +42,15 @@
   function liveHero(cv, getLook, o) {
     o = o || {}; const sc = o.scale || 4, w = S.HERO_W, hh = S.HERO_H;
     cv.width = w * sc; cv.height = hh * sc; const ctx = cv.getContext('2d'); ctx.imageSmoothingEnabled = false;
-    const entry = { draw(t) { const look = getLook(); const fr = Math.floor(t / 150) % 4; ctx.clearRect(0, 0, cv.width, cv.height); ctx.drawImage(S.heroCanvas(look, o.pose ? o.pose() : 'idle', fr), bodyShift(look) * sc, Math.round(Math.sin(t / 220) * sc * 0.6), cv.width, cv.height); } };
+    const entry = { draw(t) {
+      const look = getLook(), fr = Math.floor(t / 170) % 4; ctx.clearRect(0, 0, cv.width, cv.height); ctx.imageSmoothingEnabled = false;
+      // movimiento "casi 3D": respiración, balanceo, giro leve y saltito periódico con aplastamiento
+      const cyc = (t + (cv.width * 37) % 1700) % 5600, hk = cyc < 700 ? cyc / 700 : -1, hop = hk >= 0 ? Math.sin(hk * Math.PI) * cv.height * 0.1 : 0;
+      const sq = hk >= 0 ? (hk < 0.14 || hk > 0.86 ? 0.92 : 1.035) : 1 + Math.sin(t / 330) * 0.012, sway = Math.sin(t / 1100) * 0.035, turn = 0.965 + 0.035 * Math.cos(t / 1700);
+      ctx.save(); ctx.translate(cv.width / 2, cv.height); ctx.rotate(sway); ctx.scale(turn * (2 - sq), sq); ctx.translate(-cv.width / 2, -cv.height - hop);
+      ctx.drawImage(S.heroCanvas(look, o.pose ? o.pose() : 'idle', fr), bodyShift(look) * sc, 0, cv.width, cv.height); ctx.restore(); } };
     entry.draw(0); liveList.push(entry);
-    if (!liveTimer && !St.settings().reduceMotion) liveTimer = setInterval(() => { const t = Date.now(); liveList.forEach((e) => e.draw(t)); }, 140);
+    if (!liveTimer && !St.settings().reduceMotion) liveTimer = setInterval(() => { const t = Date.now(); liveList.forEach((e) => e.draw(t)); }, 70);
     return cv;
   }
   function stopLive() { liveList = []; if (liveTimer) { clearInterval(liveTimer); liveTimer = 0; } }
@@ -202,13 +208,21 @@
     cleanups.push(() => clearInterval(iv));
   }
   // rueda de emotes: elige uno de los que tienes
-  function emoteWheel(onPick) {
-    const list = ownedEmotes(); const wrap = h('div', { class: 'ewheel' }); let close;
-    const N2 = Math.max(1, list.length), R2 = Math.min(130, 92 + N2 * 4);
-    list.forEach((it, i) => { const a = -Math.PI / 2 + i / N2 * Math.PI * 2, tx = Math.cos(a) * R2, ty = Math.sin(a) * R2;
-      wrap.appendChild(h('button', { type: 'button', class: 'ec r-' + it.rarity, style: `transform:translate(${tx}px,${ty}px);--t:translate(${tx}px,${ty}px)`, 'aria-label': it.name, onclick: () => { close(); onPick(it); } }, h('span', { text: it.fx || '💃' }), h('small', { text: it.name }))); });
-    wrap.appendChild(h('div', { class: 'ecenter', text: 'Emotes' }));
-    close = modal({ title: '', body: wrap, buttons: [{ label: 'Cerrar', cls: 'ghost' }] });
+  function emoteWheel(onPick, anchor) {
+    const list = ownedEmotes(); if (!list.length) { toast('Aún no tienes emotes. Compra uno en el Vestidor 🎁', 'warn'); return; }
+    const old = document.querySelector('.eradial'); if (old) { old.remove(); return; }
+    const ov = h('div', { class: 'eradial' }); const vw = root.innerWidth, vh = root.innerHeight;
+    const r = anchor ? anchor.getBoundingClientRect() : { left: vw / 2 - 20, top: vh / 2 - 40, width: 40, height: 80 };
+    const rings = list.length > 7 ? [[0, 7], [7, list.length]] : [[0, list.length]];
+    const R1 = 74, maxR = rings.length > 1 ? R1 + 52 : R1, bs = 50;
+    const cx = Math.max(maxR + bs / 2 + 4, Math.min(vw - maxR - bs / 2 - 4, r.left + r.width / 2)), cy = Math.max(maxR + bs / 2 + 70, Math.min(vh - maxR - bs / 2 - 90, r.top + r.height * 0.45));
+    ov.appendChild(h('div', { class: 'ering', style: `left:${cx}px;top:${cy}px` }));
+    const close = () => { ov.classList.add('out'); setTimeout(() => ov.remove(), 160); };
+    rings.forEach(([a0, a1], ri) => { const n = a1 - a0, R = R1 + ri * 52;
+      for (let k = 0; k < n; k++) { const it = list[a0 + k], ang = -Math.PI / 2 + (k + (ri ? 0.5 : 0)) / n * Math.PI * 2, tx = Math.cos(ang) * R, ty = Math.sin(ang) * R;
+        ov.appendChild(h('button', { type: 'button', class: 'eb r-' + it.rarity, style: `left:${cx}px;top:${cy}px;--tx:${tx}px;--ty:${ty}px;animation-delay:${(a0 + k) * 25}ms`, 'aria-label': it.name, onclick: (e) => { e.stopPropagation(); close(); onPick(it); } }, h('span', { text: it.fx || '💃' }), h('small', { text: it.name }))); } });
+    ov.addEventListener('click', close); document.body.appendChild(ov); sfx('click');
+    cleanups.push(() => ov.remove());
   }
   const stageDeco = () => [h('div', { class: 'wspot' }), [0, 1, 2, 3, 4, 5, 6, 7].map((i) => h('i', { class: 'wspark', style: `left:${8 + i * 11}%;animation-delay:${(i * 0.37).toFixed(2)}s;--sz:${6 + (i % 3) * 3}px` }))];
   SCREENS.creator = (_, sc) => {
@@ -326,6 +340,7 @@
     // héroe (avatar) parado en el nivel actual; si avanzaste, camina hasta él
     const hcv = h('canvas', { class: 'px lhero-cv' }); liveHero(hcv, () => p.look, { scale: 3 });
     const hero = h('div', { class: 'lhero' }, hcv, h('span', { class: 'lhero-sh' }));
+    hero.addEventListener('click', () => emoteWheel((it) => { if (it.anim && it.anim !== 'none') playEmoteOn(hcv, hero, it, 3200); }, hcv));
     const setHero = (x, y) => { hero.style.left = x + '%'; hero.style.top = y + 'px'; hero.dataset.y = y; };
     let fromIdx = -1;
     if (lastHeroIdx !== null && lastHeroIdx !== nextIdx && lastHeroIdx < nextIdx) fromIdx = lastHeroIdx;
@@ -351,7 +366,7 @@
     { const mk = (ico, label, fn, badge, cls) => h('button', { class: 'dockbtn ' + (cls || ''), 'aria-label': label, onclick: () => { sfx('select'); fn(); } }, h('span', { class: 'dico', text: ico }), h('small', { text: label }), badge ? h('i', { class: 'dbadge', text: badge }) : null);
       const spins = St.spinsLeft();
       const L = h('div', { class: 'hubdock left' }, mk('🎡', 'Ruleta', () => go('wheel'), spins ? String(spins) : '', 'wheelbtn'), mk('🎁', 'Vestidor', () => go('wardrobe')));
-      const Rr = h('div', { class: 'hubdock right' }, mk('🏆', 'Metas', () => go('goals'), dn ? dn + '/3' : ''), mk('💃', 'Emotes', () => emoteWheel((it) => { if (it.anim && it.anim !== 'none') playEmoteOn(hcv, hero, it, 3200); }), '', 'emobtn'), mk('👥', 'Salas', () => go('rooms')));
+      const Rr = h('div', { class: 'hubdock right' }, mk('🏆', 'Metas', () => go('goals'), dn ? dn + '/3' : ''), mk('💃', 'Emotes', () => emoteWheel((it) => { if (it.anim && it.anim !== 'none') playEmoteOn(hcv, hero, it, 3200); }, hcv), '', 'emobtn'), mk('👥', 'Salas', () => go('rooms')));
       app().appendChild(L); app().appendChild(Rr); cleanups.push(() => { L.remove(); Rr.remove(); }); }
     if (params.welcome) later(() => toast(`¡Bienvenido, <b>${esc(p.name)}</b>! El Mundo DuiX te necesita.`, '', 3800), 400);
     later(() => { mapTop = map.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop; const y = py(fromIdx >= 0 ? fromIdx : nextIdx) + mapTop; sc.scrollTop = y - sc.clientHeight * 0.6; zoom(); if (fromIdx >= 0 && fromIdx < nextIdx) { const y2 = py(nextIdx) + mapTop; const s0 = sc.scrollTop, s1 = y2 - sc.clientHeight * 0.6, T0 = performance.now(); const sm = (ts) => { const k = Math.min(1, (ts - T0 - 700) / (300 + (nextIdx - fromIdx) * 380)); if (k > 0) sc.scrollTop = s0 + (s1 - s0) * k; if (k < 1 && cur && cur.name === 'hub') requestAnimationFrame(sm); }; requestAnimationFrame(sm); } }, 40);
@@ -457,6 +472,7 @@
     sc.appendChild(h('div', { class: 'results ' + (win ? 'win' : 'lose') },
       h('div', { class: 'rhead' }, h('div', { class: 'rvil', style: `--glow:${v.glow}` }, villainEl(v, 96)), h('div', { class: 'rbubble' }, h('p', { text: '“' + (res.win ? v.defeat : v.intro.split('.')[0] + '…') + '”' }))),
       h('h1', { class: 'h1 rtitle', text: title }),
+      res.lowAcc ? h('p', { class: 'hint lowacc', text: `Para ganar debes acertar al menos ${res.needClean} a la primera (sin fallar antes). Acertaste ${res.correct}. ¡Inténtalo otra vez!` }) : null,
       res.win ? resHero : null,
       res.endless ? null : stars,
       rewards,
@@ -533,7 +549,8 @@
         itemPreview(it, lookNow()),
         h('b', { class: 'iname', text: it.name }),
         h('span', { class: 'irar', text: rar.name }),
-        eq ? h('span', { class: 'ibadge on', text: 'Puesto' }) : own ? h('span', { class: 'ibadge', text: 'Tuyo' }) : trying ? h('span', { class: 'ibadge on', text: 'Probando' }) : lockAch ? h('span', { class: 'ibadge ach', text: '🏆 Logro' }) : h('span', { class: 'ibadge price' }, img('coin', 2), h('b', { text: String(it.price) })));
+        sel === it.id && (it.perk || it.desc) ? h('small', { class: 'idesc', text: it.perk || it.desc }) : null,
+        !own && !lockAch && sel === it.id ? h('span', { class: 'ibuy' + (p.coins >= it.price ? '' : ' cant'), role: 'button', tabindex: '0', onclick: (e) => { e.stopPropagation(); doBuy(it); } }, img('coin', 2), h('b', { text: ' Comprar · ' + it.price })) : eq ? h('span', { class: 'ibadge on', text: 'Puesto' }) : own ? h('span', { class: 'ibadge', text: 'Tuyo' }) : trying ? h('span', { class: 'ibadge on', text: 'Probando' }) : lockAch ? h('span', { class: 'ibadge ach', text: '🏆 Logro' }) : h('span', { class: 'ibadge price' }, img('coin', 2), h('b', { text: String(it.price) })));
     }
     function choose(it) {
       sel = it.id; if (it.cat === 'emote') playEmoteOn(stage, stageBox, it, 3600); else { stage.classList.remove('jump'); void stage.offsetWidth; stage.classList.add('jump'); }
@@ -541,19 +558,11 @@
       else { pv[it.cat] = it.id; sfx('click'); }
       renderAll();
     }
-    function renderBar() {
-      bar.innerHTML = ''; const it = sel && D.ITEM_BY_ID[sel];
-      if (cat === 'body') { bar.appendChild(h('p', { class: 'hint', text: 'Cambia tu cuerpo, piel y color de pelo cuando quieras. Es gratis.' })); return; }
-      if (!it) { bar.appendChild(h('p', { class: 'hint', text: 'Toca cualquier objeto para probártelo, aunque aún no lo tengas. Los tuyos se equipan al instante.' })); return; }
-      const own = owned(it.id), rar = D.RARITY[it.rarity];
-      bar.appendChild(h('div', { class: 'binfo' }, h('b', { text: it.name }), h('small', { class: 'brar', style: 'color:' + rar.color, text: rar.name }), it.perk || it.desc ? h('p', { class: 'perk', text: it.perk || it.desc }) : null, !own && !it.unlock ? h('p', { class: 'perk', text: 'Te lo estás probando. Cómpralo para quedártelo.' }) : null));
-      if (own) bar.appendChild(h('span', { class: 'ibadge on big', text: p.look[it.cat] === it.id ? 'Puesto ✓' : 'Tuyo' }));
-      else if (it.unlock) bar.appendChild(h('span', { class: 'ibadge ach big', text: '🏆 Se gana con el logro “' + (D.ACH.find((a) => a.id === it.unlock.ach) || {}).name + '”' }));
-      else bar.appendChild(h('button', { class: 'btn buy' + (p.coins >= it.price ? '' : ' cant'), onclick: () => {
-        const r = St.buy(it.id); if (!r.ok) { sfx('deny'); toast(r.err, 'warn'); return; }
-        sfx('buy'); St.equip(it.id); delete pv[it.cat]; toast(`¡Compraste <b>${esc(it.name)}</b> y te lo pusiste!`, ''); announceAch(r.ach); renderAll();
-      } }, img('coin', 3), h('span', { text: ` Comprar · ${it.price}` })));
+    function doBuy(it) {
+      const r = St.buy(it.id); if (!r.ok) { sfx('deny'); toast(r.err, 'warn'); return; }
+      sfx('buy'); St.equip(it.id); delete pv[it.cat]; toast(`¡Compraste <b>${esc(it.name)}</b> y te lo pusiste!`, ''); announceAch(r.ach); renderAll();
     }
+    function renderBar() { bar.innerHTML = ''; bar.hidden = true; }
     function renderBody() {
       const sw = (c, i, key) => h('button', { class: 'copt' + (p.look[key] === i ? ' on' : ''), 'aria-label': (key === 'skin' ? 'Piel ' : 'Pelo ') + (i + 1), onclick: () => { St.setLook({ [key]: i }); sfx('click'); renderAll(); } }, h('i', { class: 'sw', style: 'background:' + c }));
       const gbtn = (g, label) => h('button', { class: 'gbtn' + (p.look.gender === g ? ' on' : ''), onclick: () => { if (p.look.gender === g) return; St.setLook({ gender: g }); sfx('select'); renderAll(); } }, headThumb(Object.assign({}, p.look, { gender: g }), ''), h('b', { text: label }));
@@ -590,6 +599,8 @@
   SCREENS.wheel = (P, sc) => {
     const N = St.WHEEL.length, SEG = 360 / N; let rot = 0, spinning = false;
     const status = h('div', { class: 'wh-status' });
+    const bal = h('div', { class: 'wh-bal' });
+    const drawBal = () => { const p0 = St.profile(); bal.innerHTML = ''; bal.appendChild(h('span', { class: 'wb coin' }, h('i', { text: '🪙' }), h('b', { text: String(p0.coins) }), h('small', { text: 'monedas' }))); bal.appendChild(h('span', { class: 'wb sig' }, h('i', { text: 'Σ' }), h('b', { text: String(p0.sigma || 0) }), h('small', { text: 'sigmas' }))); bal.appendChild(h('span', { class: 'wb spn' }, h('i', { text: '🎡' }), h('b', { text: String(St.spinsLeft()) }), h('small', { text: 'giros' }))); };
     const cv = h('canvas', { class: 'wh-cv', width: 320, height: 320 });
     const ctx = cv.getContext('2d');
     function draw() {
@@ -616,7 +627,7 @@
     const shop = h('div', { class: 'wh-shop' });
     function refresh() {
       const w = St.wheelState(), n = St.spinsLeft();
-      status.innerHTML = ''; status.appendChild(h('span', { html: n ? `Giros disponibles: <b>${n}</b>${w.free ? ' (incluye el gratis de hoy)' : ''}` : 'Sin giros ahora. ¡Responde una pregunta o gana batallas!' }));
+      drawBal(); status.innerHTML = ''; status.appendChild(h('span', { html: n ? `Giros disponibles: <b>${n}</b>${w.free ? ' (incluye el gratis de hoy)' : ''}` : 'Sin giros ahora. ¡Responde una pregunta o gana batallas!' }));
       spinBtn.disabled = spinning || !n;
       qBox.innerHTML = '';
       if (w.qLeft > 0) qBox.appendChild(h('button', { class: 'btn', onclick: askQ }, `🧠 Responde y gana 1 giro (${w.qLeft} hoy)`));
@@ -653,14 +664,16 @@
       requestAnimationFrame(step);
     }
     function finish(idx) {
+      const b0 = { c: St.profile().coins, s: St.profile().sigma || 0 };
       const r = St.applyPrize(idx); spinning = false; sfx('win'); refreshCoins();
       const pz = r.prize; let extra = '';
+      const p1 = St.profile(); if (pz.coins) extra += `<br>Monedas: ${b0.c} → <b>${p1.coins}</b>`; if (pz.sigma) extra += `<br>Sigmas: ${b0.s} → <b>${p1.sigma || 0}</b>`;
       if (r.chest) extra = r.chest.item ? ` Conseguiste: ${esc(r.chest.item.name)}` : ` +${r.chest.coins} monedas`;
-      modal({ title: '¡Premio!', body: h('div', { class: 'wh-prize' }, h('div', { class: 'wp-ico', text: pz.icon }), h('b', { text: pz.label }), h('small', { html: extra })), buttons: [{ label: '¡Genial!', cls: 'gold', onClick: refresh }] });
+      modal({ title: '¡Premio!', body: h('div', { class: 'wh-prize' }, h('div', { class: 'wp-ico', text: pz.icon }), h('b', { text: pz.coins ? '+' + pz.coins + ' monedas' : pz.sigma ? '+' + pz.sigma + ' sigmas' : pz.label }), h('small', { html: extra })), buttons: [{ label: '¡Genial!', cls: 'gold', onClick: refresh }] });
       refresh();
     }
     sc.appendChild(h('div', { class: 'wheelscr' },
-      h('h1', { class: 'h1', text: '🎡 Ruleta de la Fortuna' }), status,
+      h('h1', { class: 'h1', text: '🎡 Ruleta de la Fortuna' }), bal, status, h('p', { class: 'hint', text: 'Las 8 casillas tienen la misma probabilidad (12,5 % cada una).' }),
       h('div', { class: 'wh-stage' }, h('div', { class: 'wh-pointer', text: '▼' }), cv), spinBtn, qBox, shop,
       h('button', { class: 'btn ghost', onclick: () => { sfx('back'); go('hub'); } }, 'Volver al mapa')));
     refresh();

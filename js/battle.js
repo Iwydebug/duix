@@ -185,7 +185,7 @@
       shake = Math.max(shake, 5); A.sfx('hit'); A.sfx('correct'); if (st.streak >= 3 && clean) A.sfx('combo', st.streak);
       setTimeout(() => A.sfx('coin'), 90);
       banner(PRAISE[Math.floor(Math.random() * PRAISE.length)], 'good', 700);
-      if (!endless && st.hp <= 0) return victory();
+      if (!endless && st.hp <= 0) return winOrLose();
       st.state = 'between'; st.stateT = 0; st.wait = 0.55; renderHud();
     }
     function damageHero() {
@@ -233,12 +233,14 @@
     function finish(win) {
       if (st.over) return; st.over = true; st.win = win; st.state = 'end'; st.stateT = 0;
     }
+    st.needClean = room ? 0 : Math.ceil(maxHp * 0.5);
+    function winOrLose() { if (room || endless || st.correct >= st.needClean) victory(); else { st.lowAcc = true; defeat(); } }
     function victory() { finish(true); vil.dead = true; A.sfx('boom'); say(v.defeat, 2400); burst(vil.x, 70, [v.pal.main, v.pal.accent, '#fff'], 80, 240, 1.2); renderHud(); }
     function defeat() { finish(false); A.sfx('lose'); banner(endless ? '¡FIN DEL INFINITO!' : '¡DERROTA!', 'lose'); renderHud(); }
     function report() {
       const acc = st.answered ? st.correct / st.answered : 0;
       let stars = 0; if (st.win) stars = st.heartsLost === 0 ? 3 : (st.heartsLost === 1 || acc >= 0.75) ? 2 : 1;
-      return { win: !!st.win && !endless, stars, correct: st.correct, answered: st.answered, bestStreak: st.bestStreak, mistakes: st.mistakes, goods: st.goods || [], score: Math.round(st.score), coins: st.coins, heartsLost: st.heartsLost, hintsUsed: st.hintsUsed, tier, time: Math.round(st.time), endless };
+      return { win: !!st.win && !endless, needClean: st.needClean, lowAcc: !!st.lowAcc, stars, correct: st.correct, answered: st.answered, bestStreak: st.bestStreak, mistakes: st.mistakes, goods: st.goods || [], score: Math.round(st.score), coins: st.coins, heartsLost: st.heartsLost, hintsUsed: st.hintsUsed, tier, time: Math.round(st.time), endless };
     }
 
     /* ---------- bucle ---------- */
@@ -261,7 +263,7 @@
         });
         // si solo queda la correcta y ninguna otra, sigue igual
       } else if (st.state === 'between') {
-        if (st.stateT >= st.wait && !st.over) { if (room && st.qIndex >= room.total) { if (st.hearts > 0) victory(); else defeat(); } else nextQuestion(); }
+        if (st.stateT >= st.wait && !st.over) { if (room && st.qIndex >= room.total) { if (st.hearts > 0) winOrLose(); else defeat(); } else nextQuestion(); }
       } else if (st.state === 'end') {
         if (st.stateT > (st.win ? 2.6 : 2.0) && !st.reported) { st.reported = true; cfg.onEnd(report()); }
       }

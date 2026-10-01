@@ -167,7 +167,16 @@
     });
     sc.appendChild(h('div', { class: 'rooms' }, K.topbar(), h('h1', { class: 'h1', text: 'Nueva sala' }),
       blocks,
-      h('div', { class: 'actbar' }, msg, btn, h('button', { class: 'btn ghost', type: 'button', onclick: () => { sfx('back'); go('rooms'); } }, 'Volver'))));
+      msg, h('div', { class: 'actspace' }),
+      (() => {
+        const grip = h('span', { class: 'actgrip', 'aria-label': 'Arrastra para mover', text: '⠿' });
+        const bar = h('div', { class: 'actbar fab' }, grip, h('button', { class: 'btn ghost', type: 'button', onclick: () => { sfx('back'); go('rooms'); } }, '← Volver'), btn);
+        let dx = 0, dy = 0, drag = false;
+        grip.addEventListener('pointerdown', (e) => { e.preventDefault(); drag = true; const b = bar.getBoundingClientRect(); dx = e.clientX - b.left; dy = e.clientY - b.top; bar.style.right = 'auto'; bar.style.bottom = 'auto'; bar.style.left = b.left + 'px'; bar.style.top = b.top + 'px'; try { grip.setPointerCapture(e.pointerId); } catch (x) { /* ok */ } });
+        grip.addEventListener('pointermove', (e) => { if (!drag) return; const w = bar.offsetWidth, hh = bar.offsetHeight; bar.style.left = Math.max(4, Math.min(root.innerWidth - w - 4, e.clientX - dx)) + 'px'; bar.style.top = Math.max(4, Math.min(root.innerHeight - hh - 4, e.clientY - dy)) + 'px'; });
+        const up = () => { drag = false; }; grip.addEventListener('pointerup', up); grip.addEventListener('pointercancel', up);
+        return bar;
+      })()));
   };
   async function createRoom(c) {
     const p = St.profile();
@@ -193,6 +202,8 @@
     const my = { finished: false, report: null, rewarded: null, back: false, round: -1 };
     const subs = [], timers = [];
     let viewKey = '', left = false, offline = false, battle = null, questions = null, lastWrite = 0, writeT = 0, pending = null, lastRank = 0, renderT = 0, cdTimer = 0, plaza = null, refs = {};
+    let waitEl = null, waitIdx = -1, waitKey = '';
+    let seg = null, fx = { speedUntil: 0 }, impCd = 0, lastCp = 0, voteOpen = false, lastSabId = '', announced = {}, cdTick = 0;
     const box = h('div', { class: 'room' });
     const holder = h('div', { class: 'btholder', hidden: true });
     const banner = h('div', { class: 'rbanner', hidden: true });
@@ -234,10 +245,12 @@
         if (my.round >= 0) { my.finished = false; my.report = null; my.rewarded = null; my.back = false; questions = null; seg = null; announced = {}; if (battle) { try { battle.destroy(); } catch (e) { /* ok */ } battle = null; clearOverlays(); sc.classList.remove('s-battle'); holder.hidden = true; box.hidden = false; K.setAmbient(true, 'room'); } if (prev && prev.phase === 'end' && s.phase === 'lobby') toast('¡El anfitrión abrió una nueva partida!', ''); }
         my.round = s.round || 0; viewKey = '';
       }
+      if (seg) { if (waitEl) tryAdvance(); else if (battle && (s.seg || 0) > seg.i && s.phase === 'countdown') { const bs = battle.state || {}; segDone({ score: Math.round(bs.score || 0), correct: bs.correct || 0, answered: bs.answered || 0, mistakes: bs.mistakes || [], bestStreak: bs.bestStreak || 0 }); } }
       render(false);
     }));
     function onPlayers() {
       const ph = R.state && R.state.phase;
+      if (waitEl) { buildWait(seg && seg.i >= seg.plan.length); tryAdvance(); return; }
       if (battle) { const now = Date.now(); if (now - lastRank > 900) { lastRank = now; updateRank(); if (battle.refresh) battle.refresh(); } return; }
       if (refs.plist) { refreshPlaza(); return; }
       if (ph === 'end') render(true); else if (ph === 'countdown') { clearTimeout(renderT); renderT = setTimeout(() => render(true), 350); } else render(false);
@@ -249,24 +262,37 @@
 
     /* ----- anfitrión ----- */
     if (isHost) {
-      timers.push(setInterval(() => {
-        const s = R.state; if (left || offline || !s || s.phase !== 'countdown') return;
+      let firstAt = 0, allAt = 0, lastSeg = -1;
+      timers.push(setInterval(() => {   // el anfitrión sincroniza: todos juegan el mismo juego a la vez
+        const s = R.state; if (left || offline || !s || s.phase !== 'countdown' || !R.cfg) return;
+        const cur = s.seg || 0, plan = segPlan(R.cfg).length;
+        if (cur !== lastSeg) { lastSeg = cur; firstAt = 0; allAt = 0; }
+        if (cur < plan && nowMs() - (s.t0 || nowMs()) > 3500) {
+          const act = Object.keys(R.players).filter((id) => R.players[id].online !== false && !R.players[id].done), fin = act.filter((id) => (R.players[id].sd || 0) > cur), now = Date.now();
+          let go2 = false;
+          if (act.length && fin.length === act.length) {
+            if (!allAt) allAt = now;
+            const vs = (R.votes && R.votes[cur]) || {}, voted = act.filter((id) => vs[id] != null).length;
+            go2 = nImps() ? (voted >= act.length || now - allAt > 28000) : now - allAt > 1500;
+          } else if (fin.length) { if (!firstAt) firstAt = now; if (now - firstAt > 100000) go2 = true; }
+          if (go2) { allAt = 0; firstAt = 0; lastSeg = cur + 1; N.update(P, { 'state/seg': cur + 1 }).catch(() => {}); }
+        }
         const el = nowMs() - (s.t0 || nowMs()), list = Object.values(R.players);
         if (el > 12000 && list.length && list.every((x) => x.done || x.online === false)) hostEnd();
         else if (el > 20 * 60 * 1000) hostEnd();
       }, 1000));
     }
-    function hostEnd() { const s = R.state; if (!s || s.phase === 'end') return; N.update(P, { state: { phase: 'end', t0: N.TS, round: round(), imps: s.imps || null } }).catch(() => {}); }
+    function hostEnd() { const s = R.state; if (!s || s.phase === 'end') return; N.update(P, { state: { phase: 'end', t0: N.TS, round: round(), seg: s.seg || 0, imps: s.imps || null } }).catch(() => {}); }
     async function hostStart() {
       const n = Object.keys(R.players).length;
       if (!n) { toast('Aún no hay jugadores.', 'warn'); sfx('deny'); return; }
       const ids = Object.keys(R.players).filter((id) => R.players[id].online !== false), cfgImp = (R.cfg && R.cfg.imp) || 0, want = Math.min(cfgImp < 0 ? Math.max(1, Math.round(ids.length / 5)) : cfgImp, Math.floor((ids.length - 1) / 2)), imps = {};
       if (ids.length >= 3) { const pool = ids.slice(); for (let k = 0; k < want; k++) { const i = Math.floor(Math.random() * pool.length); imps[pool.splice(i, 1)[0]] = true; } }
-      try { sfx('go'); await N.update(P, { state: { phase: 'countdown', t0: N.TS, round: round(), imps: Object.keys(imps).length ? imps : null }, votes: null, sab: null }); } catch (e) { toast(netErr(e), 'warn'); }
+      try { sfx('go'); await N.update(P, { state: { phase: 'countdown', t0: N.TS, round: round(), seg: 0, imps: Object.keys(imps).length ? imps : null }, votes: null, sab: null }); } catch (e) { toast(netErr(e), 'warn'); }
     }
     async function hostRematch() {
-      const upd = {}; Object.keys(R.players).forEach((id) => { if (R.players[id].online === false) upd['players/' + id] = null; else { upd['players/' + id + '/score'] = 0; upd['players/' + id + '/correct'] = 0; upd['players/' + id + '/qi'] = 0; upd['players/' + id + '/done'] = false; } });
-      upd['cfg/seed'] = Math.floor(Math.random() * 4294967295); upd.state = { phase: 'lobby', t0: N.TS, round: round() + 1 };
+      const upd = {}; Object.keys(R.players).forEach((id) => { if (R.players[id].online === false) upd['players/' + id] = null; else { upd['players/' + id + '/score'] = 0; upd['players/' + id + '/correct'] = 0; upd['players/' + id + '/qi'] = 0; upd['players/' + id + '/done'] = false; upd['players/' + id + '/sd'] = 0; } });
+      upd['cfg/seed'] = Math.floor(Math.random() * 4294967295); upd.state = { phase: 'lobby', t0: N.TS, round: round() + 1, seg: 0 };
       try { sfx('select'); await N.update(P, upd); } catch (e) { toast(netErr(e), 'warn'); }
     }
 
@@ -287,7 +313,6 @@
     }
     /* ----- 3 juegos seguidos + impostor ----- */
     const KIND_NAME = { shoot: '🎯 Disparo', run: '🏃 Carrera', maze: '👻 Laberinto Pac-Man' };
-    let seg = null, fx = { speedUntil: 0 }, impCd = 0, lastCp = 0, voteOpen = false, lastSabId = '', announced = {}, cdTick = 0;
     const segPlan = (cfg) => {
       const n = cfg.n; if (cfg.mix === false) return [['shoot', n]];
       const b = Math.floor(n / 3), r = n % 3, cnt = [b + (r > 0 ? 1 : 0), b + (r > 1 ? 1 : 0), b];
@@ -311,7 +336,7 @@
     }
     const adjScore = (d) => { if (battle && battle.state) battle.state.score = Math.max(0, (battle.state.score || 0) + d); else if (seg) seg.base.score = Math.max(0, seg.base.score + d); };
     const overlay = (cls, html, ms) => { const e = h('div', { class: 'rov ' + cls, html }); holder.appendChild(e); if (ms) setTimeout(() => { e.classList.add('out'); setTimeout(() => e.remove(), 350); }, ms); return e; };
-    const clearOverlays = () => { holder.querySelectorAll('.rov,.imp-ui').forEach((e) => e.remove()); holder.classList.remove('fog'); };
+    const clearOverlays = () => { holder.querySelectorAll('.rov,.imp-ui').forEach((e) => e.remove()); holder.classList.remove('fog'); waitEl = null; waitIdx = -1; waitKey = ''; };
     function startBattle() {
       if (battle || my.finished || left || !R.cfg) return;
       killPlaza(); questions = buildRoomQuestions(R.cfg);
@@ -341,7 +366,6 @@
     function onSnap(snap) {
       if (!seg) return;
       pushProgress({ score: seg.base.score + snap.score, correct: seg.base.correct + snap.correct, qi: seg.base.answered + snap.qi, over: false }, snap.over);
-      checkVote(seg.base.answered + snap.qi);
     }
     function segDone(rep) {
       if (left || my.finished || !seg) return;
@@ -349,12 +373,66 @@
       seg.base.score += rep.score; seg.base.correct += rep.correct; seg.base.answered += Math.max(rep.answered, 0);
       seg.agg.mistakes = seg.agg.mistakes.concat(rep.mistakes || []); seg.agg.bestStreak = Math.max(seg.agg.bestStreak, rep.bestStreak || 0);
       seg.off += count; seg.i++;
-      if (battle) { try { battle.destroy(); } catch (e) { /* ok */ } battle = null; }
-      if (seg.i < seg.plan.length) { startSeg(); return; }
+      if (battle) { try { battle.destroy(); } catch (e) { /* ok */ } battle = null; root.__roomBattle = null; }
+      enterWait();
+    }
+    function finalizeMine() {
       const t = seg.base; let score = t.score;
       if (amImp() && !expelledMap()[pid]) score += 150;
       finishMine({ score, correct: t.correct, answered: t.answered, bestStreak: seg.agg.bestStreak, mistakes: seg.agg.mistakes, heartsLost: 0 });
     }
+    /* ----- sala de espera entre juegos + reunión de votación ----- */
+    function enterWait() {
+      const idx = seg.i - 1, last = seg.i >= seg.plan.length;
+      pushProgress({ score: seg.base.score, correct: seg.base.correct, qi: seg.base.answered, over: true }, true);
+      N.update(P + '/players/' + pid, { sd: seg.i }).catch(() => {});
+      waitIdx = idx; waitKey = '';
+      waitEl = overlay('meet', '', 0);
+      buildWait(last);
+      A.play('menu'); sfx('win');
+      tryAdvance();
+    }
+    const activePlayers = () => Object.keys(R.players).filter((id) => R.players[id].online !== false && !R.players[id].done);
+    function buildWait(last) {
+      if (!waitEl || !seg) return;
+      const idx = waitIdx, ids = Object.keys(R.players), others = ids.filter((id) => id !== pid);
+      const key = ids.join(',') + '|' + last; if (key === waitKey) { updateWait(); return; } waitKey = key;
+      const name = KIND_NAME[seg.plan[idx][0]] || 'Juego', myV = (R.votes && R.votes[idx] && R.votes[idx][pid]) || null;
+      waitEl.innerHTML = '';
+      const vote = (id) => { N.set(P + '/votes/' + idx + '/' + pid, id || '-').catch(() => {}); sfx(id ? 'select' : 'back'); R.votes = R.votes || {}; (R.votes[idx] = R.votes[idx] || {})[pid] = id || '-'; waitKey = ''; buildWait(last); };
+      const grid = nImps() && playing() ? h('div', { class: 'vgrid' }, others.map((id) => h('button', { type: 'button', class: 'vopt' + (myV === id ? ' sel' : ''), onclick: () => vote(id) }, K.headThumb(R.players[id].look || {}, ''), h('b', { text: String(R.players[id].name || '?').slice(0, 10) })))) : null;
+      waitEl.appendChild(h('div', { class: 'vbox' },
+        h('small', { class: 'vt', text: last ? 'FIN DEL ÚLTIMO JUEGO' : 'JUEGO TERMINADO · ' + name }),
+        h('h2', { text: nImps() && playing() ? '🚨 ¿Quién es el impostor?' : '¡Terminaste!' }),
+        h('p', { class: 'vsub', text: nImps() && playing() ? 'Toca a quien creas que sabotea. Gana +100 si aciertas y −40 si fallas (se revela al terminar la reunión).' : 'Esperando a que todos terminen este juego…' }),
+        grid,
+        nImps() && playing() ? h('button', { type: 'button', class: 'btn ghost small', onclick: () => vote(null) }, myV === '-' ? '✓ No voto (cambiar)' : 'No sé · no votar') : null,
+        h('small', { class: 'vtimer meet-st', text: '' }),
+        h('small', { class: 'vsub meet-next', text: last ? 'Después verás el podio.' : 'Sigue: ' + (KIND_NAME[seg.plan[seg.i][0]] || '') })));
+      updateWait();
+    }
+    function updateWait() {
+      if (!waitEl || !seg) return; const st2 = waitEl.querySelector('.meet-st'); if (!st2) return;
+      const act = activePlayers(), done = act.filter((id) => (R.players[id].sd || 0) > waitIdx).length;
+      st2.textContent = '✅ Terminaron ' + done + ' de ' + act.length + ' jugadores';
+    }
+    function tryAdvance() {
+      if (!waitEl || waitIdx < 0 || !seg || waitEl.dataset.go) return;
+      if (!R.state || (R.state.seg || 0) <= waitIdx) { updateWait(); return; }
+      waitEl.dataset.go = '1'; const idx = waitIdx, last = seg.i >= seg.plan.length;
+      // resultado de la reunión
+      let html = '';
+      if (nImps() && playing()) {
+        const vs = (R.votes && R.votes[idx]) || {}, tally = {};
+        Object.keys(vs).forEach((v) => { const t = vs[v]; if (t && t !== '-') tally[t] = (tally[t] || 0) + 1; });
+        const top = Object.keys(tally).sort((a, b) => tally[b] - tally[a])[0], mine = vs[pid];
+        if (mine && mine !== '-') { const ok = !!imps()[mine]; adjScore(ok ? +100 : -40); toast(ok ? '🎯 ¡Acertaste! ' + ((R.players[mine] || {}).name || '') + ' ES impostor (+100)' : '❌ ' + ((R.players[mine] || {}).name || '') + ' es inocente (−40)', ok ? 'ach' : 'warn'); }
+        html = top ? '<b>Más votado: ' + esc2((R.players[top] || {}).name || '?') + ' (' + tally[top] + ')</b><small>' + (imps()[top] ? '¡Era IMPOSTOR!' : 'No era impostor…') + '</small>' : '<b>Nadie votó</b><small>El impostor sigue libre…</small>';
+      }
+      const next = () => { if (!seg || left || my.finished) return; waitEl && waitEl.remove(); waitEl = null; waitIdx = -1; waitKey = ''; if (seg.i < seg.plan.length) startSeg(); else finalizeMine(); };
+      if (html) { waitEl.innerHTML = '<div class="vbox"><small class="vt">RESULTADO DE LA REUNIÓN</small><h2>🗳️</h2>' + html.replace('<b>', '<b class="vres">') + '</div>'; later(next, 2600); } else next();
+    }
+    const esc2 = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     function finishMine(rep, quit) {
       if (my.finished || left) return; my.finished = true; my.report = rep;
       if (battle) { try { battle.destroy(); } catch (e) { /* ok */ } battle = null; }
@@ -405,7 +483,7 @@
       else if (v.k === 'steal') { adjScore(-60); toast('⚠️ ¡SABOTAJE! −60 puntos', 'warn'); }
     }
     subs.push(N.on(P + '/sab', onSab));
-    subs.push(N.on(P + '/votes', (v) => { R.votes = v || {}; checkExpelled(); }));
+    subs.push(N.on(P + '/votes', (v) => { R.votes = v || {}; checkExpelled(); if (waitEl) updateWait(); }));
     function checkExpelled() {
       const ex = expelledMap();
       Object.keys(ex).forEach((id) => { if (announced[id]) return; announced[id] = 1; const nm = (R.players[id] && R.players[id].name) || 'Alguien'; if (battle || box.hidden === false) toast('🚨 ¡' + nm + ' era IMPOSTOR y fue descubierto!', 'ach'); if (id === pid) toast('Te descubrieron: pierdes tus sabotajes.', 'warn'); });
@@ -565,7 +643,8 @@
       }
       const rest = h('ol', { class: 'rboard' }, rk.slice(3).map((x, i) => h('li', { class: 'rrow' + (x.id === pid ? ' me' : '') }, h('span', { class: 'rpos', text: String(i + 4) }), K.headThumb(x.look || {}, 'rh'), h('div', { class: 'rmid' }, h('b', { class: 'rname', text: x.name })), h('span', { class: 'rscore', text: String(x.score || 0) }))));
       const impIds = Object.keys(imps()), exm = expelledMap();
-      const reveal = impIds.length ? h('div', { class: 'imp-reveal' }, h('b', { text: '🕵️ ' + (impIds.length > 1 ? 'Los impostores eran' : 'El impostor era') }),
+      const crewWon = impIds.length && impIds.every((id) => exm[id]);
+      const reveal = impIds.length ? h('div', { class: 'imp-reveal' }, h('h3', { class: 'imp-win', text: crewWon ? '🎉 ¡Ganó la tripulación!' : '🕵️ ¡Ganaron los impostores!' }), h('b', { text: '🕵️ ' + (impIds.length > 1 ? 'Los impostores eran' : 'El impostor era') }),
         h('div', { class: 'ir-row' }, impIds.map((id) => { const x = R.players[id] || {}; return h('span', { class: 'ir-one' }, K.headThumb(x.look || {}, ''), h('b', { text: String(x.name || '???').slice(0, 10) }), h('small', { text: exm[id] ? '¡Descubierto!' : 'Escapó (+150)' })); }))) : null;
       box.appendChild(h('div', { class: 'rpanel end' }, h('h2', { class: 'rtitle', text: '¡Fin de la partida!' }), pod, reveal, reward, rk.length > 3 ? rest : null,
         h('button', { class: 'btn big', type: 'button', onclick: () => { sfx('select'); my.back = true; viewKey = ''; render(true); } }, '↩ Volver a la sala'),
@@ -579,7 +658,7 @@
         if (battle) { if (!my.report) { const t = curTotals(); my.report = { mistakes: t.mistakes, bestStreak: t.bestStreak, score: t.score, correct: t.correct, answered: t.answered, heartsLost: 0 }; } try { battle.destroy(); } catch (e) { /* ok */ } battle = null; clearOverlays(); seg = null; sc.classList.remove('s-battle'); holder.hidden = true; box.hidden = false; K.setAmbient(true, 'room'); }
         clearInterval(cdTimer);
       }
-      if (battle) return; // el combate manda
+      if (battle || waitEl) return; // el combate (o la reunión) manda
       if (ph === 'countdown' && playing() && !my.finished && R.playersLoaded && nowMs() - (s.t0 || 0) > 3000) {
         const me = myP();
         if (me && me.done) { my.finished = true; }

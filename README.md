@@ -123,3 +123,13 @@ Así nadie puede listar todas las salas: solo entra quien conoce el código. Las
 - **Disparo**: cada pregunta repite la animación centro → recuadro.
 - Retroalimentación solo al final. Avatares corregidos. Créditos con el tema del juego, «Deiwy Mondragon» y citas de Precálculo y Cálculo (Stewart).
 - Salas: impostores con Ninguno / Auto / 1 / 2 / 3 y casilla numérica.
+
+## Novedades 1.8.2
+- **Victoria justa**: hay que acertar al menos la mitad de las preguntas a la primera; en Pac-Man además hay que comer TODOS los puntitos.
+- **Pac-Man**: el tablero ya no cambia a mitad de partida; el aviso «Ese no era» es breve (la explicación completa está al final).
+- **Carrera**: más lenta, con botón «Saltar» (cuenta como fallada).
+- **Ruleta**: las 8 casillas tienen la misma probabilidad (12,5 %) y se muestran claro tus monedas, sigmas y giros.
+- **Emotes** en círculo alrededor del personaje (toca al héroe o el botón Emotes). Avatar con más movimiento (brazos, pies, cabeza, parpadeo, saltito y balanceo).
+- **Vestidor**: sin cartel grande; el botón Comprar sale dentro de la tarjeta del objeto.
+- **Salas**: botones flotantes pequeños y movibles; todos juegan el mismo juego a la vez, con sala de espera y votación de impostor entre juegos; al final se anuncia quién ganó.
+- **Tutorial** paso a paso dentro del propio juego.

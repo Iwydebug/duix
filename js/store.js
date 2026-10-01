@@ -122,7 +122,7 @@
     { id: 'chest', label: 'Cofre', icon: '🎁', col: '#ff3f9a', w: 6, chest: true }, { id: 'c150', label: '150', icon: '🪙', col: '#ff5a3c', w: 4, coins: 150 },
     { id: 'xp', label: '50 XP', icon: '⚡', col: '#4da3ff', w: 16, xp: 50 }, { id: 'spin', label: '+1 giro', icon: '🎡', col: '#ffd23f', w: 8, spin: 1 },
   ];
-  function rollWheel() { let tot = 0; WHEEL.forEach((x) => { tot += x.w; }); let r = Math.random() * tot; for (let i = 0; i < WHEEL.length; i++) { r -= WHEEL[i].w; if (r <= 0) return i; } return 0; }
+  function rollWheel() { const n = WHEEL.length; try { const a = new Uint32Array(1); const lim = Math.floor(4294967296 / n) * n; let x; do { crypto.getRandomValues(a); x = a[0]; } while (x >= lim); return x % n; } catch (e) { return Math.floor(Math.random() * n); } }  // las 8 casillas tienen exactamente la misma probabilidad (1/8)
   function applyPrize(i) {
     const pz = WHEEL[i]; const out = { prize: pz };
     if (pz.coins) addCoins(pz.coins); if (pz.sigma) addSigma(pz.sigma); if (pz.xp) out.ups = addXp(pz.xp); if (pz.spin) grantSpin(pz.spin);
