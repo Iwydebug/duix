@@ -512,6 +512,24 @@
    * VESTIDOR + TIENDA
    * ============================================================ */
   const AMULET_ICON = { 'am-none': '⚪', 'am-escudo': '🛡️', 'am-lupa': '🔍', 'am-log': '🪙', 'am-reloj': '⏳', 'am-titan': '💗' };
+  // animación + resultado de abrir un cofre (ruleta, canje, tienda)
+  function chestReveal(r, after) {
+    const p = St.profile();
+    const box = h('div', { class: 'chestopen' }, h('div', { class: 'co-chest' }, img('chest', 6)), h('p', { class: 'hint', text: 'Abriendo cofre…' }));
+    const closeM = modal({ title: '🎁 ¡Cofre!', body: box, cls: 'chestm', buttons: [{ label: '…', cls: 'ghost', onClick: () => {} }] }); const bt0 = document.querySelector('#modal .mbtns'); if (bt0) bt0.remove();
+    sfx('buy');
+    later(() => {
+      sfx(r.item ? 'levelup' : 'win');
+      box.innerHTML = '';
+      if (r.item) box.appendChild(h('div', { class: 'reveal r-' + r.item.rarity, style: `--rc:${D.RARITY[r.item.rarity].color}` }, itemPreview(r.item, p.look), h('b', { text: r.item.name }), h('small', { text: D.RARITY[r.item.rarity].name + ' · ' + D.CATS.find((c) => c.id === r.item.cat).name })));
+      else box.appendChild(h('p', { class: 'wh-prize', text: `¡Ya tienes todo! +${r.coins} monedas` }));
+      const row = h('div', { class: 'row' });
+      if (r.item) row.appendChild(h('button', { class: 'btn gold', type: 'button', onclick: () => { St.equip(r.item.id); sfx('select'); close(); } }, 'Equipar'));
+      row.appendChild(h('button', { class: 'btn' + (r.item ? ' ghost' : ' gold'), type: 'button', onclick: () => close() }, r.item ? 'Guardar' : '¡Genial!'));
+      box.appendChild(row); announceAch(r.ach);
+    }, 1100);
+    function close() { closeM(); if (after) after(); }
+  }
   function itemPreview(it, look) {
     const cv = h('canvas', { class: 'px iprev' });
     const ctx = cv.getContext('2d'); ctx.imageSmoothingEnabled = false;
@@ -523,8 +541,12 @@
     else { cv.width = S.HERO_W; cv.height = S.HERO_H; ctx.drawImage(S.heroCanvas(L, it.cat === 'weapon' ? 'shoot' : 'idle', 0), 0, 0); }
     return cv;
   }
-  SCREENS.wardrobe = (params, sc) => {
+  SCREENS.wardrobe = (params, sc) => buildWardrobe(params, sc, {});
+  // opts.free: modo sala (todo gratis, sin comprar; al salir se restaura la ropa real) · opts.onChange(look)
+  function buildWardrobe(params, sc, opts) {
+    const FREE = !!opts.free;
     const p = St.profile(); let cat = params.cat || 'suit', sel = null;
+    const freeEquip = (patch) => { if (!p.lookBackup) p.lookBackup = JSON.parse(JSON.stringify(p.look)); Object.assign(p.look, patch); St.save(); if (opts.onChange) opts.onChange(p.look); };
     const pv = {}; // vista previa (no guardada)
     const stage = h('canvas', { class: 'px wprev' });
     const lookNow = () => Object.assign({}, p.look, pv);
@@ -537,7 +559,7 @@
     const grid = h('div', { class: 'igrid' });
     const bar = h('div', { class: 'ibar' });
     const summary = h('div', { class: 'wsum' });
-    function owned(id) { return p.owned.includes(id); }
+    function owned(id) { return FREE || p.owned.includes(id); }
     function renderTabs() {
       tabs.innerHTML = '';
       const all = [{ id: 'body', name: 'Aspecto', icon: '🙂' }].concat(D.CATS);
@@ -555,7 +577,7 @@
     }
     function choose(it) {
       sel = it.id; if (it.cat === 'emote') playEmoteOn(stage, stageBox, it, 3600); else { stage.classList.remove('jump'); void stage.offsetWidth; stage.classList.add('jump'); }
-      if (owned(it.id)) { St.equip(it.id); delete pv[it.cat]; sfx('select'); }
+      if (owned(it.id)) { if (FREE) freeEquip({ [it.cat]: it.id }); else St.equip(it.id); delete pv[it.cat]; sfx('select'); }
       else { pv[it.cat] = it.id; sfx('click'); }
       renderAll();
     }
@@ -565,8 +587,8 @@
     }
     function renderBar() { bar.innerHTML = ''; bar.hidden = true; }
     function renderBody() {
-      const sw = (c, i, key) => h('button', { class: 'copt' + (p.look[key] === i ? ' on' : ''), 'aria-label': (key === 'skin' ? 'Piel ' : 'Pelo ') + (i + 1), onclick: () => { St.setLook({ [key]: i }); sfx('click'); renderAll(); } }, h('i', { class: 'sw', style: 'background:' + c }));
-      const gbtn = (g, label) => h('button', { class: 'gbtn' + (p.look.gender === g ? ' on' : ''), onclick: () => { if (p.look.gender === g) return; St.setLook({ gender: g }); sfx('select'); renderAll(); } }, headThumb(Object.assign({}, p.look, { gender: g }), ''), h('b', { text: label }));
+      const sw = (c, i, key) => h('button', { class: 'copt' + (p.look[key] === i ? ' on' : ''), 'aria-label': (key === 'skin' ? 'Piel ' : 'Pelo ') + (i + 1), onclick: () => { if (FREE) freeEquip({ [key]: i }); else St.setLook({ [key]: i }); sfx('click'); renderAll(); } }, h('i', { class: 'sw', style: 'background:' + c }));
+      const gbtn = (g, label) => h('button', { class: 'gbtn' + (p.look.gender === g ? ' on' : ''), onclick: () => { if (p.look.gender === g) return; if (FREE) freeEquip({ gender: g }); else St.setLook({ gender: g }); sfx('select'); renderAll(); } }, headThumb(Object.assign({}, p.look, { gender: g }), ''), h('b', { text: label }));
       grid.className = 'bodypanel';
       grid.appendChild(h('div', { class: 'cgroup' }, h('h3', { text: 'Cuerpo' }), h('div', { class: 'gender' }, gbtn('m', 'Hombre'), gbtn('f', 'Mujer'))));
       grid.appendChild(h('div', { class: 'cgroup' }, h('h3', { text: 'Piel' }), h('div', { class: 'copts' }, D.SKINS.map((c, i) => sw(c, i, 'skin')))));
@@ -577,7 +599,7 @@
       if (cat === 'body') renderBody();
       else { const items = D.ITEMS.filter((i) => i.cat === cat).sort((a, b) => (owned(b.id) - owned(a.id)) || a.price - b.price); items.forEach((it) => grid.appendChild(itemCard(it))); }
       renderBar(); refreshCoins();
-      summary.textContent = `Colección: ${p.owned.length}/${D.ITEMS.length} objetos`;
+      summary.textContent = FREE ? '🎁 En la sala toda la ropa es gratis. Al salir recuperas tu ropa de siempre.' : `Colección: ${p.owned.length}/${D.ITEMS.length} objetos`;
     }
     const chest = h('button', { class: 'chestbtn', onclick: () => {
       const r = St.openChest(false); if (!r.ok) { sfx('deny'); toast(r.err, 'warn'); return; }
@@ -586,9 +608,9 @@
       modal({ title: '¡Cofre abierto!', body, cls: 'chestm', buttons: r.item ? [{ label: 'Equipar', onClick: () => { St.equip(r.item.id); cat = r.item.cat; sel = r.item.id; renderAll(); } }, { label: 'Guardar', cls: 'ghost', onClick: () => { cat = r.item.cat; renderAll(); } }] : [{ label: 'Genial' }] });
       if (r.item) sfx('levelup'); announceAch(r.ach); renderAll();
     } }, img('chest', 4), h('div', null, h('b', { text: 'Cofre misterioso' }), h('small', { text: 'Un objeto al azar que aún no tengas' })), h('span', { class: 'ibadge price' }, img('coin', 2), h('b', { text: String(St.CHEST_COST) })));
-    sc.appendChild(h('div', { class: 'wardrobe' }, topbar(), stageBox, tabs, h('div', { class: 'wscroll' }, chest, grid, summary), bar));
+    sc.appendChild(h('div', { class: 'wardrobe' + (FREE ? ' free' : '') }, FREE ? null : topbar(), stageBox, tabs, h('div', { class: 'wscroll' }, FREE ? null : chest, grid, summary), bar));
     renderAll();
-  };
+  }
 
   /* ============================================================
    * METAS (misiones + logros)
@@ -637,6 +659,7 @@
       shop.appendChild(h('h3', { class: 'h3', text: 'Canjear sigmas  Σ ' + (p.sigma || 0) }));
       St.EXCHANGE.forEach((e) => shop.appendChild(h('button', { class: 'wh-item', disabled: (p.sigma || 0) < e.cost, onclick: () => {
         const r = St.exchange(e.id); if (!r.ok) { toast(r.err); return; } sfx('buy');
+        if (r.chest && r.chest.ok) { refresh(); refreshCoins(); chestReveal(r.chest, refresh); return; }
         toast(`¡Canjeaste ${esc(e.name)}!` + (r.chest ? (r.chest.item ? ' Te tocó: ' + esc(r.chest.item.name) : ' +' + r.chest.coins + ' monedas') : ''), 'ach'); refresh(); refreshCoins();
       } }, h('span', { class: 'wi-ico', text: e.icon }), h('span', { class: 'wi-n', text: e.name }), h('b', { text: e.cost + ' Σ' }))));
     }
@@ -670,6 +693,7 @@
       const pz = r.prize; let extra = '';
       const p1 = St.profile(); if (pz.coins) extra += `<br>Monedas: ${b0.c} → <b>${p1.coins}</b>`; if (pz.sigma) extra += `<br>Sigmas: ${b0.s} → <b>${p1.sigma || 0}</b>`;
       if (r.chest) extra = r.chest.item ? ` Conseguiste: ${esc(r.chest.item.name)}` : ` +${r.chest.coins} monedas`;
+      if (r.chest && r.chest.ok) { refresh(); chestReveal(r.chest, refresh); return; }
       modal({ title: '¡Premio!', body: h('div', { class: 'wh-prize' }, h('div', { class: 'wp-ico', text: pz.icon }), h('b', { text: pz.coins ? '+' + pz.coins + ' monedas' : pz.sigma ? '+' + pz.sigma + ' sigmas' : pz.label }), h('small', { html: extra })), buttons: [{ label: '¡Genial!', cls: 'gold', onClick: refresh }] });
       refresh();
     }
@@ -779,6 +803,6 @@
     go('title');
   }
 
-  const kit = { emoteWheel, ownedEmotes, playEmoteOn, h, add, esc, img, sfx, modal, toast, topbar, avatarEl, headThumb, liveHero, villainEl, go, later, refreshCoins, announceAch, plural, $, $$, onLeave: (f) => cleanups.push(f), setAmbient, SCREENS, MUSIC };
+  const kit = { buildWardrobe, emoteWheel, ownedEmotes, playEmoteOn, h, add, esc, img, sfx, modal, toast, topbar, avatarEl, headThumb, liveHero, villainEl, go, later, refreshCoins, announceAch, plural, $, $$, onLeave: (f) => cleanups.push(f), setAmbient, SCREENS, MUSIC };
   root.DuiXUI = { boot, go, toast, kit, _cur: () => cur, _battle: () => battle, SCREENS };
 })(typeof window !== 'undefined' ? window : globalThis);

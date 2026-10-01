@@ -147,6 +147,7 @@
       h('div', { class: 'set-block' }, h('h3', { text: 'Temas' }), h('div', { class: 'row' }, h('button', { type: 'button', class: 'btn small ghost', onclick: () => { TOPICS.forEach((v) => c.topics.add(v.topic)); sfx('click'); drawChips(); } }, 'Todos')), chips,
         h('small', { class: 'hint', text: 'Con un solo tema pelean contra su villano; con varios, contra El Indeterminado.' })),
       h('div', { class: 'set-block' }, h('h3', { text: 'Modo de juego' }),
+        switchRow('🗺️ Mapa con misiones (tipo Among Us)', 'Caminan por un mapa, los 3 juegos son misiones, el impostor elimina y se reportan los cuerpos', () => c.world !== false, (v) => { c.world = v; }),
         switchRow('Mezclar los 3 juegos', 'Disparo → Carrera → Laberinto Pac-Man (las preguntas se reparten entre los tres)', () => c.mix !== false, (v) => { c.mix = v; }),
         impRow(c)),
       h('div', { class: 'set-block' }, secsRow(c),
@@ -158,7 +159,7 @@
     return h('div', { class: 'set col' }, h('div', null, h('b', { text: 'Tiempo por pregunta' }), h('small', { text: 'Segundos que tarda la respuesta en llegar al héroe (15 s a 1 min). Vale para todos.' })), h('div', { class: 'secsrow' }, h('span', { text: '15' }), rng, h('span', { text: '60' }), out));
   }
   SCREENS.roomCreate = (_, sc) => {
-    const c = { n: 9, level: 0, topics: new Set(TOPICS.map((v) => v.topic)), secs: 30, hostPlays: true, mix: true, imp: 1 };
+    const c = { n: 9, level: 0, topics: new Set(TOPICS.map((v) => v.topic)), secs: 30, hostPlays: true, mix: true, imp: 1, world: true };
     const blocks = configBlocks(c);
     const msg = h('p', { class: 'hint err', role: 'alert' }), btn = h('button', { class: 'btn big', type: 'button' }, 'Crear sala');
     btn.addEventListener('click', async () => {
@@ -181,7 +182,7 @@
   async function createRoom(c) {
     const p = St.profile();
     await N.ready();
-    const cfg = { n: c.n, level: c.level, topics: Array.from(c.topics), secs: Math.max(15, Math.min(60, c.secs || 30)), hostPlays: !!c.hostPlays, mix: c.mix !== false, imp: c.imp === undefined ? 0 : c.imp, seed: Math.floor(Math.random() * 4294967295), v: 4 };
+    const cfg = { n: c.n, level: c.level, topics: Array.from(c.topics), secs: Math.max(15, Math.min(60, c.secs || 30)), hostPlays: !!c.hostPlays, mix: c.mix !== false, world: c.world !== false, imp: c.imp === undefined ? 0 : c.imp, seed: Math.floor(Math.random() * 4294967295), v: 4 };
     let code = '', ok = false;
     for (let i = 0; i < 10 && !ok; i++) { code = newCode(); ok = (await N.get('rooms/' + code + '/state')) === null; }
     if (!ok) throw new Error('No se pudo crear un código libre. Inténtalo otra vez.');
@@ -198,21 +199,23 @@
   SCREENS.room = (params, sc) => {
     const code = params.code, role = params.role, p = St.profile(), pid = p.id, isHost = role === 'host';
     const P = 'rooms/' + code;
-    const R = { cfg: null, state: null, players: {}, pos: {}, playersLoaded: false, hostOnline: true, votes: {}, sab: null };
+    const R = { cfg: null, state: null, players: {}, pos: {}, playersLoaded: false, hostOnline: true, votes: {}, sab: null, bodies: {} };
     const my = { finished: false, report: null, rewarded: null, back: false, round: -1 };
     const subs = [], timers = [];
     let viewKey = '', left = false, offline = false, battle = null, questions = null, lastWrite = 0, writeT = 0, pending = null, lastRank = 0, renderT = 0, cdTimer = 0, plaza = null, refs = {};
-    let waitEl = null, waitIdx = -1, waitKey = '';
+    let waitEl = null, waitIdx = -1, waitKey = '', world = null, wmeet = null;
     let usedEmg = false, lastMeetId = '', meetEl = null, meetIv = 0;
     let seg = null, fx = { speedUntil: 0 }, impCd = 0, lastCp = 0, voteOpen = false, lastSabId = '', announced = {}, cdTick = 0;
     const box = h('div', { class: 'room' });
     const holder = h('div', { class: 'btholder', hidden: true });
     const banner = h('div', { class: 'rbanner', hidden: true });
     const rankEl = h('div', { class: 'bt-rank', 'aria-label': 'Ranking en vivo' });
-    sc.appendChild(h('div', { class: 'roomwrap' }, banner, box)); sc.appendChild(holder);
+    const wbox = h('div', { class: 'wbox', hidden: true }), ovl = h('div', { class: 'wovl' });
+    sc.appendChild(h('div', { class: 'roomwrap' }, banner, box)); sc.appendChild(wbox); sc.appendChild(holder); document.body.appendChild(ovl);
     A.play('menu');
 
     const playing = () => !isHost || !!(R.cfg && R.cfg.hostPlays);
+    const wmode = () => !!(R.cfg && R.cfg.world !== false) && !!root.DuiXWorld;
     const nowMs = () => N.now();
     const round = () => (R.state && R.state.round) || 0;
     const myP = () => R.players[pid] || null;
@@ -223,6 +226,7 @@
       if (left) return; left = true; if (p.lookBackup) { p.look = Object.assign({}, p.lookBackup); delete p.lookBackup; St.save(); }
       subs.forEach((f) => { try { f(); } catch (e) { /* ok */ } }); timers.forEach(clearInterval); clearTimeout(writeT); clearTimeout(renderT); clearInterval(cdTimer); killPlaza();
       if (battle) { try { battle.destroy(); } catch (e) { /* ok */ } battle = null; }
+      if (world) { try { world.destroy(); } catch (e) { /* ok */ } world = null; } try { ovl.remove(); } catch (e) { /* ok */ } document.querySelectorAll('.wroom').forEach((x) => x.remove());
       try { N.remove(P + '/pos/' + pid).catch(() => {}); } catch (e) { /* ok */ }
     }
     K.onLeave(stop);
@@ -238,13 +242,14 @@
     /* ----- suscripciones ----- */
     subs.push(N.on(P + '/cfg', (cfg) => { if (cfg) { R.cfg = cfg; if (R.state) render(false); } }));
     subs.push(N.on(P + '/pos', (v) => { R.pos = v || {}; }));
+    subs.push(N.on(P + '/bodies', (v) => { R.bodies = v || {}; }));
     subs.push(N.on(P + '/players', (v) => { R.players = v || {}; R.playersLoaded = true; onPlayers(); }));
     subs.push(N.on(P + '/hostOnline', (v) => { R.hostOnline = v !== false; if (!isHost) setBanner(!R.hostOnline && R.state && R.state.phase !== 'end' ? 'El anfitrión perdió la conexión. Espera…' : ''); }));
     subs.push(N.on(P + '/state', (s) => {
       if (s === null) { if (R.state && R.state.phase === 'end') return; showClosed(); return; }
       const prev = R.state; R.state = s;
       if ((s.round || 0) !== my.round) { // nueva ronda: todo vuelve a empezar
-        if (my.round >= 0) { my.finished = false; my.report = null; my.rewarded = null; my.back = false; questions = null; seg = null; announced = {}; if (battle) { try { battle.destroy(); } catch (e) { /* ok */ } battle = null; clearOverlays(); sc.classList.remove('s-battle'); holder.hidden = true; box.hidden = false; K.setAmbient(true, 'room'); } if (prev && prev.phase === 'end' && s.phase === 'lobby') toast('¡El anfitrión abrió una nueva partida!', ''); }
+        if (my.round >= 0) { my.finished = false; my.report = null; my.rewarded = null; my.back = false; my.dead = null; my.dying = false; my.endT = 0; my.tasks = null; questions = null; seg = null; announced = {}; if (world) { try { world.destroy(); } catch (e) { /* ok */ } world = null; } wmeet = null; wbox.hidden = true; clearOverlays(); if (battle) { try { battle.destroy(); } catch (e) { /* ok */ } battle = null; clearOverlays(); sc.classList.remove('s-battle'); holder.hidden = true; box.hidden = false; K.setAmbient(true, 'room'); } if (prev && prev.phase === 'end' && s.phase === 'lobby') toast('¡El anfitrión abrió una nueva partida!', ''); }
         my.round = s.round || 0; viewKey = '';
       }
       if (seg) { if (waitEl) tryAdvance(); else if (battle && (s.seg || 0) > seg.i && s.phase === 'countdown') { const bs = battle.state || {}; segDone({ score: Math.round(bs.score || 0), correct: bs.correct || 0, answered: bs.answered || 0, mistakes: bs.mistakes || [], bestStreak: bs.bestStreak || 0 }); } }
@@ -252,6 +257,7 @@
     }));
     function onPlayers() {
       const ph = R.state && R.state.phase;
+      if (world) { const m2 = myP(); if (m2 && m2.dead && !my.dead && !my.dying && !wmeet) becomeGhost(m2.dead); if (wmeet) updateMeetUI(); const nw = Date.now(); if (battle && nw - lastRank > 900) { lastRank = nw; updateRank(); if (battle.refresh) battle.refresh(); } updateWorldHud(); if (ph === 'end') render(true); return; }
       if (waitEl) { buildWait(seg && seg.i >= seg.plan.length); tryAdvance(); return; }
       if (battle) { const now = Date.now(); if (now - lastRank > 900) { lastRank = now; updateRank(); if (battle.refresh) battle.refresh(); } return; }
       if (refs.plist) { refreshPlaza(); return; }
@@ -267,6 +273,8 @@
       let firstAt = 0, allAt = 0, lastSeg = -1;
       timers.push(setInterval(() => {   // el anfitrión sincroniza: todos juegan el mismo juego a la vez
         const s = R.state; if (left || offline || !s || s.phase !== 'countdown' || !R.cfg) return;
+        if (wmode()) { worldHostTick(); return; }
+        if (nImpsAll() && !Object.keys(imps()).some((id) => !isDead(id) && R.players[id] && R.players[id].online !== false) && nowMs() - (s.t0 || nowMs()) > 6000) { hostEnd('crew'); return; }
         const cur = s.seg || 0, plan = segPlan(R.cfg).length;
         if (cur !== lastSeg) { lastSeg = cur; firstAt = 0; allAt = 0; }
         if (cur < plan && nowMs() - (s.t0 || nowMs()) > 3500) {
@@ -284,16 +292,17 @@
         else if (el > 20 * 60 * 1000) hostEnd();
       }, 1000));
     }
-    function hostEnd() { const s = R.state; if (!s || s.phase === 'end') return; N.update(P, { state: { phase: 'end', t0: N.TS, round: round(), seg: s.seg || 0, imps: s.imps || null } }).catch(() => {}); }
+    function hostEnd(win) { const s = R.state; if (!s || s.phase === 'end') return; N.update(P, { state: { phase: 'end', t0: N.TS, round: round(), seg: s.seg || 0, imps: s.imps || null, win: win || null } }).catch(() => {}); }
     async function hostStart() {
       const n = Object.keys(R.players).length;
       if (!n) { toast('Aún no hay jugadores.', 'warn'); sfx('deny'); return; }
       const ids = Object.keys(R.players).filter((id) => R.players[id].online !== false), cfgImp = (R.cfg && R.cfg.imp) || 0, want = Math.min(cfgImp < 0 ? Math.max(1, Math.round(ids.length / 5)) : cfgImp, Math.floor((ids.length - 1) / 2)), imps = {};
       if (ids.length >= 3) { const pool = ids.slice(); for (let k = 0; k < want; k++) { const i = Math.floor(Math.random() * pool.length); imps[pool.splice(i, 1)[0]] = true; } }
-      try { sfx('go'); await N.update(P, { state: { phase: 'countdown', t0: N.TS, round: round(), seg: 0, imps: Object.keys(imps).length ? imps : null }, votes: null, sab: null }); } catch (e) { toast(netErr(e), 'warn'); }
+      try { sfx('go'); const upd0 = { state: { phase: 'countdown', t0: N.TS, round: round(), seg: 0, imps: Object.keys(imps).length ? imps : null }, votes: null, sab: null, bodies: null, meet: null, kills: null, pos: null }; Object.keys(R.players).forEach((id) => { upd0['players/' + id + '/dead'] = null; upd0['players/' + id + '/td'] = 0; upd0['players/' + id + '/tn'] = null; upd0['players/' + id + '/done'] = false; }); await N.update(P, upd0); } catch (e) { toast(netErr(e), 'warn'); }
     }
     async function hostRematch() {
       const upd = {}; Object.keys(R.players).forEach((id) => { if (R.players[id].online === false) upd['players/' + id] = null; else { upd['players/' + id + '/score'] = 0; upd['players/' + id + '/correct'] = 0; upd['players/' + id + '/qi'] = 0; upd['players/' + id + '/done'] = false; upd['players/' + id + '/sd'] = 0; } });
+      upd.bodies = null; upd.meet = null; upd.kills = null; upd.votes = null; upd.pos = null; Object.keys(R.players).forEach((id) => { if (R.players[id].online !== false) { upd['players/' + id + '/dead'] = null; upd['players/' + id + '/td'] = 0; upd['players/' + id + '/tn'] = null; } });
       upd['cfg/seed'] = Math.floor(Math.random() * 4294967295); upd.state = { phase: 'lobby', t0: N.TS, round: round() + 1, seg: 0 };
       try { sfx('select'); await N.update(P, upd); } catch (e) { toast(netErr(e), 'warn'); }
     }
@@ -301,9 +310,9 @@
     /* ----- ranking dentro del combate ----- */
     function updateRank() {
       const rk = ranking(), me = rk.findIndex((x) => x.id === pid); rankEl.innerHTML = '';
-      const chip = (x, i) => h('span', { class: 'rk' + (x.id === pid ? ' me' : '') }, h('b', { text: String(i + 1) }), K.headThumb(x.look || {}, ''), h('span', { text: String(x.name).slice(0, 8) }), h('span', { text: String(x.score || 0) }));
-      rk.slice(0, 3).forEach((x, i) => rankEl.appendChild(chip(x, i)));
-      if (me >= 3) rankEl.appendChild(chip(rk[me], me));
+      const chip = (x, i) => h('span', { class: 'rk' + (x.id === pid ? ' me' : '') + (x.dead ? ' dead' : '') }, h('b', { text: String(i + 1) }), K.headThumb(x.look || {}, ''), h('span', { text: (x.dead ? '💀' : '') + String(x.name).slice(0, 8) }), h('span', { text: String(x.score || 0) }));
+      rk.forEach((x, i) => rankEl.appendChild(chip(x, i)));
+      const meChip = rankEl.querySelector('.me'); if (meChip && rankEl.scrollWidth > rankEl.clientWidth && me >= 0 && !rankEl.dataset.sc) { rankEl.dataset.sc = '1'; try { rankEl.scrollLeft = Math.max(0, meChip.offsetLeft - 40); } catch (e) { /* ok */ } }
     }
     const sharedHp = () => { const ps = Object.values(R.players), tot = ps.length * ((R.cfg && R.cfg.n) || 1), done = ps.reduce((s, x) => s + (x.correct || 0), 0), frac = tot ? 1 - done / tot : 1; return { frac, text: Math.round(frac * 100) + '%' }; };
 
@@ -322,7 +331,8 @@
     };
     const imps = () => (R.state && R.state.imps) || {};
     const amImp = () => !!imps()[pid];
-    const nImps = () => Object.keys(imps()).length;
+    const nImpsAll = () => Object.keys(imps()).length;
+    const nImps = () => Object.keys(imps()).filter((id) => !isDead(id)).length;
     // ¿quién ya fue descubierto? (se calcula igual en todos los celulares a partir de los votos)
     const isDead = (id) => !!(R.players[id] && R.players[id].dead);
     function expelledMap() { const out = {}; Object.keys(imps()).forEach((id) => { if (isDead(id)) out[id] = true; }); return out; }
@@ -332,9 +342,10 @@
       return { score: b.score + Math.round(bs.score || 0), correct: b.correct + (bs.correct || 0), answered: b.answered + (bs.answered || 0), mistakes: a.mistakes.concat(bs.mistakes || []), bestStreak: Math.max(a.bestStreak, bs.bestStreak || 0) };
     }
     const adjScore = (d) => { if (battle && battle.state) battle.state.score = Math.max(0, (battle.state.score || 0) + d); else if (seg) seg.base.score = Math.max(0, seg.base.score + d); };
-    const overlay = (cls, html, ms) => { const e = h('div', { class: 'rov ' + cls, html }); holder.appendChild(e); if (ms) setTimeout(() => { e.classList.add('out'); setTimeout(() => e.remove(), 350); }, ms); return e; };
-    const clearOverlays = () => { clearInterval(meetIv); meetEl = null; holder.querySelectorAll('.rov,.imp-ui').forEach((e) => e.remove()); holder.classList.remove('fog'); waitEl = null; waitIdx = -1; waitKey = ''; };
+    const overlay = (cls, html, ms) => { const e = h('div', { class: 'rov ' + cls, html }); (wmode() ? ovl : holder).appendChild(e); if (ms) setTimeout(() => { e.classList.add('out'); setTimeout(() => e.remove(), 350); }, ms); return e; };
+    const clearOverlays = () => { clearInterval(meetIv); meetEl = null; holder.querySelectorAll('.rov,.imp-ui').forEach((e) => e.remove()); ovl.querySelectorAll('.rov').forEach((e) => e.remove()); holder.classList.remove('fog'); waitEl = null; waitIdx = -1; waitKey = ''; };
     function startBattle() {
+      if (wmode()) { startWorld(); return; }
       if (battle || my.finished || left || !R.cfg) return;
       killPlaza(); questions = buildRoomQuestions(R.cfg);
       K.setAmbient(false); sc.classList.add('s-battle'); box.hidden = true; holder.hidden = false; setBanner('');
@@ -392,12 +403,12 @@
     const activePlayers = () => Object.keys(R.players).filter((id) => R.players[id].online !== false && !R.players[id].done);
     function buildWait(last) {
       if (!waitEl || !seg) return;
-      const idx = waitIdx, ids = Object.keys(R.players), others = ids.filter((id) => id !== pid && !isDead(id));
+      const idx = waitIdx, ids = Object.keys(R.players), others = ids.filter((id) => !isDead(id));
       const key = ids.filter((id) => !isDead(id)).join(',') + '|' + last; if (key === waitKey) { updateWait(); return; } waitKey = key;
       const name = KIND_NAME[seg.plan[idx][0]] || 'Juego', myV = (R.votes && R.votes[idx] && R.votes[idx][pid]) || null;
       waitEl.innerHTML = '';
       const vote = (id) => { N.set(P + '/votes/' + idx + '/' + pid, id || '-').catch(() => {}); sfx(id ? 'select' : 'back'); R.votes = R.votes || {}; (R.votes[idx] = R.votes[idx] || {})[pid] = id || '-'; waitKey = ''; buildWait(last); };
-      const grid = nImps() && playing() ? h('div', { class: 'vgrid' }, others.map((id) => h('button', { type: 'button', class: 'vopt' + (myV === id ? ' sel' : ''), onclick: () => vote(id) }, K.headThumb(R.players[id].look || {}, ''), h('b', { text: String(R.players[id].name || '?').slice(0, 10) })))) : null;
+      const grid = nImps() && playing() ? h('div', { class: 'vgrid' }, others.map((id) => h('button', { type: 'button', class: 'vopt' + (myV === id ? ' sel' : ''), onclick: () => vote(id) }, K.headThumb(R.players[id].look || {}, ''), h('b', { text: String(R.players[id].name || '?').slice(0, 10) + (id === pid ? ' (tú)' : '') })))) : null;
       waitEl.appendChild(h('div', { class: 'vbox' },
         h('small', { class: 'vt', text: last ? 'FIN DEL ÚLTIMO JUEGO' : 'JUEGO TERMINADO · ' + name }),
         h('h2', { text: nImps() && playing() ? '🚨 ¿Quién es el impostor?' : '¡Terminaste!' }),
@@ -472,7 +483,7 @@
       const cand = Object.keys(R.players).filter((id) => id !== pid && !imps()[id] && !isDead(id) && R.players[id].online !== false && !R.players[id].done);
       if (!cand.length) { toast('No hay a quién eliminar ahora.', 'warn'); return; }
       const e = h('div', { class: 'rov vote kill' }, h('div', { class: 'vbox' }, h('small', { class: 'vt', text: '☠️ ELIMINAR' }), h('h2', { text: '¿A quién se come el villano?' }),
-        h('div', { class: 'vgrid' }, cand.map((id) => h('button', { type: 'button', class: 'vopt', onclick: () => { e.remove(); killCd = Date.now() + 40000; N.set(P + '/kills/' + Math.random().toString(36).slice(2, 8), { by: pid, target: id, t: N.now() }).catch(() => {}); sfx('boom'); toast('☠️ Eliminaste a ' + R.players[id].name, ''); } }, K.headThumb(R.players[id].look || {}, ''), h('b', { text: String(R.players[id].name || '?').slice(0, 10) })))),
+        h('div', { class: 'vgrid' }, cand.map((id) => h('button', { type: 'button', class: 'vopt', onclick: () => { e.remove(); killCd = Date.now() + 40000; const ku = {}; ku['players/' + id + '/dead'] = 'kill'; ku['kills/' + Math.random().toString(36).slice(2, 8)] = { by: pid, target: id, t: N.now() }; N.update(P, ku).catch(() => {}); if (R.players[id]) R.players[id].dead = 'kill'; sfx('boom'); toast('☠️ Eliminaste a ' + R.players[id].name, ''); } }, K.headThumb(R.players[id].look || {}, ''), h('b', { text: String(R.players[id].name || '?').slice(0, 10) })))),
         h('button', { type: 'button', class: 'btn ghost small', onclick: () => e.remove() }, 'Cancelar')));
       holder.appendChild(e);
     }
@@ -480,8 +491,9 @@
       if (!v || typeof v !== 'object') return;
       Object.keys(v).forEach((id) => {
         const k = v[id]; if (!k || handledKills[id] || N.now() - (k.t || 0) > 20000) return; handledKills[id] = 1;
-        if (k.target === pid) { if (left || my.finished || !seg || !playing()) return; const st0 = battle && battle.state; if (st0) st0.paused = true; clearInterval(meetIv); meetEl = null; holder.querySelectorAll('.rov.vote').forEach((x) => x.remove()); const stage = h('div', { class: 'rov eat kill' }); holder.appendChild(stage); ejectAnim(stage, pid, () => { stage.remove(); dieNow('kill'); }, true); }
-        else if (!left) toast('💀 ' + ((R.players[k.target] || {}).name || 'Alguien') + ' fue devorado por el villano', 'warn');
+        if (k.target === pid && wmode()) { onMyKill(); }
+        else if (k.target === pid) { if (left || my.finished || !seg || !playing()) return; const st0 = battle && battle.state; if (st0) st0.paused = true; clearInterval(meetIv); meetEl = null; holder.querySelectorAll('.rov.vote').forEach((x) => x.remove()); const stage = h('div', { class: 'rov eat kill' }); holder.appendChild(stage); ejectAnim(stage, pid, () => { stage.remove(); dieNow('kill'); }, true); }
+        else if (!left && !wmode()) { toast('💀 ' + ((R.players[k.target] || {}).name || 'Alguien') + ' fue devorado por el villano', 'warn'); overlay('segban', '<b>💀</b><small>' + esc2((R.players[k.target] || {}).name || 'Alguien') + ' fue devorado</small>', 1600); }
       });
     }
     subs.push(N.on(P + '/kills', onKills));
@@ -489,7 +501,7 @@
     function finishMine(rep, quit, dead) {
       if (my.finished || left) return; my.finished = true; my.report = rep;
       if (battle) { try { battle.destroy(); } catch (e) { /* ok */ } battle = null; }
-      clearOverlays(); seg = null;
+      clearOverlays(); seg = null; closeMeetUI(); if (world) { try { world.destroy(); } catch (e) { /* ok */ } world = null; } wbox.hidden = true;
       sc.classList.remove('s-battle'); holder.hidden = true; box.hidden = false; K.setAmbient(true, 'room'); A.play('menu');
       const upd = { done: true, finishedAt: N.TS }; if (rep) { upd.score = rep.score; upd.correct = rep.correct; upd.qi = rep.answered; }
       if (quit) upd.online = false; if (dead) { upd.dead = dead; my.dead = dead; }
@@ -535,13 +547,14 @@
       holder.appendChild(b);
     }
     function onMeet(v) {
+      if (wmode()) { onWMeet(v); return; }
       R.meet = v; if (!v || v.id === lastMeetId || left || my.finished || !seg || meetEl) return;
       if (!nImps() || !playing()) return;
       const remain = (v.t || 0) + MEET_SECS * 1000 - N.now(); if (remain < 3000) return;   // ya terminó
       lastMeetId = v.id; if (waitEl) { /* ya estás en sala de espera/votación: se mantiene */ }
       const st0 = battle && battle.state; if (st0) st0.paused = true;
       const key = 'e' + v.id, caller = (R.players[v.by] && R.players[v.by].name) || 'Alguien';
-      const others = Object.keys(R.players).filter((id) => id !== pid && R.players[id].online !== false && !R.players[id].done);
+      const others = Object.keys(R.players).filter((id) => R.players[id].online !== false && !isDead(id));
       let myV = null, resolved = false;
       meetEl = h('div', { class: 'rov vote emg' });
       holder.appendChild(meetEl); sfx('boom'); try { if (navigator.vibrate) navigator.vibrate([120, 60, 120]); } catch (e) { /* ok */ }
@@ -553,7 +566,7 @@
         meetEl.dataset.built = '1'; meetEl.innerHTML = '';
         meetEl.appendChild(h('div', { class: 'vbox emgbox' }, h('small', { class: 'vt', text: '🚨 REUNIÓN DE EMERGENCIA' }), h('h2', { text: caller + (v.by === pid ? ' (tú)' : '') + ' convocó una reunión' }),
           h('p', { class: 'vsub', text: 'El juego está en pausa para todos. ¿Quién creen que es el impostor? Acertar da +100 y fallar −40.' }),
-          h('div', { class: 'vgrid' }, others.map((id) => h('button', { type: 'button', class: 'vopt' + (myV === id ? ' sel' : ''), onclick: () => cast(id) }, K.headThumb(R.players[id].look || {}, ''), h('b', { text: String(R.players[id].name || '?').slice(0, 10) })))),
+          h('div', { class: 'vgrid' }, others.map((id) => h('button', { type: 'button', class: 'vopt' + (myV === id ? ' sel' : ''), onclick: () => cast(id) }, K.headThumb(R.players[id].look || {}, ''), h('b', { text: String(R.players[id].name || '?').slice(0, 10) + (id === pid ? ' (tú)' : '') })))),
           h('button', { type: 'button', class: 'btn ghost small', onclick: () => cast('-') }, myV === '-' ? '✓ No voto (cambiar)' : 'No sé · no votar'),
           h('small', { class: 'vtimer', text: '' })));
         render();
@@ -622,6 +635,190 @@
     }
     async function leaveGame() { lsDel(LSK); if (playing()) { try { await N.update(P + '/players/' + pid, { done: true, online: false }); } catch (e) { /* ok */ } } stop(); go('rooms'); }
 
+
+    /* ================= MODO MAPA (mundo tipo Among Us) ================= */
+    const WMEET_SECS = 30, KILL_CD = 20000;
+    const rid = () => Math.random().toString(36).slice(2, 8);
+    const meetBusy = () => !!(wmeet || (R.meet && !R.meet.res && N.now() - (R.meet.t || 0) < (WMEET_SECS + 8) * 1000) || (R.meet && R.meet.res && N.now() - (R.meet.res.t || 0) < 7000));
+    function assignTasks() {
+      const plan = segPlan(R.cfg), sts = root.DuiXWorld.STATIONS; let off = 0;
+      const hash = (str) => { let x = 0; for (let i = 0; i < str.length; i++) x = (x * 31 + str.charCodeAt(i)) >>> 0; return x; };
+      return plan.map(([kind, count]) => { const opts = sts.filter((x) => x.kind === kind), pick = opts[hash(pid + kind + ((R.cfg && R.cfg.seed) || 0)) % opts.length], t = { kind, count, off, st: pick.id, done: false }; off += count; return t; });
+    }
+    function startWorld() {
+      if (world || my.finished || left || !R.cfg) return;
+      killPlaza(); questions = buildRoomQuestions(R.cfg);
+      K.setAmbient(false); sc.classList.add('s-battle'); box.hidden = true; holder.hidden = true; wbox.hidden = false; setBanner('');
+      A.play('room');
+      seg = { plan: segPlan(R.cfg), i: 0, off: 0, base: { score: 0, correct: 0, answered: 0 }, agg: { mistakes: [], bestStreak: 0 }, world: true };
+      const mp = myP(); if (mp) { seg.base.score = mp.score || 0; seg.base.correct = mp.correct || 0; seg.base.answered = mp.qi || 0; if (mp.dead) my.dead = mp.dead; }
+      my.tasks = assignTasks(); const td0 = (mp && mp.td) || 0; my.tasks.forEach((t, i) => { if (i < td0) t.done = true; });
+      usedEmg = false; lastMeetId = ''; killCd = Date.now() + 12000; wmeet = null; clearOverlays();
+      world = root.DuiXWorld.mount(wbox, {
+        pid, getPlayers: () => R.players, getPos: () => R.pos, getBodies: () => R.bodies || {}, getLook: () => p.look,
+        setPos: (x, y, f, m) => { N.update(P + '/pos/' + pid, { x, y, f, m, w: 1 }).catch(() => {}); },
+        isImp: () => amImp(), isImpId: (id) => !!imps()[id],
+        getTasks: () => (my.tasks || []).map((t) => ({ kind: t.kind, st: t.st, done: t.done })),
+        killCd: () => Math.max(0, killCd - Date.now()), killMax: KILL_CD,
+        canEmergency: () => nImpsAll() > 0 && !usedEmg && !my.dead && !meetBusy(),
+        onUse: useStation, onEmergency: () => callMeeting(null), onReport: (bid) => callMeeting(bid), onKill: doWorldKill, onLeave: () => confirmLeave(),
+      });
+      root.__roomWorld = world; world.setTasks(my.tasks, amImp()); if (my.dead) world.setGhost(true);
+      N.update(P + '/players/' + pid, { tn: amImp() ? 0 : my.tasks.length, td: my.tasks.filter((t) => t.done).length }).catch(() => {});
+      updateRank(); updateWorldHud();
+      timers.push(setInterval(() => { if (!world || left) return; const m3 = myP(), tn3 = amImp() ? 0 : my.tasks.length, td3 = my.tasks.filter((x) => x.done).length; if (m3 && (m3.tn !== tn3 || (m3.td || 0) !== td3)) N.update(P + '/players/' + pid, { tn: tn3, td: td3 }).catch(() => {}); }, 5000));
+      const intro = () => { if (world) toast(amImp() ? '🕵️ Eres IMPOSTOR: acércate a un tripulante y pulsa ELIMINAR (sin que te vean).' : '🧑‍🚀 Camina con el joystick y busca las consolas ❗ para hacer tus misiones.', ''); };
+      if (nImpsAll() && playing()) roleCard(intro); else intro();
+    }
+    function updateWorldHud() {
+      if (!world) return; const ids = Object.keys(R.players).filter((id) => R.players[id].online !== false && !imps()[id]); let tn = 0, td = 0;
+      ids.forEach((id) => { const x = R.players[id], n = x.tn || 0; tn += n; td += Math.min(n, x.td || 0); });
+      world.setProgress(tn ? td / tn : 0, td + ' / ' + tn);
+    }
+    function backToWorld() { if (!world) return; holder.hidden = true; wbox.hidden = false; world.setActive(true); A.play('room'); }
+    function useStation(st) {
+      if (!world || battle || wmeet || my.finished || left) return;
+      const t = (my.tasks || []).find((x) => x.st === st.id);
+      if (amImp() && !(t && !t.done)) { sfx('select'); world.float('Fingiendo…', '#ffb3c0'); toast('🎭 Finges hacer la misión (nadie lo nota…)', ''); return; }
+      if (!t || t.done) { sfx('deny'); toast('Esa consola no es tu misión.', 'warn'); return; }
+      startTask(t);
+    }
+    function startTask(t) {
+      if (battle || !world || left) return; const idx = my.tasks.indexOf(t), cfg = R.cfg;
+      world.setActive(false); wbox.hidden = true; holder.hidden = false; A.play('battle'); updateRank();
+      const bcfg = {
+        container: holder, villain: roomVillain(cfg), tier: cfg.level || 2, look: p.look, perks: {}, noTutorial: true, lockSettings: true, fallSecs: cfg.secs || (cfg.more ? 40 : 30), extraTop: rankEl, speedMul,
+        room: { total: t.count, getQuestion: (i) => questions[t.off + i], hp: sharedHp, noHearts: true },
+        onProgress: (snap) => { if (seg) pushProgress({ score: seg.base.score + snap.score, correct: seg.base.correct + snap.correct, qi: seg.base.answered + snap.qi, over: false }, snap.over); },
+        onEnd: (rep) => { setTimeout(() => taskDone(idx, rep), 0); },
+        onQuit: () => abortTask(),
+      };
+      const kind = t.kind, factory = kind === 'shoot' ? (c2) => B.start(c2) : kind === 'run' ? (c2) => G.startRun(c2) : (c2) => G.startMaze(c2);
+      overlay('segban', '<b>' + KIND_NAME[kind] + '</b><small>Misión · ' + t.count + ' preguntas</small>', 1300);
+      battle = G.withTutorial(bcfg, kind, factory); root.__roomBattle = battle;
+      if (wmeet && battle.state) battle.state.paused = true;
+    }
+    function dropBattle() { if (battle) { try { battle.destroy(); } catch (e) { /* ok */ } battle = null; root.__roomBattle = null; } }
+    function taskDone(idx, rep) {
+      if (left || !seg || !my.tasks) return; const t = my.tasks[idx]; if (!t || t.done) return;
+      seg.base.score += rep.score; seg.base.correct += rep.correct; seg.base.answered += Math.max(rep.answered, 0);
+      seg.agg.mistakes = seg.agg.mistakes.concat(rep.mistakes || []); seg.agg.bestStreak = Math.max(seg.agg.bestStreak, rep.bestStreak || 0);
+      t.done = true; dropBattle();
+      const td = my.tasks.filter((x) => x.done).length;
+      N.update(P + '/players/' + pid, { td, score: seg.base.score, correct: seg.base.correct, qi: seg.base.answered }).catch(() => {});
+      if (R.players[pid]) R.players[pid].td = td;
+      backToWorld(); world.setTasks(my.tasks, amImp()); sfx('win'); world.float('¡Misión cumplida!', '#9dff8a'); world.burst(world.me.x, world.me.y - 12, '#9dff8a'); updateWorldHud();
+      toast(td >= my.tasks.length ? '🎉 ¡Completaste todas tus misiones! Ayuda a encontrar al impostor.' : '✅ Misión ' + td + ' de ' + my.tasks.length, 'ach');
+    }
+    function abortTask() { dropBattle(); backToWorld(); }
+    /* ----- el impostor elimina ----- */
+    function doWorldKill(tid, x, y) {
+      if (!amImp() || my.dead || wmeet || !R.players[tid] || R.players[tid].dead) return; killCd = Date.now() + KILL_CD;
+      const upd = {}; upd['players/' + tid + '/dead'] = 'kill'; upd['bodies/' + tid] = { x: Math.round(x), y: Math.round(y), t: N.TS }; upd['kills/' + rid()] = { by: pid, target: tid, t: N.now() };
+      N.update(P, upd).catch(() => {});
+      R.bodies = R.bodies || {}; R.bodies[tid] = { x, y }; R.players[tid].dead = 'kill';
+    }
+    function becomeGhost(how) {
+      if (my.dead && !my.dying) return; my.dead = how; my.dying = false; if (world) { world.setGhost(true); world.setFrozen(!!wmeet); world.setTasks(my.tasks || [], amImp()); }
+      N.update(P + '/players/' + pid, { dead: how }).catch(() => {});
+      if (battle) { const t = curTotals(); seg.base.score = t.score; seg.base.correct = t.correct; seg.base.answered = t.answered; abortTask(); }
+      toast(how === 'kill' ? '💀 Te eliminaron. Ahora eres un fantasma: sigue haciendo misiones.' : '🗳️ Te expulsaron. Ahora eres un fantasma: sigue haciendo misiones.', 'warn');
+    }
+    function onMyKill() {
+      if (!world || my.dying || my.dead || left) return; my.dying = true; world.setFrozen(true);
+      if (battle && battle.state) battle.state.paused = true;
+      const stage = h('div', { class: 'rov eat kill' }); ovl.appendChild(stage);
+      ejectAnim(stage, pid, () => { stage.remove(); becomeGhost('kill'); }, true);
+    }
+    /* ----- reuniones (emergencia o cuerpo reportado) ----- */
+    function callMeeting(bodyId) {
+      if (!world || left || my.dead || wmeet) return;
+      if (meetBusy()) { toast('Ya hay una reunión en curso.', 'warn'); sfx('deny'); return; }
+      if (bodyId == null) { if (usedEmg) { toast('Ya usaste tu reunión de emergencia.', 'warn'); sfx('deny'); return; } usedEmg = true; }
+      const m = { id: rid(), by: pid, t: N.now(), body: bodyId || null };
+      N.set(P + '/meet', m).catch(() => {}); onWMeet(m);
+    }
+    function closeMeetUI() { if (!wmeet) return; clearInterval(wmeet.iv); if (wmeet.el) wmeet.el.remove(); wmeet = null; }
+    function onWMeet(v) {
+      R.meet = v; if (!v || left || !world) return;
+      if (wmeet && wmeet.id === v.id) { if (v.res && !wmeet.done) resolveMeet(v.res.ej); return; }
+      if (v.id === lastMeetId || v.res) return;
+      if ((v.t || 0) + (WMEET_SECS + 4) * 1000 < N.now()) return;
+      if (wmeet) closeMeetUI();
+      lastMeetId = v.id; world.setFrozen(true); if (battle && battle.state) battle.state.paused = true;
+      const m = wmeet = { id: v.id, key: 'e' + v.id, v, done: false, myV: null, sig: '', el: h('div', { class: 'rov vote emg wmeet' }) };
+      ovl.appendChild(m.el); sfx('boom'); try { if (navigator.vibrate) navigator.vibrate([120, 60, 120]); } catch (e) { /* ok */ }
+      buildMeetUI(); m.iv = setInterval(meetTick, 400); timers.push(m.iv); meetTick();
+    }
+    const votersNow = () => Object.keys(R.players).filter((id) => R.players[id].online !== false && !isDead(id));
+    function buildMeetUI() {
+      const m = wmeet; if (!m) return; const v = m.v, caller = (R.players[v.by] && R.players[v.by].name) || 'Alguien', victim = v.body && R.players[v.body] ? R.players[v.body].name : '';
+      const ids = Object.keys(R.players).filter((id) => R.players[id].online !== false), vs = (R.votes && R.votes[m.key]) || {};
+      m.sig = ids.map((id) => id + (isDead(id) ? 'x' : '')).join(','); m.el.innerHTML = '';
+      const grid = h('div', { class: 'vgrid wv' }, ids.map((id) => {
+        const x = R.players[id], dead = isDead(id), b = h('button', { type: 'button', class: 'vopt' + (dead ? ' dead' : '') + (m.myV === id ? ' sel' : ''), 'data-id': id, disabled: dead || !!my.dead, onclick: () => castVote(id) }, K.headThumb(x.look || {}, ''), h('b', { text: (dead ? '💀 ' : '') + String(x.name || '?').slice(0, 10) + (id === pid ? ' (tú)' : '') }), h('i', { class: 'vbadge', text: '✓', hidden: !vs[id] }));
+        return b;
+      }));
+      m.el.appendChild(h('div', { class: 'vbox emgbox' },
+        h('small', { class: 'vt', text: v.body ? '💀 ¡CUERPO ENCONTRADO!' : '🚨 REUNIÓN DE EMERGENCIA' }),
+        h('h2', { text: caller + (v.by === pid ? ' (tú)' : '') + (v.body ? ' reportó el cuerpo de ' + (victim || 'alguien') : ' convocó una reunión') }),
+        h('p', { class: 'vsub', text: my.dead ? 'Eres un fantasma: puedes mirar, pero no votar.' : 'Hablen y voten: ¿quién es el impostor? Puedes votar por cualquiera, incluso por ti. Acertar +100 · fallar −40.' }),
+        grid,
+        my.dead ? null : h('button', { type: 'button', class: 'btn ghost small', onclick: () => castVote('-') }, m.myV === '-' ? '✓ Saltar voto (cambiar)' : 'Saltar voto'),
+        h('small', { class: 'vtimer', text: '' })));
+    }
+    function castVote(id) {
+      const m = wmeet; if (!m || m.done || my.dead) return; m.myV = id; sfx(id === '-' ? 'back' : 'select');
+      N.set(P + '/votes/' + m.key + '/' + pid, id).catch(() => {}); R.votes = R.votes || {}; (R.votes[m.key] = R.votes[m.key] || {})[pid] = id; updateMeetUI(true);
+    }
+    function updateMeetUI(force) {
+      const m = wmeet; if (!m || m.done) return; const ids = Object.keys(R.players).filter((id) => R.players[id].online !== false), sig = ids.map((id) => id + (isDead(id) ? 'x' : '')).join(',');
+      if (sig !== m.sig) { buildMeetUI(); }
+      const vs = (R.votes && R.votes[m.key]) || {}, act = votersNow();
+      m.el.querySelectorAll('.vopt').forEach((b) => { const id = b.getAttribute('data-id'); b.classList.toggle('sel', m.myV === id); const bd = b.querySelector('.vbadge'); if (bd) bd.hidden = !vs[id]; });
+      const secs = Math.max(0, Math.ceil(((m.v.t || 0) + WMEET_SECS * 1000 - N.now()) / 1000)), tm = m.el.querySelector('.vtimer');
+      if (tm) tm.textContent = '⏱ ' + secs + ' s · votaron ' + act.filter((id) => vs[id]).length + ' de ' + act.length;
+    }
+    function meetTick() {
+      const m = wmeet; if (!m || m.done) return; updateMeetUI();
+      const v = R.meet && R.meet.id === m.id ? R.meet : m.v; if (v.res) { resolveMeet(v.res.ej); return; }
+      const now = N.now(), end = (m.v.t || 0) + WMEET_SECS * 1000, vs = (R.votes && R.votes[m.key]) || {}, act = votersNow();
+      if (isHost && !m.hostWrote && (now >= end || (act.length && act.every((id) => vs[id]) && now > (m.v.t || 0) + 5000))) {
+        m.hostWrote = true; const ej = ejectTarget(vs), upd = { 'meet/res': { ej: ej || '-', t: N.TS }, bodies: null }; if (ej) upd['players/' + ej + '/dead'] = 'vote'; N.update(P, upd).catch(() => {});
+      }
+      if (now >= end + 7000) resolveMeet(ejectTarget(vs) || '-');   // por si el anfitrión se desconectó
+    }
+    function resolveMeet(ejId) {
+      const m = wmeet; if (!m || m.done) return; m.done = true; clearInterval(m.iv);
+      const ej = !ejId || ejId === '-' ? null : ejId;
+      if (m.myV && m.myV !== '-' && !amImp() && !my.dead) { const ok = !!imps()[m.myV]; adjScore(ok ? +100 : -40); toast(ok ? '🎯 ¡Acertaste! ' + ((R.players[m.myV] || {}).name || '') + ' ES impostor (+100)' : '❌ ' + ((R.players[m.myV] || {}).name || '') + ' es inocente (−40)', ok ? 'ach' : 'warn'); }
+      m.el.innerHTML = '';
+      ejectAnim(m.el, ej, () => {
+        if (wmeet !== m) return; m.el.remove(); wmeet = null; R.bodies = {};
+        if (seg) { const t = curTotals(); N.update(P + '/players/' + pid, { score: t.score, correct: t.correct, qi: t.answered }).catch(() => {}); }
+        if (world) { world.setFrozen(false); world.gather(Object.keys(R.players).indexOf(pid)); }
+        killCd = Math.max(killCd, Date.now() + 15000);
+        if (battle && battle.state) battle.state.paused = false;
+        if (ej === pid) becomeGhost('vote');
+      });
+    }
+    /* ----- el anfitrión decide cuándo termina la partida ----- */
+    function worldHostTick() {
+      const s = R.state, el = nowMs() - (s.t0 || nowMs()); if (el < 6000 || meetBusy()) return;
+      const ids = Object.keys(R.players).filter((id) => R.players[id].online !== false), allImp = Object.keys(imps());
+      const aImps = allImp.filter((id) => R.players[id] && !R.players[id].dead && R.players[id].online !== false), crew = ids.filter((id) => !imps()[id]), aCrew = crew.filter((id) => !R.players[id].dead);
+      let win = null;
+      if (allImp.length) { if (!aImps.length) win = 'crew'; else if (aCrew.length <= aImps.length) win = 'imp'; }
+      if (!win && crew.length && crew.every((id) => R.players[id].tn != null)) { let tn = 0, td = 0; crew.forEach((id) => { tn += R.players[id].tn || 0; td += Math.min(R.players[id].tn || 0, R.players[id].td || 0); }); if (tn > 0 && td >= tn) win = 'crew'; }
+      if (win) { hostEnd(win); return; }
+      if (!ids.length || el > 25 * 60 * 1000) hostEnd(allImp.length ? 'imp' : 'crew');
+    }
+    function worldFinish() {
+      if (my.finished || left) return; const t = curTotals(), win = R.state && R.state.win; let score = t.score;
+      if (amImp()) { if (win === 'imp') score += 150; } else if (win === 'crew') score += 100;
+      finishMine({ score, correct: t.correct, answered: t.answered, bestStreak: t.bestStreak, mistakes: t.mistakes, heartsLost: 0 });
+    }
+
     /* ----- vistas ----- */
     function boardFill(el, limit) {
       const rk = ranking(), n = (R.cfg && R.cfg.n) || 1; el.innerHTML = '';
@@ -649,14 +846,14 @@
       lsDel(LSK); stop(); go('rooms');
     }
     function openOutfit() {
-      let cat = D.CATS[0].id; const prev = h('canvas', { class: 'px oprev' }); K.liveHero(prev, () => p.look, { scale: 4 });
-      const tabs = h('div', { class: 'ctabs' }), grid = h('div', { class: 'ogrid' });
-      const draw = () => {
-        tabs.innerHTML = ''; D.CATS.forEach((c) => tabs.appendChild(h('button', { type: 'button', class: 'ctab' + (c.id === cat ? ' on' : ''), onclick: () => { cat = c.id; sfx('click'); draw(); } }, h('span', { text: c.icon || '•' }), h('b', { text: c.name }))));
-        grid.innerHTML = ''; const its = D.ITEMS.filter((i) => i.cat === cat);
-        its.forEach((it) => grid.appendChild(h('button', { type: 'button', class: 'ochip r-' + it.rarity + (p.look[it.cat] === it.id ? ' on' : ''), onclick: () => { if (!p.lookBackup) p.lookBackup = JSON.parse(JSON.stringify(p.look)); p.look[it.cat] = it.id; St.save(); sfx('select'); N.update(P + '/players/' + pid, { look: p.look }).catch(() => {}); draw(); } }, it.name)));
-      };
-      draw(); modal({ title: 'Cámbiate de ropa', body: h('div', { class: 'outfit' }, h('div', { class: 'oprevbox' }, prev), h('p', { class: 'hint', text: '🎁 Dentro de la sala toda la ropa es gratis. Al salir recuperas tu ropa de siempre.' }), tabs, grid), buttons: [{ label: 'Listo' }] });
+      if (document.querySelector('.wroom')) return;
+      const ov = h('div', { class: 'wroom' }), inner = h('div', { class: 'screen s-wardrobe' });
+      const close = () => { ov.remove(); };
+      ov.appendChild(h('div', { class: 'wroom-top' }, h('b', { text: '👕 Vestidor de la sala' }), h('button', { class: 'btn small gold', type: 'button', onclick: () => { sfx('click'); close(); } }, 'Listo ✓')));
+      ov.appendChild(inner); document.body.appendChild(ov);
+      // el MISMO vestidor del juego; dentro de la sala todo es gratis y se vuelve a tu ropa al salir
+      K.buildWardrobe({}, inner, { free: true, onChange: (look) => { if (world) world.setLook(look); N.update(P + '/players/' + pid, { look }).catch(() => {}); } });
+      timers.push(setInterval(() => { if (left) close(); }, 800));
     }
     function openSound() {
       const mp = h('div', { class: 'seg' });
@@ -666,10 +863,10 @@
       modal({ title: 'Ajustes', body: h('div', { class: 'set-block' }, h('b', { text: 'Música' }), mp, switchRow('Efectos de sonido', '', () => St.settings().sfx, (v) => St.setSetting('sfx', v)), switchRow('Pantalla retro (CRT)', '', () => St.settings().crt, (v) => St.setSetting('crt', v))), buttons: [{ label: 'Listo' }] });
     }
     function openHostConfig() {
-      const cfg0 = R.cfg || {}; const c = { n: cfg0.n || 8, level: cfg0.level || 0, topics: new Set(cfg0.topics || TOPICS.map((v) => v.topic)), secs: cfg0.secs || 30, hostPlays: cfg0.hostPlays !== false, mix: cfg0.mix !== false, imp: cfg0.imp || 0 };
+      const cfg0 = R.cfg || {}; const c = { n: cfg0.n || 8, level: cfg0.level || 0, topics: new Set(cfg0.topics || TOPICS.map((v) => v.topic)), secs: cfg0.secs || 30, hostPlays: cfg0.hostPlays !== false, mix: cfg0.mix !== false, imp: cfg0.imp || 0, world: cfg0.world !== false };
       modal({ title: 'Configurar la sala', cls: 'hostcfg', body: h('div', { class: 'hostcfgbody' }, configBlocks(c), h('small', { class: 'hint', text: 'Solo tú ves esta configuración. Los cambios valen para la próxima partida.' })),
         buttons: [{ label: 'Cancelar', cls: 'ghost' }, { label: 'Guardar', cls: 'gold', onClick: () => {
-          const upd = { n: c.n, level: c.level, topics: Array.from(c.topics), secs: Math.max(15, Math.min(60, c.secs || 30)), hostPlays: !!c.hostPlays, mix: c.mix !== false, imp: c.imp || 0 };
+          const upd = { n: c.n, level: c.level, topics: Array.from(c.topics), secs: Math.max(15, Math.min(60, c.secs || 30)), hostPlays: !!c.hostPlays, mix: c.mix !== false, imp: c.imp || 0, world: c.world !== false };
           N.update(P + '/cfg', upd).then(() => { toast('Configuración guardada', ''); sfx('buy'); }).catch((e) => toast(netErr(e), 'warn'));
           if (!!c.hostPlays !== (cfg0.hostPlays !== false)) { if (c.hostPlays) N.set(P + '/players/' + pid, { name: p.name, look: p.look, score: 0, correct: 0, qi: 0, done: false, online: true, joined: N.TS }).catch(() => {}); else N.remove(P + '/players/' + pid).catch(() => {}); }
         } }] });
@@ -748,7 +945,7 @@
       }
       const rest = h('ol', { class: 'rboard' }, rk.slice(3).map((x, i) => h('li', { class: 'rrow' + (x.id === pid ? ' me' : '') }, h('span', { class: 'rpos', text: String(i + 4) }), K.headThumb(x.look || {}, 'rh'), h('div', { class: 'rmid' }, h('b', { class: 'rname', text: x.name })), h('span', { class: 'rscore', text: String(x.score || 0) }))));
       const impIds = Object.keys(imps()), exm = expelledMap();
-      const crewWon = impIds.length && impIds.every((id) => exm[id]);
+      const wn = R.state && R.state.win, crewWon = wn ? wn === 'crew' : (impIds.length && impIds.every((id) => exm[id]));
       const reveal = impIds.length ? h('div', { class: 'imp-reveal' }, h('h3', { class: 'imp-win', text: crewWon ? '🎉 ¡Ganó la tripulación!' : '🕵️ ¡Ganaron los impostores!' }), h('b', { text: '🕵️ ' + (impIds.length > 1 ? 'Los impostores eran' : 'El impostor era') }),
         h('div', { class: 'ir-row' }, impIds.map((id) => { const x = R.players[id] || {}; return h('span', { class: 'ir-one' }, K.headThumb(x.look || {}, ''), h('b', { text: String(x.name || '???').slice(0, 10) }), h('small', { text: exm[id] ? '¡Descubierto!' : 'Escapó (+150)' })); }))) : null;
       box.appendChild(h('div', { class: 'rpanel end' }, h('h2', { class: 'rtitle', text: '¡Fin de la partida!' }), pod, reveal, reward, rk.length > 3 ? rest : null,
@@ -759,15 +956,23 @@
     function render(force) {
       const s = R.state; if (left || !s || !R.cfg) return;
       const ph = s.phase;
+      if (ph === 'end' && wmode() && playing() && !my.finished && (world || seg)) {   // el mapa termina: mostramos quién ganó y luego el podio
+        if (!my.endT) {
+          const win = s.win; closeMeetUI(); if (world) world.setFrozen(true); dropBattle();
+          overlay('rolecard ' + (win === 'imp' ? 'imp' : 'crew'), '<div class="rc-ico">' + (win === 'imp' ? '🕵️' : '🎉') + '</div><h2>' + (win === 'imp' ? '¡Ganaron los impostores!' : win === 'crew' ? '¡Ganó la tripulación!' : '¡Fin de la partida!') + '</h2><p>' + (win === 'imp' ? 'Quedaron muy pocos tripulantes.' : win === 'crew' ? 'Descubrieron a los impostores o completaron todas las misiones.' : 'Se acabó el tiempo.') + '</p>', 0); sfx(win === 'imp' ? 'boom' : 'win');
+          my.endT = setTimeout(() => { if (!left) worldFinish(); }, 2600); timers.push(my.endT);
+        }
+        return;
+      }
       if (ph === 'end') {
         if (battle) { if (!my.report) { const t = curTotals(); my.report = { mistakes: t.mistakes, bestStreak: t.bestStreak, score: t.score, correct: t.correct, answered: t.answered, heartsLost: 0 }; } try { battle.destroy(); } catch (e) { /* ok */ } battle = null; clearOverlays(); seg = null; sc.classList.remove('s-battle'); holder.hidden = true; box.hidden = false; K.setAmbient(true, 'room'); }
         clearInterval(cdTimer);
       }
-      if (battle || waitEl) return; // el combate (o la reunión) manda
+      if (battle || waitEl || world) return; // el combate (o la reunión) manda
       if (ph === 'countdown' && playing() && !my.finished && R.playersLoaded && nowMs() - (s.t0 || 0) > 3000) {
         const me = myP();
         if (me && me.done) { my.finished = true; }
-        else if (me && (me.qi || 0) > 0) { finishMine(null, true); return; }
+        else if (me && (me.qi || 0) > 0 && !wmode()) { finishMine(null, true); return; }
       }
       const key = ph + ':' + (my.finished ? 'F' : '') + (my.back ? 'B' : '') + ':' + my.round;
       if (!force && key === viewKey) return;
@@ -779,5 +984,5 @@
       else viewPlaza('live');
     }
   };
-  root.DuiXRooms = { _battle: () => root.__roomBattle || null };
+  root.DuiXRooms = { _battle: () => root.__roomBattle || null, _world: () => root.__roomWorld || null };
 })(window);

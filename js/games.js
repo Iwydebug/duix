@@ -590,7 +590,7 @@
     // Tutorial obligatorio (con opción de omitir) en los 3 primeros niveles (tablero 1) para CADA perfil nuevo
     let seen = false; try { const pr0 = St.profile(); seen = !!(pr0 && pr0.tutDone && pr0.tutDone[kind]); } catch (e) { /* ok */ }
     if (seen || cfg.noTutorial || cfg.room || root.__noTutorial || !cfg.villain || cfg.villain.n !== 1 || cfg.villain.endless) return startFn(cfg);
-    const T = TUT[kind]; let inner = null, dead = false, timer = 0, switched = false, si = 0, stepT0 = Date.now(), flashUntil = 0, base = null;
+    const T = TUT[kind]; let inner = null, dead = false, timer = 0, fin = false, switched = false, si = 0, stepT0 = Date.now(), flashUntil = 0, base = null;
     const strip = el('div', 'coach'); strip.setAttribute('role', 'status');
     const playing = () => { if (!inner) return false; if (kind === 'shoot') return inner.state && inner.state.state === 'play'; const d = kind === 'run' ? inner._run : inner._mz; return !!d && d.st === 'play'; };
     const hero = () => { const d = kind === 'run' ? inner._run : inner._mz; return d && d.hero; };
@@ -599,20 +599,19 @@
     const STEPS = {
       shoot: [
         { ico: '📖', t: 'Lee la pregunta', d: 'Arriba está el problema. Tómate tu tiempo: cuando se acabe la barra, empieza el juego.', done: () => playing() },
-        { ico: '👆', t: 'Toca la respuesta correcta', d: 'Caen 4 respuestas. TOCA la que creas correcta y tu héroe le dispara (en compu: teclas 1 a 4).', done: () => inner.state.answered >= 1 },
+        { ico: '👆', t: 'Toca la respuesta correcta', d: 'Caen 4 respuestas. TOCA la que creas correcta y tu héroe le dispara (en compu: teclas 1 a 4).', done: () => inner.state.correct >= 1 },
       ],
       run: [
         { ico: '📖', t: 'Lee la pregunta', d: 'Mira el problema con calma. Cuando termine la barra empiezas a correr.', done: () => playing() },
         { ico: '👆', t: 'Arrastra el dedo para moverte', d: 'Mueve a tu héroe a izquierda y derecha (en compu: flechas o WASD).', init: () => pos(), done: (b) => { const p = pos(); return Math.abs(p[0] - b[0]) > 45; } },
         { ico: '⤒', t: 'Salta como en Subway Surfers', d: 'Desliza el dedo hacia ARRIBA (o toca Saltar, o Espacio). Mientras estás en el aire, las minas no te tocan.', done: () => (!!inner._run && inner._run.hero.jumps > 0) || Date.now() - stepT0 > 15000 },
-        { ico: '💣', t: 'Esquiva o salta las minas', d: 'Las minas 💣 te frenan y quitan puntos; las monedas 🪙 suman. Muévete a otro carril o salta justo antes de la mina.', done: () => Date.now() - stepT0 > 5500 || inner.state.coins > 0 },
-        { ico: '🪧', t: 'Cruza el cartel correcto', d: 'Atraviesa SOLO el cartel con la respuesta correcta.', done: () => inner.state.answered >= 1 },
+        { ico: '🪧', t: 'Cruza el cartel correcto', d: 'Atraviesa SOLO el cartel con la respuesta correcta. Esquiva (o salta) las minas 💣 y recoge monedas 🪙. Si te equivocas, vuelves a intentarlo.', done: () => inner.state.correct >= 1 },
       ],
       maze: [
         { ico: '📖', t: 'Lee la pregunta', d: 'Mira el problema y las respuestas que lleva cada fantasma. Luego empieza el laberinto.', done: () => playing() },
         { ico: '👆', t: 'Desliza para moverte', d: 'Desliza el dedo (o flechas/WASD) y tu héroe avanza por el laberinto.', init: () => pos(), done: (b) => { const p = pos(); return Math.abs(p[0] - b[0]) + Math.abs(p[1] - b[1]) > 2.2; } },
         { ico: '●', t: 'Come los puntitos', d: 'Cada puntito suma puntos. En el juego real debes comerlos TODOS para ganar.', done: () => inner.state.score > 5 },
-        { ico: '👻', t: 'Cómete el fantasma correcto', d: 'Solo el que lleva la respuesta correcta. Si tocas otro, pierdes. Los 4 portales (izquierda↔derecha, arriba↔abajo) te llevan al otro extremo.', done: () => inner.state.answered >= 1 },
+        { ico: '👻', t: 'Cómete el fantasma correcto', d: 'Solo el que lleva la respuesta correcta. Si tocas otro, pierdes. Los 4 portales (izquierda↔derecha, arriba↔abajo) te llevan al otro extremo.', done: () => inner.state.correct >= 1 },
       ],
     }[kind];
     const draw = () => {
@@ -623,7 +622,9 @@
     draw();
     timer = setInterval(() => {
       if (dead || switched || !inner) return;
-      if (Date.now() < flashUntil) return; const s = STEPS[si]; if (!s) return;
+      if (Date.now() < flashUntil) return;
+      if (si >= STEPS.length) { if (!fin) { fin = true; clearInterval(timer); setTimeout(() => { if (dead || switched) return; if (inner) { try { inner.destroy(); } catch (e) { /* ok */ } inner = null; } strip.remove(); modal('¡Felicidades! Ya estás listo para tu primer juego.', 'Jugar', toReal, false); A.sfx('levelup'); }, 1100); } return; }
+      const s = STEPS[si]; if (!s) return;
       if (base == null && s.init) base = s.init();
       let ok = false; try { ok = s.done(base); } catch (e) { ok = false; }
       if (ok) { si++; base = null; stepT0 = Date.now(); flashUntil = Date.now() + 900; A.sfx('coin'); draw(); setTimeout(() => { if (!dead && !switched) draw(); }, 950); }
@@ -639,7 +640,7 @@
     }
     strip.addEventListener('click', (e) => { if (e.target.closest('[data-a=skip]')) { A.sfx('click'); toReal(); } });
     const pcfg = Object.assign({}, cfg, { extraTop: strip, onProgress: null, speedMul: () => 0.75, fallSecs: 42,
-      room: { total: 1, getQuestion: () => pq, hp: () => ({ frac: 1, text: 'Práctica' }), noHearts: true, label: '🎓 Práctica' },
+      room: { total: 99, getQuestion: (i) => { if (!i) return pq; try { return Q.generate(cfg.villain.topic === 'mix' || cfg.villain.endless ? 'fracciones' : cfg.villain.topic, 1); } catch (e) { return pq; } }, hp: () => ({ frac: 1, text: 'Práctica' }), noHearts: true, label: '🎓 Práctica' },
       onEnd: () => { setTimeout(() => { if (switched || dead) return; if (inner) { try { inner.destroy(); } catch (e) { /* ok */ } inner = null; } modal('¡Felicidades! Ya estás listo para tu primer juego.', 'Jugar', toReal, false); A.sfx('levelup'); }, 0); },
       onQuit: () => { clearInterval(timer); dead = true; cfg.onQuit && cfg.onQuit(); }, onRestart: null });
     const welcome = { 'shoot': 'Antes de jugar de verdad te enseñamos los controles del juego de DISPARO. Solo sigue las instrucciones.', 'run': 'Antes de jugar de verdad te enseñamos los controles de la CARRERA. Solo sigue las instrucciones.', 'maze': 'Antes de jugar de verdad te enseñamos los controles del LABERINTO. Solo sigue las instrucciones.' }[kind];

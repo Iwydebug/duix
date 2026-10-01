@@ -124,6 +124,16 @@ Así nadie puede listar todas las salas: solo entra quien conoce el código. Las
 - Retroalimentación solo al final. Avatares corregidos. Créditos con el tema del juego, «Deiwy Mondragon» y citas de Precálculo y Cálculo (Stewart).
 - Salas: impostores con Ninguno / Auto / 1 / 2 / 3 y casilla numérica.
 
+## Novedades 1.8.5
+- **Mapa tipo Among Us en las salas:** al empezar, todos aparecen en la Cafetería de un colegio-nave (Laboratorio, Biblioteca, Gimnasio, Cancha, Sótano, Sala de máquinas, Enfermería y Dirección). Se camina con joystick (o WASD/flechas), con visión limitada y botón rojo de emergencia en la mesa.
+- **Los 3 juegos son MISIONES:** cada jugador tiene una consola de Disparo, una de Carrera y una de Laberinto Pac-Man repartidas por el mapa (lista de tareas + barra "Tareas completadas"). Al terminar vuelves al mapa.
+- **El impostor elimina en el mapa** (botón ELIMINAR cerca de alguien, enfriamiento 20 s) y deja un cuerpo que TODOS ven al instante. Cualquiera lo reporta o convoca una reunión de emergencia; el villano del tema se come al expulsado. Los eliminados quedan como fantasmas y pueden seguir haciendo misiones.
+- **Votación:** se puede votar por todos, incluso por uno mismo. La partida termina de inmediato cuando se expulsa a todos los impostores (o cuando los impostores igualan a la tripulación, o se completan todas las misiones).
+- **Ranking de arriba:** ahora muestra a todos los jugadores (con 💀 si fueron eliminados).
+- **Vestidor de la sala = el mismo vestidor del juego** (todo gratis solo dentro de la sala; al salir recuperas tu ropa).
+- Ruleta: el cofre ahora se abre y muestra el premio. Tutorial: arreglado el avance solo y el parpadeo; 50/50 quita 2 opciones.
+- Para usar el modo anterior (juegos seguidos sin mapa) desactiva "Mapa con misiones" al crear la sala.
+
 ## Novedades 1.8.4
 - **Tutorial tipo Parchís** (bienvenida → pasos guiados → felicitaciones, con *Omitir*) en los 3 primeros niveles (tablero 1: disparo, carrera, laberinto) y para CADA perfil nuevo, aunque borres el avatar y crees otro.
 - **Salas estilo Among Us**: el impostor puede ☠️ *Eliminar* a un tripulante (el villano del tema se lo come con animación); el eliminado sigue viendo la partida como espectador.
