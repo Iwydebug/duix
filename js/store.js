@@ -37,6 +37,7 @@
   }
   function migrate(p) {
     // compatibilidad con guardados anteriores
+    if (p.lookBackup) { p.look = Object.assign({}, p.lookBackup); delete p.lookBackup; }   // ropa gratis de sala: se restaura la real
     const L = p.look = Object.assign({}, DEFAULT_LOOK, p.look || {});
     if (L.hairStyle) { if (D.ITEM_BY_ID['hair-' + L.hairStyle]) L.hair = 'hair-' + L.hairStyle; delete L.hairStyle; }
     if (L.cape === 'cape-alas') { L.cape = 'cape-corta'; L.wings = 'wing-murcielago'; if (p.owned && !p.owned.includes('wing-murcielago')) p.owned.push('wing-murcielago'); }

@@ -220,7 +220,8 @@
     const setBanner = (t) => { banner.hidden = !t; banner.textContent = t || ''; };
     const killPlaza = () => { if (plaza) { try { plaza.destroy(); } catch (e) { /* ok */ } plaza = null; } refs = {}; };
     function stop() {
-      if (left) return; left = true; subs.forEach((f) => { try { f(); } catch (e) { /* ok */ } }); timers.forEach(clearInterval); clearTimeout(writeT); clearTimeout(renderT); clearInterval(cdTimer); killPlaza();
+      if (left) return; left = true; if (p.lookBackup) { p.look = Object.assign({}, p.lookBackup); delete p.lookBackup; St.save(); }
+      subs.forEach((f) => { try { f(); } catch (e) { /* ok */ } }); timers.forEach(clearInterval); clearTimeout(writeT); clearTimeout(renderT); clearInterval(cdTimer); killPlaza();
       if (battle) { try { battle.destroy(); } catch (e) { /* ok */ } battle = null; }
       try { N.remove(P + '/pos/' + pid).catch(() => {}); } catch (e) { /* ok */ }
     }
@@ -323,13 +324,8 @@
     const amImp = () => !!imps()[pid];
     const nImps = () => Object.keys(imps()).length;
     // ¿quién ya fue descubierto? (se calcula igual en todos los celulares a partir de los votos)
-    function expelledMap() {
-      const out = {}, ids = Object.keys(imps()); if (!ids.length) return out;
-      const crew = Math.max(1, Object.keys(R.players).length - ids.length), need = Math.max(2, Math.ceil(crew * 0.4)), hits = {};
-      Object.values(R.votes || {}).forEach((cp) => Object.keys(cp || {}).forEach((voter) => { const t = cp[voter]; if (imps()[t] && !imps()[voter]) { hits[t] = hits[t] || {}; hits[t][voter] = 1; } }));
-      ids.forEach((t) => { if (hits[t] && Object.keys(hits[t]).length >= need) out[t] = true; });
-      return out;
-    }
+    const isDead = (id) => !!(R.players[id] && R.players[id].dead);
+    function expelledMap() { const out = {}; Object.keys(imps()).forEach((id) => { if (isDead(id)) out[id] = true; }); return out; }
     const speedMul = () => (Date.now() < fx.speedUntil ? 1.45 : 1);
     function curTotals() {
       const bs = (battle && battle.state) || { score: 0, correct: 0, answered: 0, mistakes: [], bestStreak: 0 }, b = seg ? seg.base : { score: 0, correct: 0, answered: 0 }, a = seg ? seg.agg : { mistakes: [], bestStreak: 0 };
@@ -379,7 +375,7 @@
     }
     function finalizeMine() {
       const t = seg.base; let score = t.score;
-      if (amImp() && !expelledMap()[pid]) score += 150;
+      if (amImp() && !my.dead) score += 150;
       finishMine({ score, correct: t.correct, answered: t.answered, bestStreak: seg.agg.bestStreak, mistakes: seg.agg.mistakes, heartsLost: 0 });
     }
     /* ----- sala de espera entre juegos + reunión de votación ----- */
@@ -396,8 +392,8 @@
     const activePlayers = () => Object.keys(R.players).filter((id) => R.players[id].online !== false && !R.players[id].done);
     function buildWait(last) {
       if (!waitEl || !seg) return;
-      const idx = waitIdx, ids = Object.keys(R.players), others = ids.filter((id) => id !== pid);
-      const key = ids.join(',') + '|' + last; if (key === waitKey) { updateWait(); return; } waitKey = key;
+      const idx = waitIdx, ids = Object.keys(R.players), others = ids.filter((id) => id !== pid && !isDead(id));
+      const key = ids.filter((id) => !isDead(id)).join(',') + '|' + last; if (key === waitKey) { updateWait(); return; } waitKey = key;
       const name = KIND_NAME[seg.plan[idx][0]] || 'Juego', myV = (R.votes && R.votes[idx] && R.votes[idx][pid]) || null;
       waitEl.innerHTML = '';
       const vote = (id) => { N.set(P + '/votes/' + idx + '/' + pid, id || '-').catch(() => {}); sfx(id ? 'select' : 'back'); R.votes = R.votes || {}; (R.votes[idx] = R.votes[idx] || {})[pid] = id || '-'; waitKey = ''; buildWait(last); };
@@ -421,26 +417,82 @@
       if (!waitEl || waitIdx < 0 || !seg || waitEl.dataset.go) return;
       if (!R.state || (R.state.seg || 0) <= waitIdx) { updateWait(); return; }
       waitEl.dataset.go = '1'; const idx = waitIdx, last = seg.i >= seg.plan.length;
-      // resultado de la reunión
-      let html = '';
+      // resultado de la reunión: el más votado sale de la sala (como en Among Us)
+      let ej = null;
       if (nImps() && playing()) {
-        const vs = (R.votes && R.votes[idx]) || {}, tally = {};
-        Object.keys(vs).forEach((v) => { const t = vs[v]; if (t && t !== '-') tally[t] = (tally[t] || 0) + 1; });
-        const top = Object.keys(tally).sort((a, b) => tally[b] - tally[a])[0], mine = vs[pid];
-        if (mine && mine !== '-') { const ok = !!imps()[mine]; adjScore(ok ? +100 : -40); toast(ok ? '🎯 ¡Acertaste! ' + ((R.players[mine] || {}).name || '') + ' ES impostor (+100)' : '❌ ' + ((R.players[mine] || {}).name || '') + ' es inocente (−40)', ok ? 'ach' : 'warn'); }
-        html = top ? '<b>Más votado: ' + esc2((R.players[top] || {}).name || '?') + ' (' + tally[top] + ')</b><small>' + (imps()[top] ? '¡Era IMPOSTOR!' : 'No era impostor…') + '</small>' : '<b>Nadie votó</b><small>El impostor sigue libre…</small>';
+        const vs = (R.votes && R.votes[idx]) || {}, mine = vs[pid];
+        if (mine && mine !== '-' && !amImp()) { const ok = !!imps()[mine]; adjScore(ok ? +100 : -40); toast(ok ? '🎯 ¡Acertaste! ' + ((R.players[mine] || {}).name || '') + ' ES impostor (+100)' : '❌ ' + ((R.players[mine] || {}).name || '') + ' es inocente (−40)', ok ? 'ach' : 'warn'); }
+        ej = ejectTarget(vs);
       }
       const next = () => { if (!seg || left || my.finished) return; waitEl && waitEl.remove(); waitEl = null; waitIdx = -1; waitKey = ''; if (seg.i < seg.plan.length) startSeg(); else finalizeMine(); };
-      if (html) { waitEl.innerHTML = '<div class="vbox"><small class="vt">RESULTADO DE LA REUNIÓN</small><h2>🗳️</h2>' + html.replace('<b>', '<b class="vres">') + '</div>'; later(next, 2600); } else next();
+      if (nImps() && playing()) {
+        waitEl.innerHTML = ''; ejectAnim(waitEl, ej, () => { if (ej === pid) dieNow('vote'); else next(); });
+      } else next();
     }
+    /* ----- expulsión por votación y eliminación por el impostor: animación del villano del tema ----- */
+    function ejectTarget(vs) {
+      const tally = {}; Object.keys(vs || {}).forEach((v) => { if (isDead(v)) return; const t = vs[v]; if (t) tally[t] = (tally[t] || 0) + 1; });
+      const ks = Object.keys(tally).sort((a, b) => tally[b] - tally[a]); if (!ks.length) return null;
+      const top = ks[0]; if (top === '-' || (ks[1] && tally[ks[1]] === tally[top])) return null;
+      return top;
+    }
+    const roomV = () => roomVillain(R.cfg || { topics: [] });
+    // ej: id expulsado (o null = empate / nadie). Dibuja la animación dentro de "host" y llama done()
+    function ejectAnim(host, ej, done, kill) {
+      const v = roomV(), pl = ej && R.players[ej], wasImp = !!(ej && imps()[ej]);
+      const e = h('div', { class: 'eatwrap' });
+      if (!ej || !pl) {
+        e.appendChild(h('div', { class: 'eat-res' }, h('small', { class: 'vt', text: 'RESULTADO DE LA REUNIÓN' }), h('h2', { text: '🗳️ Nadie fue expulsado' }), h('p', { class: 'vsub', text: 'Hubo empate o nadie votó. El impostor sigue libre…' })));
+        host.appendChild(e); later(() => { e.remove(); done(); }, 2400); return;
+      }
+      const nm = String(pl.name || '?');
+      const vil = h('div', { class: 'eat-v' }, K.villainEl(v, 120)), pp = h('div', { class: 'eat-p' }, K.headThumb(pl.look || {}, ''));
+      e.appendChild(h('div', { class: 'eat-stage' }, vil, pp));
+      e.appendChild(h('div', { class: 'eat-res' }, h('small', { class: 'vt', text: kill ? 'ELIMINADO' : 'RESULTADO DE LA REUNIÓN' }),
+        h('h2', { class: 'eat-t', text: kill ? '💀 ' + nm + ' fue devorado' : '🗳️ ' + nm + ' fue expulsado' }),
+        h('p', { class: 'vsub eat-s', text: v.name + ' se lo comió…' })));
+      host.appendChild(e); sfx('boom'); setTimeout(() => sfx('hit'), 900); setTimeout(() => sfx('boom'), 1500);
+      setTimeout(() => {
+        if (kill) { const s2 = e.querySelector('.eat-s'); if (s2) s2.textContent = 'Un tripulante menos…'; }
+        else { const t = e.querySelector('.eat-t'), s2 = e.querySelector('.eat-s'); if (t) t.textContent = wasImp ? '🎯 ' + nm + ' ERA el impostor' : '❌ ' + nm + ' NO era el impostor'; if (s2) s2.textContent = wasImp ? '¡Bien hecho, tripulantes!' : 'Todavía hay un impostor entre ustedes…'; e.classList.add(wasImp ? 'was-imp' : 'was-crew'); sfx(wasImp ? 'win' : 'deny'); }
+      }, 2300);
+      setTimeout(() => { e.remove(); if (!kill && wasImp) { const left2 = Object.keys(imps()).filter((id) => !isDead(id) && id !== ej); if (!left2.length && !amImp()) { toast('🏆 ¡Descubrieron a todos los impostores! +80', 'ach'); adjScore(+80); } } done(); }, 4600);
+    }
+    // el jugador sale de la partida (expulsado o eliminado) pero sigue viendo cómo juegan los demás
+    function dieNow(how) {
+      if (my.finished || left) return; const t = seg ? curTotals() : { score: 0, correct: 0, answered: 0, mistakes: [], bestStreak: 0 };
+      finishMine({ score: t.score, correct: t.correct, answered: t.answered, bestStreak: t.bestStreak, mistakes: t.mistakes, heartsLost: 0 }, false, how);
+      toast(how === 'kill' ? '💀 Te eliminaron. Sigues viendo la partida como espectador.' : '🗳️ Te expulsaron. Sigues viendo la partida como espectador.', 'warn');
+    }
+    /* ----- el impostor elimina a un tripulante ----- */
+    let killCd = 0; const handledKills = {};
+    function pickKill() {
+      if (!amImp() || my.finished || left) return;
+      if (Date.now() < killCd) { sfx('deny'); toast('Espera un poco para volver a eliminar.', 'warn'); return; }
+      const cand = Object.keys(R.players).filter((id) => id !== pid && !imps()[id] && !isDead(id) && R.players[id].online !== false && !R.players[id].done);
+      if (!cand.length) { toast('No hay a quién eliminar ahora.', 'warn'); return; }
+      const e = h('div', { class: 'rov vote kill' }, h('div', { class: 'vbox' }, h('small', { class: 'vt', text: '☠️ ELIMINAR' }), h('h2', { text: '¿A quién se come el villano?' }),
+        h('div', { class: 'vgrid' }, cand.map((id) => h('button', { type: 'button', class: 'vopt', onclick: () => { e.remove(); killCd = Date.now() + 40000; N.set(P + '/kills/' + Math.random().toString(36).slice(2, 8), { by: pid, target: id, t: N.now() }).catch(() => {}); sfx('boom'); toast('☠️ Eliminaste a ' + R.players[id].name, ''); } }, K.headThumb(R.players[id].look || {}, ''), h('b', { text: String(R.players[id].name || '?').slice(0, 10) })))),
+        h('button', { type: 'button', class: 'btn ghost small', onclick: () => e.remove() }, 'Cancelar')));
+      holder.appendChild(e);
+    }
+    function onKills(v) {
+      if (!v || typeof v !== 'object') return;
+      Object.keys(v).forEach((id) => {
+        const k = v[id]; if (!k || handledKills[id] || N.now() - (k.t || 0) > 20000) return; handledKills[id] = 1;
+        if (k.target === pid) { if (left || my.finished || !seg || !playing()) return; const st0 = battle && battle.state; if (st0) st0.paused = true; clearInterval(meetIv); meetEl = null; holder.querySelectorAll('.rov.vote').forEach((x) => x.remove()); const stage = h('div', { class: 'rov eat kill' }); holder.appendChild(stage); ejectAnim(stage, pid, () => { stage.remove(); dieNow('kill'); }, true); }
+        else if (!left) toast('💀 ' + ((R.players[k.target] || {}).name || 'Alguien') + ' fue devorado por el villano', 'warn');
+      });
+    }
+    subs.push(N.on(P + '/kills', onKills));
     const esc2 = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-    function finishMine(rep, quit) {
+    function finishMine(rep, quit, dead) {
       if (my.finished || left) return; my.finished = true; my.report = rep;
       if (battle) { try { battle.destroy(); } catch (e) { /* ok */ } battle = null; }
       clearOverlays(); seg = null;
       sc.classList.remove('s-battle'); holder.hidden = true; box.hidden = false; K.setAmbient(true, 'room'); A.play('menu');
       const upd = { done: true, finishedAt: N.TS }; if (rep) { upd.score = rep.score; upd.correct = rep.correct; upd.qi = rep.answered; }
-      if (quit) upd.online = false;
+      if (quit) upd.online = false; if (dead) { upd.dead = dead; my.dead = dead; }
       clearTimeout(writeT); pending = null;
       N.update(P + '/players/' + pid, upd).catch(() => {});
       viewKey = ''; render(true);
@@ -464,8 +516,8 @@
       if (!imp) return;
       const btn = h('button', { type: 'button', class: 'imp-ui imp-btn', 'aria-label': 'Sabotaje' }, h('span', { class: 'ib-i', text: '🕵️' }), h('small', { text: 'Sabotaje' }), h('i', { class: 'ib-cd' }));
       const menu = h('div', { class: 'imp-ui imp-menu', hidden: true },
-        [['turbo', '⏩', 'Turbo', 'Todo va más rápido 8 s'], ['fog', '🌫️', 'Niebla', 'No ven bien 6 s'], ['steal', '💸', 'Robo', '−60 pts a cada uno, +50 para ti']].map(([k, ico, nm, ds]) => h('button', { type: 'button', class: 'imp-opt', onclick: () => { menu.hidden = true; doSabotage(k); } }, h('b', { text: ico + ' ' + nm }), h('small', { text: ds }))));
-      btn.addEventListener('click', () => { if (expelledMap()[pid]) { toast('Te descubrieron: sin poderes.', 'warn'); return; } if (Date.now() < impCd) { sfx('deny'); return; } sfx('click'); menu.hidden = !menu.hidden; });
+        [['turbo', '⏩', 'Turbo', 'Todo va más rápido 8 s'], ['fog', '🌫️', 'Niebla', 'No ven bien 6 s'], ['steal', '💸', 'Robo', '−60 pts a cada uno, +50 para ti'], ['kill', '☠️', 'Eliminar', 'El villano se come a un tripulante']].map(([k, ico, nm, ds]) => h('button', { type: 'button', class: 'imp-opt', onclick: () => { menu.hidden = true; if (k === 'kill') pickKill(); else doSabotage(k); } }, h('b', { text: ico + ' ' + nm }), h('small', { text: ds }))));
+      btn.addEventListener('click', () => { if (expelledMap()[pid]) { toast('Te descubrieron: sin poderes.', 'warn'); return; } sfx('click'); menu.hidden = !menu.hidden; });
       holder.appendChild(btn); holder.appendChild(menu);
       cdTick = setInterval(() => { const left2 = Math.max(0, impCd - Date.now()), dead = !!expelledMap()[pid]; btn.classList.toggle('cd', left2 > 0 || dead); btn.classList.toggle('dead', dead); btn.querySelector('.ib-cd').style.setProperty('--p', dead ? 1 : left2 / 22000); }, 250); timers.push(cdTick);
     }
@@ -509,13 +561,10 @@
       const cast = (id) => { if (resolved) return; myV = id; sfx(id === '-' ? 'back' : 'select'); N.set(P + '/votes/' + key + '/' + pid, id).catch(() => {}); R.votes = R.votes || {}; (R.votes[key] = R.votes[key] || {})[pid] = id; if (meetEl) { delete meetEl.dataset.built; } render(); };
       const finish = () => {
         if (resolved) return; resolved = true; clearInterval(meetIv);
-        const vs = (R.votes && R.votes[key]) || {}, tally = {}; Object.keys(vs).forEach((vv) => { const t = vs[vv]; if (t && t !== '-') tally[t] = (tally[t] || 0) + 1; });
-        const top = Object.keys(tally).sort((a, b) => tally[b] - tally[a])[0];
+        const vs = (R.votes && R.votes[key]) || {};
         if (myV && myV !== '-' && !amImp()) { const ok = !!imps()[myV]; adjScore(ok ? +100 : -40); toast(ok ? '🎯 ¡Acertaste! ' + ((R.players[myV] || {}).name || '') + ' ES impostor (+100)' : '❌ ' + ((R.players[myV] || {}).name || '') + ' es inocente (−40)', ok ? 'ach' : 'warn'); }
-        const html = top ? '<b class="vres">Más votado: ' + esc2((R.players[top] || {}).name || '?') + ' (' + tally[top] + ')</b><small>' + (imps()[top] ? '¡Era IMPOSTOR!' : 'No era impostor…') + '</small>' : '<b class="vres">Nadie votó</b><small>El impostor sigue libre…</small>';
-        if (meetEl) meetEl.innerHTML = '<div class="vbox"><small class="vt">RESULTADO DE LA REUNIÓN</small><h2>🗳️</h2>' + html + '</div>';
-        checkExpelled();
-        later(() => { if (meetEl) { meetEl.remove(); meetEl = null; } const s1 = battle && battle.state; if (s1) s1.paused = false; }, 2600);
+        const ej = ejectTarget(vs); meetEl.innerHTML = '';
+        ejectAnim(meetEl, ej, () => { if (meetEl) { meetEl.remove(); meetEl = null; } if (ej === pid) { dieNow('vote'); return; } const s1 = battle && battle.state; if (s1) s1.paused = false; });
       };
       render();
       meetIv = setInterval(() => {
@@ -525,6 +574,7 @@
     }
     subs.push(N.on(P + '/meet', onMeet));
     function doSabotage(k) {
+      if (Date.now() < impCd) { sfx('deny'); toast('Sabotaje en espera…', 'warn'); return; }
       impCd = Date.now() + 22000; sfx('power');
       N.set(P + '/sab', { k, by: pid, id: Math.random().toString(36).slice(2, 8), t: N.now() }).catch(() => {});
       if (k === 'steal') { adjScore(+50); toast('💸 +50 puntos (robo)', ''); } else toast(k === 'turbo' ? '⏩ ¡Turbo enviado!' : '🌫️ ¡Niebla enviada!', '');
@@ -540,7 +590,7 @@
     }
     subs.push(N.on(P + '/sab', onSab));
     subs.push(N.on(P + '/votes', (v) => { R.votes = v || {}; checkExpelled(); if (waitEl) updateWait(); }));
-    function checkExpelled() {
+    function checkExpelled() { return;
       const ex = expelledMap();
       Object.keys(ex).forEach((id) => { if (announced[id]) return; announced[id] = 1; const nm = (R.players[id] && R.players[id].name) || 'Alguien'; if (battle || box.hidden === false) toast('🚨 ¡' + nm + ' era IMPOSTOR y fue descubierto!', 'ach'); if (id === pid) toast('Te descubrieron: pierdes tus sabotajes.', 'warn'); });
     }
@@ -579,7 +629,7 @@
         const prog = Math.min(100, Math.round((x.qi || 0) / n * 100));
         el.appendChild(h('li', { class: 'rrow' + (x.id === pid ? ' me' : '') }, h('span', { class: 'rpos', text: String(i + 1) }), K.headThumb(x.look || {}, 'rh'),
           h('div', { class: 'rmid' }, h('b', { class: 'rname', text: x.name }), h('div', { class: 'rprog' }, h('i', { style: 'width:' + prog + '%' }))),
-          h('span', { class: 'rst', text: x.done ? '✔' : x.online === false ? '⚠' : '🎮' }), h('span', { class: 'rscore', text: String(x.score || 0) })));
+          h('span', { class: 'rst', text: x.dead ? '💀' : x.done ? '✔' : x.online === false ? '⚠' : '🎮' }), h('span', { class: 'rscore', text: String(x.score || 0) })));
       });
     }
     function bossBarEl() {
@@ -603,11 +653,10 @@
       const tabs = h('div', { class: 'ctabs' }), grid = h('div', { class: 'ogrid' });
       const draw = () => {
         tabs.innerHTML = ''; D.CATS.forEach((c) => tabs.appendChild(h('button', { type: 'button', class: 'ctab' + (c.id === cat ? ' on' : ''), onclick: () => { cat = c.id; sfx('click'); draw(); } }, h('span', { text: c.icon || '•' }), h('b', { text: c.name }))));
-        grid.innerHTML = ''; const its = D.ITEMS.filter((i) => i.cat === cat && p.owned.includes(i.id));
-        if (!its.length) grid.appendChild(h('p', { class: 'hint', text: 'Aún no tienes objetos de esta categoría. ¡Consíguelos en la Ciudad!' }));
-        its.forEach((it) => grid.appendChild(h('button', { type: 'button', class: 'ochip r-' + it.rarity + (p.look[it.cat] === it.id ? ' on' : ''), onclick: () => { St.equip(it.id); sfx('select'); N.update(P + '/players/' + pid, { look: p.look }).catch(() => {}); draw(); } }, it.name)));
+        grid.innerHTML = ''; const its = D.ITEMS.filter((i) => i.cat === cat);
+        its.forEach((it) => grid.appendChild(h('button', { type: 'button', class: 'ochip r-' + it.rarity + (p.look[it.cat] === it.id ? ' on' : ''), onclick: () => { if (!p.lookBackup) p.lookBackup = JSON.parse(JSON.stringify(p.look)); p.look[it.cat] = it.id; St.save(); sfx('select'); N.update(P + '/players/' + pid, { look: p.look }).catch(() => {}); draw(); } }, it.name)));
       };
-      draw(); modal({ title: 'Cámbiate de ropa', body: h('div', { class: 'outfit' }, h('div', { class: 'oprevbox' }, prev), tabs, grid), buttons: [{ label: 'Listo' }] });
+      draw(); modal({ title: 'Cámbiate de ropa', body: h('div', { class: 'outfit' }, h('div', { class: 'oprevbox' }, prev), h('p', { class: 'hint', text: '🎁 Dentro de la sala toda la ropa es gratis. Al salir recuperas tu ropa de siempre.' }), tabs, grid), buttons: [{ label: 'Listo' }] });
     }
     function openSound() {
       const mp = h('div', { class: 'seg' });
@@ -640,7 +689,7 @@
       const emo = h('div', { class: 'emotes' }, root.DuiXPlaza.EMOTES.map((e) => h('button', { type: 'button', class: 'emo', 'aria-label': 'Emote ' + e, onclick: () => { sfx('click'); N.update(P + '/pos/' + pid, { e, et: N.TS }).catch(() => {}); if (e === '💃') sfx('levelup'); } }, e)).concat([h('button', { type: 'button', class: 'emo emo-wheel', 'aria-label': 'Rueda de emotes', onclick: () => { sfx('select'); K.emoteWheel((it) => { N.update(P + '/pos/' + pid, { e: 'dance:' + it.id, et: N.TS }).catch(() => {}); }); } }, '💃 Emotes')]));
       const plist = h('div', { class: 'plist' }), count = h('b', { class: 'pc', text: '0' });
       refs = { plist, count };
-      const title = mode === 'lobby' ? (isHost ? 'Sala lista' : 'Estás dentro') : mode === 'live' ? (my.finished ? '¡Terminaste!' : 'Partida en curso') : '¡Fin de la partida!';
+      const title = mode === 'lobby' ? (isHost ? 'Sala lista' : 'Estás dentro') : mode === 'live' ? (my.dead ? (my.dead === 'kill' ? '💀 Te eliminaron · modo espectador' : '🗳️ Te expulsaron · modo espectador') : my.finished ? '¡Terminaste!' : 'Partida en curso') : '¡Fin de la partida!';
       const sub = mode === 'lobby' ? (isHost ? 'Los demás entran en DuiX → Salas con este código. ¡Mientras tanto, camina, baila y cámbiate de ropa!' : 'Espera a que el anfitrión empiece. ¡Camina por la plaza, haz emotes y cámbiate de ropa!') : mode === 'live' ? 'Espera a que terminen los demás mientras paseas por la plaza.' : (isHost ? 'Cuando todos estén en la plaza, abre una nueva partida.' : 'Espera a que el anfitrión abra una nueva partida.');
       const parts = [
         h('div', { class: 'rtop' }, h('button', { class: 'btn small ghost', type: 'button', onclick: () => confirmLeave() }, isHost ? 'Cerrar sala' : 'Salir'), mode === 'live' && isHost ? h('button', { class: 'btn small', type: 'button', onclick: () => { sfx('click'); hostEnd(); } }, 'Terminar ya ⏹') : null, h('button', { class: 'gear', type: 'button', 'aria-label': isHost ? 'Configurar la sala' : 'Ajustes de sonido', onclick: () => { sfx('select'); if (isHost && mode !== 'live') openHostConfig(); else openSound(); } }, '⚙')),

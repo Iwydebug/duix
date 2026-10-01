@@ -213,7 +213,7 @@
       return {
         fifty: { cost: fiftyCost(), ok: !q._f && wr().length >= 2 && coins >= fiftyCost(), why: q._f ? 'Ya la usaste en esta pregunta' : wr().length < 2 ? 'Ya quedan pocas respuestas' : 'Te faltan monedas' },
         hint: { cost: hintTxtCost(), ok: !q._h && coins >= hintTxtCost(), why: q._h ? 'Ya la usaste en esta pregunta' : 'Te faltan monedas' },
-        doFifty() { const a = wr(); if (!q._f && a.length >= 2 && St.spend(fiftyCost())) { q._f = 1; for (let k = 0; k < Math.min(2, a.length - 1); k++) a.splice(Math.floor(Math.random() * a.length), 1)[0].crossed = true; st.hintsUsed++; A.sfx('hint'); prog(); } },
+        doFifty() { const a = wr(); if (!q._f && a.length >= 2 && St.spend(fiftyCost())) { q._f = 1; for (let k = 0, nk = Math.min(2, a.length - 1); k < nk; k++) a.splice(Math.floor(Math.random() * a.length), 1)[0].crossed = true; st.hintsUsed++; A.sfx('hint'); prog(); } },
         doHint() { if (!q._h && St.spend(hintTxtCost())) { q._h = 1; st.hintsUsed++; A.sfx('hint'); H_.showHintText($('.bt-explain'), '💡 Pista: ' + (q.hint || 'Relee con calma y descarta los carteles que no tienen sentido.')); prog(); } },
       };
     }
@@ -446,7 +446,7 @@
       return {
         fifty: { cost: fiftyCost(), ok: !q._f && wr().length >= 2 && coins >= fiftyCost(), why: q._f ? 'Ya la usaste en esta pregunta' : wr().length < 2 ? 'Ya quedan pocos fantasmas' : 'Te faltan monedas' },
         hint: { cost: hintTxtCost(), ok: !q._h && coins >= hintTxtCost(), why: q._h ? 'Ya la usaste en esta pregunta' : 'Te faltan monedas' },
-        doFifty() { const a = wr(); if (!q._f && a.length >= 2 && St.spend(fiftyCost())) { q._f = 1; for (let k = 0; k < Math.min(2, a.length - 1); k++) { const g = a.splice(Math.floor(rnd() * a.length), 1)[0]; g.gone = true; const gp = posOf(g); burst(gp.x, gp.y, ['#ff4d4d', '#fff'], 16, 140, 0.6); } st.hintsUsed++; A.sfx('hint'); hintT = 1; prog(); } },
+        doFifty() { const a = wr(); if (!q._f && a.length >= 2 && St.spend(fiftyCost())) { q._f = 1; for (let k = 0, nk = Math.min(2, a.length - 1); k < nk; k++) { const g = a.splice(Math.floor(rnd() * a.length), 1)[0]; g.gone = true; const gp = posOf(g); burst(gp.x, gp.y, ['#ff4d4d', '#fff'], 16, 140, 0.6); } st.hintsUsed++; A.sfx('hint'); hintT = 1; prog(); } },
         doHint() { if (!q._h && St.spend(hintTxtCost())) { q._h = 1; st.hintsUsed++; A.sfx('hint'); H_.showHintText($('.bt-explain'), '💡 Pista: ' + (q.hint || 'Relee con calma y descarta los fantasmas que no tienen sentido.')); prog(); } },
       };
     }
@@ -587,9 +587,9 @@
   };
   /* Práctica dentro del mismo juego: una mini-ronda con 1 pregunta fácil, sin vidas ni puntaje, con una tira-guía arriba. Se puede omitir. */
   function withTutorial(cfg, kind, startFn) {
-    const key = 'duix.tut.' + kind; let seen = false;
-    try { seen = localStorage.getItem(key) === '1'; } catch (e) { /* ok */ }
-    if (seen || cfg.noTutorial || cfg.room || root.__noTutorial) return startFn(cfg);
+    // Tutorial obligatorio (con opción de omitir) en los 3 primeros niveles (tablero 1) para CADA perfil nuevo
+    let seen = false; try { const pr0 = St.profile(); seen = !!(pr0 && pr0.tutDone && pr0.tutDone[kind]); } catch (e) { /* ok */ }
+    if (seen || cfg.noTutorial || cfg.room || root.__noTutorial || !cfg.villain || cfg.villain.n !== 1 || cfg.villain.endless) return startFn(cfg);
     const T = TUT[kind]; let inner = null, dead = false, timer = 0, switched = false, si = 0, stepT0 = Date.now(), flashUntil = 0, base = null;
     const strip = el('div', 'coach'); strip.setAttribute('role', 'status');
     const playing = () => { if (!inner) return false; if (kind === 'shoot') return inner.state && inner.state.state === 'play'; const d = kind === 'run' ? inner._run : inner._mz; return !!d && d.st === 'play'; };
@@ -628,20 +628,22 @@
       let ok = false; try { ok = s.done(base); } catch (e) { ok = false; }
       if (ok) { si++; base = null; stepT0 = Date.now(); flashUntil = Date.now() + 900; A.sfx('coin'); draw(); setTimeout(() => { if (!dead && !switched) draw(); }, 950); }
     }, 220);
-    const seenNow = () => { try { localStorage.setItem(key, '1'); } catch (e) { /* ok */ } };
+    const seenNow = () => { try { const pr0 = St.profile(); pr0.tutDone = pr0.tutDone || {}; pr0.tutDone[kind] = 1; St.save(); } catch (e) { /* ok */ } };
     let pq; try { pq = Q.generate(cfg.villain.topic === 'mix' || cfg.villain.endless ? 'fracciones' : cfg.villain.topic, 1); } catch (e) { pq = Q.generate('fracciones', 1); }
+    const modal = (txt, btn, onOk, skip) => { const m = el('div', 'tut-modal'); m.innerHTML = `<div class="tm-card"><p>${esc(txt)}</p><button class="tm-ok" type="button">${esc(btn)}</button>${skip ? '<button class="tm-skip" type="button">Omitir</button>' : ''}</div>`; cfg.container.appendChild(m); const ok = () => { A.unlock(); A.sfx('select'); m.remove(); onOk(); }; m.querySelector('.tm-ok').addEventListener('click', ok); const sk = m.querySelector('.tm-skip'); if (sk) sk.addEventListener('click', () => { m.remove(); toReal(); }); return m; };
     function toReal() {
       if (switched || dead) return; switched = true; clearInterval(timer); seenNow();
-      if (inner) inner.destroy(); strip.remove();
+      document.querySelectorAll('.tut-modal').forEach((m) => m.remove()); if (inner) inner.destroy(); strip.remove();
       inner = startFn(cfg);
       const go = el('div', 'coach-go'); go.textContent = '¡Ahora sí: el juego de verdad!'; cfg.container.appendChild(go); setTimeout(() => go.remove(), 1900);
     }
     strip.addEventListener('click', (e) => { if (e.target.closest('[data-a=skip]')) { A.sfx('click'); toReal(); } });
     const pcfg = Object.assign({}, cfg, { extraTop: strip, onProgress: null, speedMul: () => 0.75, fallSecs: 42,
       room: { total: 1, getQuestion: () => pq, hp: () => ({ frac: 1, text: 'Práctica' }), noHearts: true, label: '🎓 Práctica' },
-      onEnd: () => { setTimeout(toReal, 0); },
+      onEnd: () => { setTimeout(() => { if (switched || dead) return; if (inner) { try { inner.destroy(); } catch (e) { /* ok */ } inner = null; } modal('¡Felicidades! Ya estás listo para tu primer juego.', 'Jugar', toReal, false); A.sfx('levelup'); }, 0); },
       onQuit: () => { clearInterval(timer); dead = true; cfg.onQuit && cfg.onQuit(); }, onRestart: null });
-    inner = startFn(pcfg);
+    const welcome = { 'shoot': 'Antes de jugar de verdad te enseñamos los controles del juego de DISPARO. Solo sigue las instrucciones.', 'run': 'Antes de jugar de verdad te enseñamos los controles de la CARRERA. Solo sigue las instrucciones.', 'maze': 'Antes de jugar de verdad te enseñamos los controles del LABERINTO. Solo sigue las instrucciones.' }[kind];
+    modal('¡Bienvenido! ' + welcome, 'OK', () => { if (!dead && !switched && !inner) inner = startFn(pcfg); }, true);
     const none = { mistakes: [], score: 0, correct: 0, answered: 0, bestStreak: 0, hearts: 3 };
     return { destroy() { dead = true; clearInterval(timer); strip.remove(); if (inner) inner.destroy(); }, refresh() { if (inner && inner.refresh) inner.refresh(); }, pause() { if (inner && inner.pause) inner.pause(); },
       get state() { return inner ? inner.state : none; }, get _mz() { return inner && inner._mz; }, get _run() { return inner && inner._run; }, get _fire() { return inner && inner._fire; }, get _caps() { return inner && inner._caps; }, get _hint() { return inner && inner._hint; }, get _power() { return inner && inner._power; } };

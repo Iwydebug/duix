@@ -124,6 +124,13 @@ Así nadie puede listar todas las salas: solo entra quien conoce el código. Las
 - Retroalimentación solo al final. Avatares corregidos. Créditos con el tema del juego, «Deiwy Mondragon» y citas de Precálculo y Cálculo (Stewart).
 - Salas: impostores con Ninguno / Auto / 1 / 2 / 3 y casilla numérica.
 
+## Novedades 1.8.4
+- **Tutorial tipo Parchís** (bienvenida → pasos guiados → felicitaciones, con *Omitir*) en los 3 primeros niveles (tablero 1: disparo, carrera, laberinto) y para CADA perfil nuevo, aunque borres el avatar y crees otro.
+- **Salas estilo Among Us**: el impostor puede ☠️ *Eliminar* a un tripulante (el villano del tema se lo come con animación); el eliminado sigue viendo la partida como espectador.
+- **Votación real**: el más votado sale de la sala (impostor o inocente) con animación del villano y revelación; empate = nadie sale. Los expulsados quedan como espectadores (💀 en el ranking).
+- **Ropa gratis solo dentro de la sala** (al salir se recupera la ropa real).
+- **50/50** ahora quita 2 respuestas cuando hay 4 (error corregido).
+
 ## Novedades 1.8.3
 - **Feedback más puntual**: las explicaciones de las 104 familias de preguntas ahora muestran el procedimiento paso a paso con los números de cada ejercicio y el error común.
 - **Ruleta**: se quitó el texto de probabilidades (sigue siendo equiprobable).

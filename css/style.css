@@ -907,3 +907,24 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:var(--safe-t,
 @keyframes emgp{50%{transform:scale(1.07)}}
 .rov.emg{z-index:90;background:rgba(40,0,10,.92)}
 .emgbox{border-color:#ff4d6d!important}
+
+/* v1.8.3: tutorial estilo Parchís */
+.tut-modal{position:fixed;inset:0;z-index:95;display:grid;place-items:center;background:rgba(10,4,30,.72);padding:16px}
+.tm-card{width:min(92%,420px);padding:28px 20px 20px;border-radius:22px;border:4px solid #ffd23f;background:linear-gradient(180deg,#b02f78,#5c0f55);box-shadow:0 8px 0 #000;text-align:center;color:#fff;display:grid;gap:18px}
+.tm-card p{margin:0;font:800 clamp(18px,5vw,23px)/1.3 system-ui;text-shadow:0 2px 0 #0006}
+.tm-ok{justify-self:center;min-width:170px;padding:12px 26px;border-radius:999px;border:4px solid #ffd23f;background:linear-gradient(180deg,#3df03d,#12b312);color:#fff;font:900 24px system-ui;text-shadow:0 2px 0 #0a5a0a;cursor:pointer;box-shadow:0 4px 0 #000}
+.tm-skip{justify-self:center;background:none;border:0;color:#fff;opacity:.8;font:700 14px system-ui;text-decoration:underline;cursor:pointer;padding:6px}
+/* v1.8.3: expulsión / eliminación — el villano del tema se come al jugador */
+.rov.eat{background:rgba(6,3,20,.94);z-index:92}
+.eatwrap{display:grid;justify-items:center;align-content:center;gap:14px;width:100%;min-height:100%;padding:16px;color:#fff;text-align:center}
+.eat-stage{position:relative;width:240px;height:260px}
+.eat-v{position:absolute;left:50%;top:0;transform:translate(-50%,-140%);animation:eatDrop .7s .1s cubic-bezier(.3,1.5,.5,1) forwards,eatChomp .3s 1.1s 4 alternate ease-in-out;filter:drop-shadow(0 8px 0 #0008)}
+.eat-p{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);width:72px;height:72px;animation:eatSuck 1s 1.3s ease-in forwards}
+.eat-p>*{width:100%!important;height:100%!important}
+@keyframes eatDrop{to{transform:translate(-50%,10%)}}
+@keyframes eatChomp{from{transform:translate(-50%,10%) scale(1,1)}to{transform:translate(-50%,10%) scale(1.06,.88)}}
+@keyframes eatSuck{0%{transform:translateX(-50%) scale(1) rotate(0)}70%{transform:translate(-50%,-150px) scale(.5) rotate(200deg);opacity:1}100%{transform:translate(-50%,-190px) scale(0) rotate(360deg);opacity:0}}
+.eat-res{display:grid;gap:6px}.eat-res h2{margin:0;font:900 clamp(22px,6.5vw,30px) system-ui;text-shadow:0 3px 0 #000}
+.eat-res .vt{font:900 11px system-ui;letter-spacing:.16em;color:#ffd23f}
+.eatwrap.was-imp .eat-t{color:#5ce1e6}.eatwrap.was-crew .eat-t{color:#ff6a86}
+.rov.kill .vbox{border-color:#ff4d6d}

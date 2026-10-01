@@ -248,7 +248,7 @@
       return {
         fifty: { cost: fiftyCost(), ok: !q._f && wrong.length >= 2 && coins >= fiftyCost(), why: q._f ? 'Ya la usaste en esta pregunta' : wrong.length < 2 ? 'Ya quedan pocas respuestas' : 'Te faltan monedas' },
         hint: { cost: hintTxtCost(), ok: !q._h && coins >= hintTxtCost(), why: q._h ? 'Ya la usaste en esta pregunta' : 'Te faltan monedas' },
-        doFifty() { const w = caps.filter((c) => c.state === 'fall' && !c.ok); if (!q._f && w.length >= 2 && St.spend(fiftyCost())) { q._f = 1; for (let k = 0; k < Math.min(2, w.length - 1); k++) { const c = w.splice(Math.floor(Math.random() * w.length), 1)[0]; c.state = 'dead'; burst(c.x, c.y + c.h / 2, ['#ffe14a', '#fff'], 18, 120, 0.5); float(c.x, c.y, 'Descartada', '#ffe14a', 13); } st.hintsUsed++; A.sfx('hint'); renderHud(); } },
+        doFifty() { const w = caps.filter((c) => c.state === 'fall' && !c.ok); if (!q._f && w.length >= 2 && St.spend(fiftyCost())) { q._f = 1; for (let k = 0, nk = Math.min(2, w.length - 1); k < nk; k++) { const c = w.splice(Math.floor(Math.random() * w.length), 1)[0]; c.state = 'dead'; burst(c.x, c.y + c.h / 2, ['#ffe14a', '#fff'], 18, 120, 0.5); float(c.x, c.y, 'Descartada', '#ffe14a', 13); } st.hintsUsed++; A.sfx('hint'); renderHud(); } },
         doHint() { if (!q._h && St.spend(hintTxtCost())) { q._h = 1; st.hintsUsed++; A.sfx('hint'); showHintText($('.bt-explain'), '💡 Pista: ' + (q.hint || 'Relee con calma y descarta las respuestas que no tienen sentido.')); renderHud(); } },
       };
     }
