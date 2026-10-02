@@ -77,7 +77,7 @@
     const m = $('#modal'); m.innerHTML = ''; m.hidden = false;
     const close = () => { m.hidden = true; m.innerHTML = ''; };
     const box = h('div', { class: 'mbox' + (o.cls ? ' ' + o.cls : '') }, o.title ? h('h2', { text: o.title }) : null, o.body, h('div', { class: 'mbtns' }, (o.buttons || [{ label: 'Cerrar' }]).map((b) => h('button', { class: 'btn ' + (b.cls || ''), onclick: () => { close(); if (b.onClick) b.onClick(); sfx('click'); } }, b.label))));
-    m.appendChild(box); m.onclick = (e) => { if (e.target === m && !o.locked) close(); }; return close;
+    m.appendChild(box); try { root.DuiXQ.fitTables(box); setTimeout(() => root.DuiXQ.fitTables(box), 60); } catch (e) { /* ok */ } m.onclick = (e) => { if (e.target === m && !o.locked) close(); }; return close;
   }
   function announceAch(list) { (list || []).forEach((a, i) => setTimeout(() => { toast(`<b>🏆 Logro: ${esc(a.name)}</b><br>+${a.coins} monedas${a.item && D.ITEM_BY_ID[a.item] ? ' · ' + esc(D.ITEM_BY_ID[a.item].name) : ''}`, 'ach', 4200); sfx('levelup'); }, i * 900)); }
 

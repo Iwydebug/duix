@@ -1030,3 +1030,38 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:var(--safe-t,
 .qgraph{display:block;margin:4px auto 0;width:min(100%,190px);height:auto;border:2px solid var(--ink,#1a1033);border-radius:10px}
 .bt-qtable .qgraph{width:min(100%,150px)}
 .mtable .qgraph{width:min(100%,200px)}
+
+/* ===== v1.9.2: tablas/gráficas siempre completas y nítidas ===== */
+.bt-qtable, .bt-bigtab, .mtable { max-width: 100%; }
+.bt-qtable table, .bt-bigtab table, .mtable table { --tf: 15px; width: auto; max-width: 100%; table-layout: auto; }
+.bt-qtable td, .bt-qtable th, .bt-bigtab td, .bt-bigtab th, .mtable td, .mtable th { min-width: 0 !important; padding: .22em .5em !important; font-size: var(--tf) !important; white-space: nowrap; line-height: 1.25; }
+.wh-modal .mtable td, .wh-modal .mtable th { font-size: var(--tf) !important; }
+.qgraph { display: block; margin: 6px auto 2px; width: min(100%, 300px) !important; height: auto; max-height: 36vh; border: 3px solid #000; border-radius: 12px; background: #fff; image-rendering: auto; shape-rendering: geometricPrecision; }
+.bt-q .qgraph, .bt-big .qgraph { width: min(100%, 250px) !important; max-height: 30vh; }
+.modal { padding: 12px; }
+.mbox { max-height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+/* ===== v1.9.2: modo HORIZONTAL (celular de lado): pregunta a la izquierda, juego a la derecha ===== */
+@media (orientation: landscape) and (max-height: 560px) {
+  .bt { position: relative; box-sizing: border-box; padding-right: 56%; }
+  .bt > .bt-field { position: absolute !important; top: 0; bottom: 0; right: 0; left: 44%; margin: 0 !important; height: auto; border-left: 3px solid #000; }
+  .bt-hud { padding: calc(4px + var(--safe-t, 0px)) 8px 2px; }
+  .bt-hearts { min-width: 0; } .bt-hearts img { width: 20px; height: 20px; }
+  .bt-score { font-size: 13px; } .bt-combo { height: 12px; font-size: 10px; }
+  .bt-right { min-width: 0; } .bt-pause { width: 34px; height: 34px; }
+  .bt-boss { padding: 0 8px 4px; gap: 6px; } .bt-bname { font-size: 13px; }
+  .bt-hpbar { height: 10px; border-width: 2px; }
+  .bt-q { flex: 1 1 auto; min-height: 0 !important; width: calc(100% - 12px) !important; margin: 0 6px !important; padding: 6px 8px !important; overflow: auto; justify-content: flex-start; }
+  .bt-qtag { font-size: 10px; } .bt-qtext, .gm-run .bt-qtext, .gm-maze .bt-qtext { font-size: 15px !important; line-height: 1.2; }
+  .bt-qtext.long, .bt-qtext.mid { font-size: 13.5px !important; }
+  .bt-q .qgraph { max-height: 44vh; width: auto !important; max-width: 100%; }
+  .bt-ctl { padding: 4px 8px calc(4px + var(--safe-b, 0px)) !important; gap: 6px; margin-top: auto; }
+  .bt-ctl .bt-btn { min-width: 0; transform: scale(.85); transform-origin: center; }
+  .bt-keys { font-size: 10px !important; } .bt-keys small { display: none; }
+  .bt-big { left: calc(44% + 8px) !important; right: 8px !important; padding: 8px 10px !important; }
+  .bt-bigtext { font-size: 18px !important; } .bt-bigtext.mid, .bt-bigtext.long, .bt-bigtext.xl { font-size: 15px !important; }
+  .bt-big .qgraph { max-height: 40vh; width: auto !important; }
+  .bt-rank, .bt-hud, .bt-boss { max-width: none; }
+  .mbox { padding: 12px; } .mbox h2 { font-size: 22px; margin-bottom: 6px; }
+  .wh-modal .qgraph { max-height: 32vh; width: auto !important; }
+}

@@ -1226,17 +1226,37 @@ const FSH = [[[-4, -2], [-2, 2], [0, 0], [2, 3], [4, -1]], [[-4, 1], [-2, -2], [
   // Dibujo de gráficas para preguntas (devuelve SVG como texto). g = { pts:[[x,y]...], dots:[[x,y]...], lbl:'y = f(x)', r:5 }
   function graphSVG(g) {
     if (!g) return '';
-    const r = g.r || 5, W = 190, H = 150, px = (x) => (W / 2 + (x / r) * (W / 2 - 10)).toFixed(1), py = (y) => (H / 2 - (y / r) * (H / 2 - 10)).toFixed(1);
-    let s = `<svg class="qgraph" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Gráfica">`;
-    s += `<rect width="${W}" height="${H}" rx="8" fill="#fff"/>`;
-    for (let k = -r; k <= r; k++) { s += `<line x1="${px(k)}" y1="6" x2="${px(k)}" y2="${H - 6}" stroke="${k ? '#dfe3ef' : '#1a1033'}" stroke-width="${k ? 1 : 1.8}"/><line x1="6" y1="${py(k)}" x2="${W - 6}" y2="${py(k)}" stroke="${k ? '#dfe3ef' : '#1a1033'}" stroke-width="${k ? 1 : 1.8}"/>`; if (k && k % 2 === 0) s += `<text x="${px(k)}" y="${(H / 2 + 11).toFixed(0)}" font-size="8" text-anchor="middle" fill="#555">${k}</text><text x="${(W / 2 - 4).toFixed(0)}" y="${(+py(k) + 3).toFixed(0)}" font-size="8" text-anchor="end" fill="#555">${k}</text>`; }
-    s += `<text x="${W - 8}" y="${H / 2 - 4}" font-size="9" font-weight="800" text-anchor="end" fill="#1a1033">x</text><text x="${W / 2 + 5}" y="14" font-size="9" font-weight="800" fill="#1a1033">y</text>`;
-    if (g.pts) { s += `<polyline fill="none" stroke="#e02a3a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" points="${g.pts.map((p) => px(p[0]) + ',' + py(p[1])).join(' ')}"/>`; g.pts.forEach((p) => { s += `<circle cx="${px(p[0])}" cy="${py(p[1])}" r="3" fill="#e02a3a"/>`; }); }
-    (g.dots || []).forEach((p) => { s += `<circle cx="${px(p[0])}" cy="${py(p[1])}" r="5" fill="#2a6bff" stroke="#000" stroke-width="1.5"/><text x="${(+px(p[0]) + 7).toFixed(0)}" y="${(+py(p[1]) - 6).toFixed(0)}" font-size="10" font-weight="800" fill="#1a1033">(${p[0]}, ${p[1]})</text>`; });
-    if (g.lbl) s += `<text x="8" y="${H - 8}" font-size="11" font-weight="800" fill="#e02a3a">${g.lbl}</text>`;
+    const r = g.r || 5, W = 240, H = 190, m = 14, px = (x) => +(W / 2 + (x / r) * (W / 2 - m)).toFixed(1), py = (y) => +(H / 2 - (y / r) * (H / 2 - m)).toFixed(1);
+    const halo = 'paint-order="stroke" stroke="#fff" stroke-width="3.5" stroke-linejoin="round"';
+    let s = `<svg class="qgraph" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Gráfica" preserveAspectRatio="xMidYMid meet">`;
+    s += `<rect width="${W}" height="${H}" rx="10" fill="#fff"/>`;
+    for (let k = -r; k <= r; k++) { const ax = k === 0; s += `<line x1="${px(k)}" y1="${m - 4}" x2="${px(k)}" y2="${H - m + 4}" stroke="${ax ? '#1a1033' : '#d6dbea'}" stroke-width="${ax ? 2 : 1}"/><line x1="${m - 4}" y1="${py(k)}" x2="${W - m + 4}" y2="${py(k)}" stroke="${ax ? '#1a1033' : '#d6dbea'}" stroke-width="${ax ? 2 : 1}"/>`; }
+    const step = r > 6 ? 2 : 1;
+    for (let k = -r; k <= r; k++) if (k && k % step === 0) s += `<text x="${px(k)}" y="${H / 2 + 13}" font-size="11" font-weight="700" text-anchor="middle" fill="#333" ${halo}>${k}</text><text x="${W / 2 - 5}" y="${py(k) + 4}" font-size="11" font-weight="700" text-anchor="end" fill="#333" ${halo}>${k}</text>`;
+    s += `<text x="${W - 8}" y="${H / 2 - 6}" font-size="13" font-weight="900" text-anchor="end" fill="#1a1033">x</text><text x="${W / 2 + 7}" y="15" font-size="13" font-weight="900" fill="#1a1033">y</text>`;
+    if (g.pts) { s += `<polyline fill="none" stroke="#e02a3a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round" points="${g.pts.map((p) => px(p[0]) + ',' + py(p[1])).join(' ')}"/>`; g.pts.forEach((p) => { s += `<circle cx="${px(p[0])}" cy="${py(p[1])}" r="3.5" fill="#e02a3a"/>`; }); }
+    (g.dots || []).forEach((p) => {
+      const cx = px(p[0]), cy = py(p[1]), right = cx < W * 0.62, below = cy < H * 0.35;
+      s += `<line x1="${cx}" y1="${cy}" x2="${cx}" y2="${H / 2}" stroke="#2a6bff" stroke-width="1.5" stroke-dasharray="3 3"/><line x1="${cx}" y1="${cy}" x2="${W / 2}" y2="${cy}" stroke="#2a6bff" stroke-width="1.5" stroke-dasharray="3 3"/>`;
+      s += `<circle cx="${cx}" cy="${cy}" r="6" fill="#2a6bff" stroke="#000" stroke-width="2"/><text x="${right ? cx + 10 : cx - 10}" y="${below ? cy + 20 : cy - 10}" font-size="13" font-weight="900" text-anchor="${right ? 'start' : 'end'}" fill="#0a2a8a" ${halo}>(${String(p[0]).replace('-', '−')}, ${String(p[1]).replace('-', '−')})</text>`;
+    });
+    if (g.lbl) s += `<text x="10" y="${H - 9}" font-size="14" font-weight="900" fill="#c4121f" ${halo}>${g.lbl}</text>`;
     return s + '</svg>';
   }
+  // Ajusta las tablas al ancho disponible (sin recortes) reduciendo la letra lo necesario
+  function fitTables(scope) {
+    try {
+      const doc = scope || document;
+      doc.querySelectorAll('.bt-qtable table, .bt-bigtab table, .mtable table').forEach((t) => {
+        const box = t.parentNode; if (!box) return;
+        let avail = box.clientWidth; if (!avail) return;
+        let fs = 17; t.style.setProperty('--tf', fs + 'px');
+        while (t.offsetWidth > avail - 2 && fs > 7) { fs -= 0.5; t.style.setProperty('--tf', fs + 'px'); }
+      });
+    } catch (e) { /* ok */ }
+  }
+  if (typeof window !== 'undefined') ['resize', 'orientationchange'].forEach((ev) => window.addEventListener(ev, () => { setTimeout(() => fitTables(), 60); setTimeout(() => fitTables(), 400); }));
 
-  const API = { graphSVG, TOPICS, generate, generateAny, _gens: G, _setRandom: (fn) => { R = fn; }, _fmt: { poly, ifmt, fs, rad, exact } };
+  const API = { graphSVG, fitTables, TOPICS, generate, generateAny, _gens: G, _setRandom: (fn) => { R = fn; }, _fmt: { poly, ifmt, fs, rad, exact } };
   if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.DuiXQ = API;
 })(typeof window !== 'undefined' ? window : globalThis);

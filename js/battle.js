@@ -147,7 +147,7 @@
       const bar = bg.querySelector('.bt-bigbar i'); bar.style.transition = 'none'; bar.style.width = '100%'; void bar.offsetWidth; bar.style.transition = 'width ' + st.readFor + 's linear'; bar.style.width = '0%';
       bg.classList.remove('settle'); bg.style.transition = 'none'; bg.style.transform = ''; bg.style.opacity = ''; bg.hidden = false; bg.classList.add('pop');
       { const fr = $('.bt-field').getBoundingClientRect(), wr = wrap.getBoundingClientRect(); bg.style.top = '0px'; const hh = bg.offsetHeight; bg.style.top = Math.max(fr.top - wr.top + 8, fr.top - wr.top + fr.height * 0.42 - hh / 2) + 'px'; }
-      qbox.style.visibility = 'hidden'; st.bigOn = true; A.sfx('tick');
+      bg.querySelector('.bt-bigtab').innerHTML = $('.bt-qtable').innerHTML; Q.fitTables(wrap); qbox.style.visibility = 'hidden'; st.bigOn = true; A.sfx('tick');
     }
     function settleBig() {
       const bg = $('.bt-big'), qbox = $('.bt-q'); bg.classList.remove('pop');
@@ -164,6 +164,7 @@
       const tb = $('.bt-qtable'); tb.innerHTML = '';
       if (q.table) { let h = '<table><tr>' + q.table.head.map((c, i) => (i ? '<td>' : '<th>') + esc(c) + (i ? '</td>' : '</th>')).join('') + '</tr>'; q.table.rows.forEach((r) => { h += '<tr>' + r.map((c, i) => (i ? '<td class="' + (c === '?' ? 'qm' : '') + '">' : '<th>') + esc(c) + (i ? '</td>' : '</th>')).join('') + '</tr>'; }); tb.innerHTML = h + '</table>'; }
       if (q.graph) tb.innerHTML = Q.graphSVG(q.graph);
+      Q.fitTables(wrap); setTimeout(() => Q.fitTables(wrap), 80);
       $('.bt-explain').hidden = true;
       const speed = baseSpeed() * (1 + Math.min(0.15, st.qIndex * 0.01)) * (1 - (perks.slow || 0)) * (endless ? 1 + Math.min(0.6, st.correct * 0.02) : 1);
       caps.length = 0;

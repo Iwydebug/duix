@@ -102,7 +102,7 @@
         bg.style.transition = 'none'; bg.style.transform = ''; bg.style.opacity = ''; bg.hidden = false; bg.classList.remove('pop'); void bg.offsetWidth; bg.classList.add('pop');
         const fr = $('.bt-field').getBoundingClientRect(), wr = c.wrap.getBoundingClientRect(); bg.style.top = '0px'; const hh = bg.offsetHeight;
         bg.style.top = Math.max(fr.top - wr.top + 8, fr.top - wr.top + fr.height * 0.42 - hh / 2) + 'px';
-        qbox.style.visibility = 'hidden'; A.sfx('tick');
+        root.DuiXQ.fitTables(c.wrap); qbox.style.visibility = 'hidden'; A.sfx('tick');
       },
       settle() {
         const bg = $('.bt-big'), qbox = $('.bt-q'); bg.classList.remove('pop');
@@ -119,6 +119,7 @@
     const tb = $('.bt-qtable'); tb.innerHTML = '';
     if (q.table) { let h = '<table><tr>' + q.table.head.map((x, i) => (i ? '<td>' : '<th>') + esc(x) + (i ? '</td>' : '</th>')).join('') + '</tr>'; q.table.rows.forEach((r) => { h += '<tr>' + r.map((x, i) => (i ? '<td class="' + (x === '?' ? 'qm' : '') + '">' : '<th>') + esc(x) + (i ? '</td>' : '</th>')).join('') + '</tr>'; }); tb.innerHTML = h + '</table>'; }
     if (q.graph) tb.innerHTML = root.DuiXQ.graphSVG(q.graph);
+    root.DuiXQ.fitTables(c.wrap); setTimeout(() => root.DuiXQ.fitTables(c.wrap), 80);
     $('.bt-explain').hidden = true;
   }
   const explainBox = (c, t, ms) => { const e = c.$('.bt-explain'); e.textContent = t; e.hidden = false; clearTimeout(e._t); e._t = setTimeout(() => { e.hidden = true; }, ms || 6000); };

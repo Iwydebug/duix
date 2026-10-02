@@ -184,3 +184,7 @@ Así nadie puede listar todas las salas: solo entra quien conoce el código. Las
 
 ## Novedades 1.9.1
 - Código secreto del autor en Ajustes (modo desarrollador): monedas, sigmas, giros y vidas infinitos, todo desbloqueado.
+
+## Novedades 1.9.2
+- Tablas y gráficas siempre completas y nítidas: las tablas se ajustan solas al ancho (sin recortes) y las gráficas son más grandes, con números legibles.
+- Modo horizontal: la pregunta queda a la izquierda y el juego a la derecha (disparo, carrera, laberinto y salas). Las ventanas largas se pueden deslizar.
