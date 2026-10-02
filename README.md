@@ -163,3 +163,10 @@ Así nadie puede listar todas las salas: solo entra quien conoce el código. Las
 - **Vestidor**: sin cartel grande; el botón Comprar sale dentro de la tarjeta del objeto.
 - **Salas**: botones flotantes pequeños y movibles; todos juegan el mismo juego a la vez, con sala de espera y votación de impostor entre juegos; al final se anuncia quién ganó.
 - **Tutorial** paso a paso dentro del propio juego.
+
+## Novedades 1.8.7
+- Tutorial lento y guiado estilo Parchís (flecha que señala dónde disparar/qué hacer, pausas, sin "¡Muy bien!").
+- Preguntas por nivel: nivel 1 = 3, nivel 2 = 2, nivel 3 = 1.
+- Carrera: sin salto, movimiento libre hacia todos lados.
+- Mapa: sabotajes del impostor (Apagón, Turbo, Niebla, Robo), túneles para teletransportarse, iconos más grandes y flechas en el borde, cámara sin recortes en los límites, escenarios con nombres de temas y decoración matemática.
+- Al expulsar a alguien sale siempre un villano al azar entre los existentes.

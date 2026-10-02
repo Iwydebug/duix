@@ -44,7 +44,7 @@
     const root_ = cfg.container;
     const level = () => (endless ? Math.min(3, 1 + Math.floor(st.correct / 5)) : v.topic === 'mix' ? Math.max(2, tier) : tier);
     // Preguntas por pelea: bajan al subir la dificultad (villano normal 4·3·2, jefe 5·4·3). En sala las fija el anfitrión.
-    const QUESTIONS_PER_FIGHT = (v.boss ? [5, 4, 3] : [4, 3, 2])[tier - 1] || 4, room = cfg.room || null;
+    const QUESTIONS_PER_FIGHT = 3, room = cfg.room || null;
     const maxHp = endless ? Infinity : room ? room.total : QUESTIONS_PER_FIGHT;
     const amb = root.DuiXAmbient ? root.DuiXAmbient.scene({ seed: v.id, topic: v.topic === 'mix' ? 'all' : v.topic, pal: v.pal, mode: 'battle' }) : null;
     let lastSnap = '';
@@ -173,7 +173,7 @@
       st.spawnT = 0;
       st.state = 'read'; st.stateT = 0;
       { const more = cfg.moreTime ? 1.7 : 1, len = q.text.length + (q.table ? 30 : 0) + q.options.reduce((a, o) => a + o.length, 0) * 0.4;
-        st.readFor = Math.min(room ? 6 : 10, Math.max(room ? 3 : 4, 2 + len * 0.06)) * more; if (st.qIndex > 1) st.readFor = Math.max(room ? 2.5 : 3, st.readFor * 0.75); }
+        st.readFor = Math.min(room ? 6 : 10, Math.max(room ? 3 : 4, 2 + len * 0.06)) * more * (cfg.readMul || 1); if (st.qIndex > 1) st.readFor = Math.max(room ? 2.5 : 3, st.readFor * 0.75); }
       showBig(q);
       renderHud();
     }
@@ -442,7 +442,7 @@
     function destroy() { destroyed = true; cancelAnimationFrame(raf); root.removeEventListener('keydown', onKey); root.removeEventListener('resize', resize); document.removeEventListener('visibilitychange', onVis); if (ro) ro.disconnect(); if (wrap.parentNode) wrap.parentNode.removeChild(wrap); }
 
     renderHearts(); renderHud(); resize(); raf = requestAnimationFrame(loop);
-    return { destroy, refresh: renderHud, pause: () => togglePause(true), state: st, _fire: fire, _hint: useHint, _power: usePower, _caps: caps };
+    return { destroy, refresh: renderHud, pause: () => togglePause(true), state: st, _fire: fire, _hint: useHint, _power: usePower, _caps: caps, _pt: (what) => { const s0 = W / LW; if (what === 'hero') return { x: hero.x * s0, y: (hero.y || LH - 60) * s0 }; const c = caps.find((x) => x.ok && x.state === 'fall'); return c ? { x: c.x * s0, y: (c.y + c.h / 2) * s0 } : null; } };
   }
 
 

@@ -127,12 +127,11 @@
    * NIVEL 2 · CARRERA
    * ------------------------------------------------------------------ */
   function startRun(cfg) {
-    const v = cfg.villain, room = cfg.room || null, N = room ? room.total : v.boss ? 4 : 3;
+    const v = cfg.villain, room = cfg.room || null, N = room ? room.total : 2;
     const body = `<div class="bt-q"><div class="bt-qtag"></div><div class="bt-qtext"></div><div class="bt-qtable"></div><div class="bt-explain" hidden></div></div>
       <div class="bt-field"><canvas></canvas><div class="bt-banner" hidden></div></div>${BIGHTML}`;
     const ctl = `<button class="bt-btn bt-hint"><img alt="" src="${S.icon('bulb', 3)}"><span>Ayuda</span><em></em></button>
-      <div class="bt-keys">Arrastra el dedo a los lados · desliza hacia ARRIBA (o toca Saltar) para saltar las minas<br><small>Teclado: ← → o A D · Espacio saltar · H pista</small></div>
-      <button class="bt-btn bt-skip bt-jump"><span>⤒</span><span>Saltar</span></button>`;
+      <div class="bt-keys">Arrastra el dedo para mover a tu héroe en cualquier dirección<br><small>Teclado: flechas o WASD · H pista</small></div>`;
     const c = core(cfg, 'run', body, ctl), st = c.st, $ = c.$, cv = $('.bt-field canvas'), ctx = cv.getContext('2d');
     st.sigma = 0; st.needClean = room ? 0 : Math.ceil(N * 0.5);
     const intro = qIntro(c); let LW = 360, GW = LW / 4 - 6;
@@ -166,7 +165,7 @@
     // relleno entre la pared y el héroe: las minas quedan siempre lejos de los carteles (>= 140 px)
     function spawnFiller(wall) {
       const lane = () => Math.floor(Math.random() * 4), cx = (l) => LW / 4 * (l + 0.5);
-      const top = wall.y + Math.max.apply(null, wall.gates.map((g) => g.h)) + 150, bot = hero.y - 70; let nm = 0;
+      const top = wall.y + Math.max.apply(null, wall.gates.map((g) => g.h)) + 150, bot = LH - 130; let nm = 0;
       for (let y = top; y < bot; y += 66) {
         const r = Math.random(), l = lane();
         if (r < 0.36 && nm < 3) { nm++; items.push({ t: 'mine', x: cx(l), y, got: false }); if (Math.random() < 0.35 && y + 66 < bot) { let l2 = lane(); while (l2 === l) l2 = lane(); items.push({ t: 'coin', x: cx(l2), y, got: false }); } }
@@ -179,7 +178,7 @@
     function beginRead() {
       const q = makeQ(); st.nextQ = q; fillQ(c, q, topicTag(v, q)); state = 'read'; sT = 0; $('.bt-explain').hidden = true;
       const len = q.text.length + (q.table ? 30 : 0) + q.options.reduce((a, o) => a + o.length, 0) * 0.4;
-      readFor = Math.min(room ? 6 : 10, Math.max(room ? 3 : 4, 2 + len * 0.06)); if (spawned > 0) readFor = Math.max(room ? 2.5 : 3, readFor * 0.75);
+      readFor = Math.min(room ? 6 : 10, Math.max(room ? 3 : 4, 2 + len * 0.06)); if (spawned > 0) readFor = Math.max(room ? 2.5 : 3, readFor * 0.75); readFor *= (cfg.readMul || 1);
       intro.show(q, readFor, topicTag(v, q));
     }
     const bad = { text: '' };
@@ -206,7 +205,6 @@
       prog();
     }
     function jump() { if (state !== 'play' || hero.jt > 0 || stun > 0) return; hero.jt = JT; hero.jumps++; A.sfx('hint'); burst(hero.x, hero.y, '#fff', 8, 90, 0.35); }
-    $('.bt-jump').addEventListener('click', () => { A.unlock(); jump(); });
     const H_ = root.DuiXHelp, fiftyCost = () => hintCost(), hintTxtCost = () => Math.max(1, Math.round(hintCost() / 2));
     function hintInfo() {
       const w = walls.find((q) => !q.resolved); if (!w || state !== 'play') return null; const q = w.q, coins = St.profile().coins, wr = () => w.gates.filter((g) => !g.ok && !g.crossed && !g.gone);
@@ -220,13 +218,12 @@
     const hmenu = H_.helpMenu(c.wrap, $('.bt-hint'), hintInfo); const hint = () => hmenu.open();
     $('.bt-hint em').textContent = fiftyCost();
     const toL = (e) => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * LW, y: (e.clientY - r.top) / r.width * LW }; };
-    // el héroe queda EXACTAMENTE debajo del dedo (sin suavizado ni desfase) y solo se mueve a los lados
-    let sy = 0;
-    const aim = (e) => { const p = toL(e); hero.tx = hero.x = clamp(p.x, 20, LW - 20); };
-    cv.addEventListener('pointerdown', (e) => { e.preventDefault(); A.unlock(); drag = true; sy = e.clientY; try { cv.setPointerCapture(e.pointerId); } catch (x) { /* ok */ } aim(e); });
-    cv.addEventListener('pointermove', (e) => { if (!drag) return; aim(e); if (e.clientY > sy) sy = e.clientY; else if (sy - e.clientY > 34) { jump(); sy = e.clientY; } });
+    // movimiento libre y suave en todas las direcciones
+    const aim = (e) => { const p = toL(e); hero.tx = clamp(p.x, 20, LW - 20); hero.ty = clamp(p.y - 44, LH * 0.3, LH - 40); };
+    cv.addEventListener('pointerdown', (e) => { e.preventDefault(); A.unlock(); drag = true; try { cv.setPointerCapture(e.pointerId); } catch (x) { /* ok */ } aim(e); });
+    cv.addEventListener('pointermove', (e) => { if (drag) aim(e); });
     const up = () => { drag = false; }; cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
-    c.keys = (e) => { const k = e.key.toLowerCase(); if (k === 'h') hint(); else if (k === ' ' || k === 'x' || k === 'arrowup' || k === 'w') jump(); };
+    c.keys = (e) => { const k = e.key.toLowerCase(); if (k === 'h') hint(); };
     const kd = (e) => { keys[e.key.toLowerCase()] = true; if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', ' '].includes(e.key.toLowerCase())) e.preventDefault(); }, ku = (e) => { keys[e.key.toLowerCase()] = false; };
     root.addEventListener('keydown', kd); root.addEventListener('keyup', ku);
     root.addEventListener('resize', resize); const ro = root.ResizeObserver ? new ResizeObserver(resize) : null; if (ro) ro.observe($('.bt-field'));
@@ -239,10 +236,9 @@
       floats.forEach((f) => { f.t += dt; f.y -= 26 * dt; }); for (let i = floats.length - 1; i >= 0; i--) if (floats[i].t >= floats[i].life) floats.splice(i, 1);
       shake = Math.max(0, shake - dt * 30); flash = Math.max(0, flash - dt); stun = Math.max(0, stun - dt); slowT = Math.max(0, slowT - dt);
       // movimiento lateral del héroe (dedo directo o teclado) + salto
-      const sp = 250; let kx = 0; if (keys.arrowleft || keys.a) kx -= 1; if (keys.arrowright || keys.d) kx += 1;
-      if (kx) { hero.tx = clamp(hero.tx + kx * sp * dt, 20, LW - 20); }
-      hero.ty = hero.y = LH - 60;
-      if (stun <= 0) { const dx = hero.tx - hero.x; hero.x += dx * Math.min(1, dt * (drag ? 60 : 14)); if (Math.abs(dx) > 1.5) hero.face = dx > 0 ? 1 : -1; }
+      const sp = 250; let kx = 0, ky = 0; if (keys.arrowleft || keys.a) kx -= 1; if (keys.arrowright || keys.d) kx += 1; if (keys.arrowup || keys.w) ky -= 1; if (keys.arrowdown || keys.s) ky += 1;
+      if (kx || ky) { hero.tx = clamp(hero.tx + kx * sp * dt, 20, LW - 20); hero.ty = clamp(hero.ty + ky * sp * dt, LH * 0.3, LH - 40); }
+      if (stun <= 0) { const dx = hero.tx - hero.x; hero.x += dx * Math.min(1, dt * 12); hero.y += (hero.ty - hero.y) * Math.min(1, dt * 12); if (Math.abs(dx) > 1.5) hero.face = dx > 0 ? 1 : -1; }
       if (hero.jt > 0) { hero.jt = Math.max(0, hero.jt - dt); const ph = 1 - hero.jt / JT; hero.z = Math.sin(Math.PI * ph) * 58; } else hero.z = 0;
       if (state === 'intro') { if (sT > 0.1 && !st.said) { st.said = true; c.banner('¡A CORRER!', 'go', 1200); } if (sT > 1.3) beginRead(); }
       else if (state === 'clear') { const vv = baseV() * 4.5, dy2 = vv * dt; scroll += dy2; walls.forEach((w) => { w.y += dy2; }); items.forEach((it) => { it.y += dy2; }); if (sT >= 0.75) { walls.length = 0; items.length = 0; beginRead(); } }
@@ -326,7 +322,7 @@
     };
     const dl = (ts) => { if (c.destroyed || !c.wrap.parentNode) return; dr = requestAnimationFrame(dl); draw(ts / 1000); }; dr = requestAnimationFrame(dl);
     c.hud(1, '0/' + N); c.start(); resize();
-    return { destroy: c.destroy, refresh: prog, pause: () => c.toggle(true), state: st, _run: { go: (x, y) => { hero.tx = x; }, jump, get walls() { return walls; }, get hero() { return hero; }, get st() { return state; }, get LH() { return LH; } } };
+    return { destroy: c.destroy, refresh: prog, pause: () => c.toggle(true), state: st, _run: { pt: (what) => { const s0 = W / LW; if (what === 'hero') return { x: hero.x * s0, y: (hero.y - 20) * s0 }; const w = walls.find((q) => !q.resolved); if (!w) return null; const g = w.gates.find((q) => q.ok); if (!g) return null; return { x: (g.x + g.w / 2) * s0, y: (w.y + g.h / 2) * s0 }; }, go: (x, y) => { hero.tx = x; if (y != null) hero.ty = y; }, jump, get walls() { return walls; }, get hero() { return hero; }, get st() { return state; }, get LH() { return LH; } } };
   }
 
   /* ------------------------------------------------------------------
@@ -344,7 +340,7 @@
     return { lines: [text.slice(0, 9)], fs: 8 };
   }
   function startMaze(cfg) {
-    const v = cfg.villain, room = cfg.room || null, N = room ? room.total : v.boss ? 3 : 2;
+    const v = cfg.villain, room = cfg.room || null, N = room ? room.total : 1;
     const body = `<div class="bt-q"><div class="bt-qtag"></div><div class="bt-qtext"></div><div class="bt-qtable"></div><div class="bt-explain" hidden></div></div>
       <div class="bt-field"><canvas></canvas><div class="bt-banner" hidden></div></div>${BIGHTML}`;
     const ctl = `<button class="bt-btn bt-hint"><img alt="" src="${S.icon('bulb', 3)}"><span>Ayuda</span><em></em></button>
@@ -400,7 +396,7 @@
     function beginRead() {
       newQuestion(true); if (qn > 1) respawn(); state = 'read'; sT = 0; $('.bt-explain').hidden = true;
       const len = q.text.length + (q.table ? 30 : 0) + q.options.reduce((a, o) => a + o.length, 0) * 0.4;
-      readFor = Math.min(room ? 6 : 10, Math.max(room ? 3 : 4, 2 + len * 0.06)); if (qn > 1) readFor = Math.max(room ? 2.5 : 3, readFor * 0.8);
+      readFor = Math.min(room ? 6 : 10, Math.max(room ? 3 : 4, 2 + len * 0.06)); if (qn > 1) readFor = Math.max(room ? 2.5 : 3, readFor * 0.8); readFor *= (cfg.readMul || 1);
       intro.show(q, readFor, topicTag(v, q));
     }
     function finish(win) { if (ended) return; ended = true; st.over = true; st.win = win; state = 'end'; sT = 0; if (win) { A.sfx('levelup'); c.banner(room ? '¡LISTO!' : '¡VICTORIA!', 'go'); } else { A.sfx('lose'); c.banner('¡DERROTA!', 'lose'); } }
@@ -561,7 +557,7 @@
     };
     const dl = (ts) => { if (c.destroyed || !c.wrap.parentNode) return; dr = requestAnimationFrame(dl); draw(ts / 1000); }; dr = requestAnimationFrame(dl);
     c.hud(1, '0/' + N); c.start(); resize();
-    return { destroy: c.destroy, refresh: prog, pause: () => c.toggle(true), state: st, _mz: { get dots() { return dotSet; }, get pills() { return pills; }, get hero() { return hero; }, get grid() { return grid; }, get st() { return state; }, bfs, want: (d) => { hero.want = d; }, pass, get cols() { return COLS; } } };
+    return { destroy: c.destroy, refresh: prog, pause: () => c.toggle(true), state: st, _mz: { pt: (what) => { const s0 = W / LW; if (what === 'hero') { const p0 = posOf(hero); return { x: p0.x * s0, y: p0.y * s0 }; } if (what === 'ghost') { const pl = pills.find((q) => q.ghost && q.ok && !q.gone); if (!pl) return null; const p1 = posOf(pl); return { x: p1.x * s0, y: p1.y * s0 }; } let best = null, bd = 1e9; dotSet.forEach((v2, k) => { const a = k.split(','), d = Math.abs(a[0] - hero.i) + Math.abs(a[1] - hero.j); if (d < bd && d > 1) { bd = d; best = a; } }); return best ? { x: px(+best[0]) * s0, y: py(+best[1]) * s0 } : null; }, get dots() { return dotSet; }, get pills() { return pills; }, get hero() { return hero; }, get grid() { return grid; }, get st() { return state; }, bfs, want: (d) => { hero.want = d; }, pass, get cols() { return COLS; } } };
   }
 
 
@@ -595,58 +591,80 @@
     const playing = () => { if (!inner) return false; if (kind === 'shoot') return inner.state && inner.state.state === 'play'; const d = kind === 'run' ? inner._run : inner._mz; return !!d && d.st === 'play'; };
     const hero = () => { const d = kind === 'run' ? inner._run : inner._mz; return d && d.hero; };
     const pos = () => { const h2 = hero(); if (!h2) return [0, 0]; return kind === 'run' ? [h2.x, h2.y] : [h2.i + (h2.ni - h2.i) * h2.p, h2.j + (h2.nj - h2.j) * h2.p]; };
-    // pasos guiados: cada uno se completa solo cuando el jugador hace la acción
+    // pasos guiados (estilo Parchís): cada paso señala qué tocar; al cumplirlo el juego se PAUSA y esperas a tocar "Siguiente"
+    const fieldEl = () => cfg.container.querySelector('.bt-field');
+    const PT = () => (kind === 'shoot' ? (inner && inner._pt) : kind === 'run' ? (inner && inner._run && inner._run.pt) : (inner && inner._mz && inner._mz.pt));
     const STEPS = {
       shoot: [
-        { ico: '📖', t: 'Lee la pregunta', d: 'Arriba está el problema. Tómate tu tiempo: cuando se acabe la barra, empieza el juego.', done: () => playing() },
-        { ico: '👆', t: 'Toca la respuesta correcta', d: 'Caen 4 respuestas. TOCA la que creas correcta y tu héroe le dispara (en compu: teclas 1 a 4).', done: () => inner.state.correct >= 1 },
+        { ico: '📖', t: 'Lee la pregunta', d: 'Arriba está el problema (marcado en amarillo). Léelo con calma: cuando termine la barra, empieza el juego.', hl: '.bt-q', done: () => playing() },
+        { ico: '👆', t: 'Toca la respuesta correcta', d: 'Caen 4 respuestas. El círculo amarillo marca la correcta: TÓCALA y tu héroe le dispara (en compu: teclas 1 a 4).', ptr: 'cap', lbl: 'TOCA AQUÍ', gate: true, okT: '¡Eso es!', okD: 'Cada acierto le quita vida al villano. Si fallas, pierdes un corazón. ¿Listo para jugar de verdad?', done: () => inner.state.correct >= 1 },
       ],
       run: [
-        { ico: '📖', t: 'Lee la pregunta', d: 'Mira el problema con calma. Cuando termine la barra empiezas a correr.', done: () => playing() },
-        { ico: '👆', t: 'Arrastra el dedo para moverte', d: 'Mueve a tu héroe a izquierda y derecha (en compu: flechas o WASD).', init: () => pos(), done: (b) => { const p = pos(); return Math.abs(p[0] - b[0]) > 45; } },
-        { ico: '⤒', t: 'Salta como en Subway Surfers', d: 'Desliza el dedo hacia ARRIBA (o toca Saltar, o Espacio). Mientras estás en el aire, las minas no te tocan.', done: () => (!!inner._run && inner._run.hero.jumps > 0) || Date.now() - stepT0 > 15000 },
-        { ico: '🪧', t: 'Cruza el cartel correcto', d: 'Atraviesa SOLO el cartel con la respuesta correcta. Esquiva (o salta) las minas 💣 y recoge monedas 🪙. Si te equivocas, vuelves a intentarlo.', done: () => inner.state.correct >= 1 },
+        { ico: '📖', t: 'Lee la pregunta', d: 'Mira el problema (marcado en amarillo). Cuando termine la barra, empiezas a correr.', hl: '.bt-q', done: () => playing() },
+        { ico: '👆', t: 'Arrastra el dedo para moverte', d: 'Pon el dedo en la pantalla y arrástralo: tu héroe te sigue hacia donde quieras (en compu: flechas o WASD).', ptr: 'hero', lbl: 'ARRASTRA ↔', init: () => pos(), gate: true, okT: '¡Muy bien!', okD: 'Así te mueves. Ahora a cruzar el cartel correcto.', done: (b) => { const p = pos(); return Math.abs(p[0] - b[0]) + Math.abs(p[1] - b[1]) > 55; } },
+        { ico: '🪧', t: 'Cruza el cartel correcto', d: 'El círculo amarillo marca el cartel con la respuesta correcta: llévale tu héroe. Esquiva las minas 💣 y recoge monedas 🪙.', ptr: 'gate', lbl: 'CRUZA POR AQUÍ', gate: true, okT: '¡Perfecto!', okD: 'Ya sabes correr. ¿Listo para jugar de verdad?', done: () => inner.state.correct >= 1 },
       ],
       maze: [
-        { ico: '📖', t: 'Lee la pregunta', d: 'Mira el problema y las respuestas que lleva cada fantasma. Luego empieza el laberinto.', done: () => playing() },
-        { ico: '👆', t: 'Desliza para moverte', d: 'Desliza el dedo (o flechas/WASD) y tu héroe avanza por el laberinto.', init: () => pos(), done: (b) => { const p = pos(); return Math.abs(p[0] - b[0]) + Math.abs(p[1] - b[1]) > 2.2; } },
-        { ico: '●', t: 'Come los puntitos', d: 'Cada puntito suma puntos. En el juego real debes comerlos TODOS para ganar.', done: () => inner.state.score > 5 },
-        { ico: '👻', t: 'Cómete el fantasma correcto', d: 'Solo el que lleva la respuesta correcta. Si tocas otro, pierdes. Los 4 portales (izquierda↔derecha, arriba↔abajo) te llevan al otro extremo.', done: () => inner.state.correct >= 1 },
+        { ico: '📖', t: 'Lee la pregunta', d: 'Mira el problema (marcado en amarillo) y las respuestas que lleva cada fantasma. Luego empieza el laberinto.', hl: '.bt-q', done: () => playing() },
+        { ico: '👆', t: 'Desliza para moverte', d: 'Desliza el dedo (o flechas/WASD) y tu héroe avanza por el laberinto. Pruébalo.', ptr: 'hero', lbl: 'DESLIZA', init: () => pos(), gate: true, okT: '¡Muy bien!', okD: 'Así te mueves. Los 4 portales te llevan al otro extremo.', done: (b) => { const p = pos(); return Math.abs(p[0] - b[0]) + Math.abs(p[1] - b[1]) > 2.2; } },
+        { ico: '●', t: 'Come los puntitos', d: 'Cada puntito suma puntos. Ve hacia el círculo amarillo. En el juego real debes comerlos TODOS para ganar.', ptr: 'dot', lbl: 'COME', gate: true, okT: '¡Rico!', okD: 'Los puntitos dan puntos. Ahora el fantasma correcto.', done: () => inner.state.score > 5 },
+        { ico: '👻', t: 'Cómete el fantasma correcto', d: 'El círculo amarillo marca al fantasma con la respuesta correcta. Cómetelo. Si tocas otro, pierdes.', ptr: 'ghost', lbl: 'ÉSTE', gate: true, okT: '¡Excelente!', okD: 'Ya sabes jugar el laberinto. ¿Listo para jugar de verdad?', done: () => inner.state.correct >= 1 },
       ],
     }[kind];
+    let gate = false, hlEl = null;
+    const ptr = el('div', 'coach-ptr'); ptr.hidden = true; ptr.innerHTML = '<div class="cp-lbl"></div><div class="cp-ring"></div><div class="cp-hand">👆</div>';
+    const setHl = (sel) => { if (hlEl) { hlEl.classList.remove('coach-hl'); hlEl = null; } if (sel) { hlEl = cfg.container.querySelector(sel); if (hlEl) hlEl.classList.add('coach-hl'); } };
     const draw = () => {
-      const s = STEPS[Math.min(si, STEPS.length - 1)], ok = Date.now() < flashUntil;
-      strip.classList.toggle('ok', ok);
-      strip.innerHTML = `<div class="coach-ico" aria-hidden="true">${ok ? '✅' : s.ico}</div><div class="coach-tx"><small>PRÁCTICA ${esc(T.name.toUpperCase())} · PASO ${Math.min(si + 1, STEPS.length)} DE ${STEPS.length}</small><b>${ok ? '¡Muy bien!' : esc(s.t)}</b><span>${ok ? '' : esc(s.d)}</span><div class="coach-dots">${STEPS.map((_, k) => `<i class="${k < si ? 'done' : k === si ? 'on' : ''}"></i>`).join('')}</div></div><button class="coach-skip" data-a="skip">Omitir ⏭</button>`;
+      const s = STEPS[Math.min(si, STEPS.length - 1)], last = si >= STEPS.length - 1;
+      strip.classList.toggle('ok', gate);
+      strip.innerHTML = `<div class="coach-ico" aria-hidden="true">${gate ? '✅' : s.ico}</div><div class="coach-tx"><small>PRÁCTICA ${esc(T.name.toUpperCase())} · PASO ${Math.min(si + 1, STEPS.length)} DE ${STEPS.length}</small><b>${gate ? esc(s.okT) : esc(s.t)}</b><span>${gate ? esc(s.okD) : esc(s.d)}</span><div class="coach-dots">${STEPS.map((_, k) => `<i class="${k < si || (k === si && gate) ? 'done' : k === si ? 'on' : ''}"></i>`).join('')}</div></div>${gate ? `<button class="coach-next" data-a="next">${last ? '¡A jugar! ▶' : 'Siguiente ▶'}</button>` : '<button class="coach-skip" data-a="skip">Omitir ⏭</button>'}`;
+      setHl(gate ? null : s.hl);
+    };
+    const placePtr = () => {
+      const s = STEPS[Math.min(si, STEPS.length - 1)];
+      if (gate || !s.ptr || !inner || switched || dead) { ptr.hidden = true; return; }
+      const f = fieldEl(), fn = PT(); if (!f || !fn) { ptr.hidden = true; return; }
+      let p = null; try { p = fn(s.ptr); } catch (e) { p = null; } if (!p) { ptr.hidden = true; return; }
+      if (ptr.parentNode !== f) f.appendChild(ptr);
+      ptr.hidden = false; ptr.style.left = Math.round(p.x) + 'px'; ptr.style.top = Math.round(p.y) + 'px'; ptr.querySelector('.cp-lbl').textContent = s.lbl || '';
+    };
+    const pauseInner = (b) => { try { if (inner && inner.state) inner.state.paused = !!b; } catch (e) { /* ok */ } };
+    const nextStep = () => {
+      if (!gate || switched || dead) return; gate = false; const wasLast = si >= STEPS.length - 1; pauseInner(false); A.sfx('select');
+      if (wasLast) { si = STEPS.length; ptr.remove(); setHl(null); toReal(); return; }
+      si++; base = null; stepT0 = Date.now(); draw();
     };
     draw();
     timer = setInterval(() => {
       if (dead || switched || !inner) return;
-      if (Date.now() < flashUntil) return;
-      if (si >= STEPS.length) { if (!fin) { fin = true; clearInterval(timer); A.sfx('levelup'); setTimeout(() => { if (!dead && !switched) toReal(); }, 500); } return; }
+      placePtr();
+      if (gate || si >= STEPS.length) return;
       const s = STEPS[si]; if (!s) return;
       if (base == null && s.init) base = s.init();
       let ok = false; try { ok = s.done(base); } catch (e) { ok = false; }
-      if (ok) { si++; base = null; stepT0 = Date.now(); flashUntil = Date.now() + 900; A.sfx('coin'); draw(); setTimeout(() => { if (!dead && !switched) draw(); }, 950); }
-    }, 220);
+      if (!ok) return;
+      A.sfx('coin');
+      if (s.gate) { gate = true; pauseInner(true); draw(); ptr.hidden = true; }
+      else { si++; base = null; stepT0 = Date.now(); draw(); }
+    }, 120);
     const seenNow = () => { try { const pr0 = St.profile(); pr0.tutDone = pr0.tutDone || {}; pr0.tutDone[kind] = 1; St.save(); } catch (e) { /* ok */ } };
     let pq; try { pq = Q.generate(cfg.villain.topic === 'mix' || cfg.villain.endless ? 'fracciones' : cfg.villain.topic, 1); } catch (e) { pq = Q.generate('fracciones', 1); }
     const modal = (txt, btn, onOk, skip) => { const m = el('div', 'tut-modal'); m.innerHTML = `<div class="tm-card"><p>${esc(txt)}</p><button class="tm-ok" type="button">${esc(btn)}</button>${skip ? '<button class="tm-skip" type="button">Omitir</button>' : ''}</div>`; cfg.container.appendChild(m); const ok = () => { A.unlock(); A.sfx('select'); m.remove(); onOk(); }; m.querySelector('.tm-ok').addEventListener('click', ok); const sk = m.querySelector('.tm-skip'); if (sk) sk.addEventListener('click', () => { m.remove(); toReal(); }); return m; };
     function toReal() {
       if (switched || dead) return; switched = true; clearInterval(timer); seenNow();
-      document.querySelectorAll('.tut-modal').forEach((m) => m.remove()); if (inner) inner.destroy(); strip.remove();
+      document.querySelectorAll('.tut-modal').forEach((m) => m.remove()); if (inner) inner.destroy(); strip.remove(); ptr.remove(); setHl(null);
       inner = startFn(cfg);
       const go = el('div', 'coach-go'); go.textContent = '¡Ahora sí: el juego de verdad!'; cfg.container.appendChild(go); setTimeout(() => go.remove(), 1900);
     }
-    strip.addEventListener('click', (e) => { if (e.target.closest('[data-a=skip]')) { A.sfx('click'); toReal(); } });
-    const pcfg = Object.assign({}, cfg, { extraTop: strip, onProgress: null, speedMul: () => 0.75, fallSecs: 42,
+    strip.addEventListener('click', (e) => { if (e.target.closest('[data-a=skip]')) { A.sfx('click'); toReal(); } else if (e.target.closest('[data-a=next]')) nextStep(); });
+    const pcfg = Object.assign({}, cfg, { extraTop: strip, onProgress: null, speedMul: () => 0.5, fallSecs: 60, readMul: 1.8,
       room: { total: 99, getQuestion: (i) => { if (!i) return pq; try { return Q.generate(cfg.villain.topic === 'mix' || cfg.villain.endless ? 'fracciones' : cfg.villain.topic, 1); } catch (e) { return pq; } }, hp: () => ({ frac: 1, text: 'Práctica' }), noHearts: true, label: '🎓 Práctica' },
       onEnd: () => { setTimeout(() => { if (!switched && !dead) toReal(); }, 0); },
       onQuit: () => { clearInterval(timer); dead = true; cfg.onQuit && cfg.onQuit(); }, onRestart: null });
     const welcome = { 'shoot': 'Antes de jugar de verdad te enseñamos los controles del juego de DISPARO. Solo sigue las instrucciones.', 'run': 'Antes de jugar de verdad te enseñamos los controles de la CARRERA. Solo sigue las instrucciones.', 'maze': 'Antes de jugar de verdad te enseñamos los controles del LABERINTO. Solo sigue las instrucciones.' }[kind];
     modal('¡Bienvenido! ' + welcome, 'OK', () => { if (!dead && !switched && !inner) inner = startFn(pcfg); }, true);
     const none = { mistakes: [], score: 0, correct: 0, answered: 0, bestStreak: 0, hearts: 3 };
-    return { destroy() { dead = true; clearInterval(timer); strip.remove(); if (inner) inner.destroy(); }, refresh() { if (inner && inner.refresh) inner.refresh(); }, pause() { if (inner && inner.pause) inner.pause(); },
+    return { destroy() { dead = true; clearInterval(timer); strip.remove(); ptr.remove(); setHl(null); if (inner) inner.destroy(); }, refresh() { if (inner && inner.refresh) inner.refresh(); }, pause() { if (inner && inner.pause) inner.pause(); },
       get state() { return inner ? inner.state : none; }, get _mz() { return inner && inner._mz; }, get _run() { return inner && inner._run; }, get _fire() { return inner && inner._fire; }, get _caps() { return inner && inner._caps; }, get _hint() { return inner && inner._hint; }, get _power() { return inner && inner._power; } };
   }
 

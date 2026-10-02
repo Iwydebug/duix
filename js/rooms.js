@@ -450,7 +450,8 @@
     const roomV = () => roomVillain(R.cfg || { topics: [] });
     // ej: id expulsado (o null = empate / nadie). Dibuja la animación dentro de "host" y llama done()
     function ejectAnim(host, ej, done, kill) {
-      const v = roomV(), pl = ej && R.players[ej], wasImp = !!(ej && imps()[ej]);
+      const VL = D.VILLAINS.filter((x) => !x.endless), hs = String(ej || '') + (R.meet && R.meet.id || ''); let hh = 0; for (let i = 0; i < hs.length; i++) hh = (hh * 31 + hs.charCodeAt(i)) >>> 0;
+      const v = VL[hh % VL.length], pl = ej && R.players[ej], wasImp = !!(ej && imps()[ej]);
       const e = h('div', { class: 'eatwrap' });
       if (!ej || !pl) {
         e.appendChild(h('div', { class: 'eat-res' }, h('small', { class: 'vt', text: 'RESULTADO DE LA REUNIÓN' }), h('h2', { text: '🗳️ Nadie fue expulsado' }), h('p', { class: 'vsub', text: 'Hubo empate o nadie votó. El impostor sigue libre…' })));
@@ -590,16 +591,28 @@
       if (Date.now() < impCd) { sfx('deny'); toast('Sabotaje en espera…', 'warn'); return; }
       impCd = Date.now() + 22000; sfx('power');
       N.set(P + '/sab', { k, by: pid, id: Math.random().toString(36).slice(2, 8), t: N.now() }).catch(() => {});
-      if (k === 'steal') { adjScore(+50); toast('💸 +50 puntos (robo)', ''); } else toast(k === 'turbo' ? '⏩ ¡Turbo enviado!' : '🌫️ ¡Niebla enviada!', '');
+      if (k === 'steal') { adjScore(+50); syncScore(); toast('💸 +50 puntos (robo)', ''); } else toast(k === 'turbo' ? '⏩ ¡Turbo enviado!' : k === 'dark' ? '🌑 ¡Apagón enviado!' : '🌫️ ¡Niebla enviada!', '');
+    }
+    const syncScore = () => { if (seg) { const t = curTotals(); N.update(P + '/players/' + pid, { score: t.score }).catch(() => {}); } };
+    function openSabMenu() {
+      if (!world || my.dead || wmeet || ovl.querySelector('.sabmenu')) return;
+      if (Date.now() < impCd) { sfx('deny'); toast('Sabotaje en espera…', 'warn'); return; }
+      const pick = (k) => { e.remove(); doSabotage(k); };
+      const opt = (ico, nm, ds, k) => h('button', { type: 'button', class: 'vopt', onclick: () => pick(k) }, h('b', { text: ico + ' ' + nm }), h('small', { text: ds }));
+      const e = h('div', { class: 'rov vote sabmenu' }, h('div', { class: 'vbox' }, h('small', { class: 'vt', text: '⚡ SABOTAJE' }), h('h2', { text: 'Elige tu sabotaje' }),
+        h('div', { class: 'vgrid' }, opt('🌑', 'Apagón', 'Casi no ven por 14 s', 'dark'), opt('⏩', 'Turbo', 'Sus misiones van más rápido', 'turbo'), opt('🌫️', 'Niebla', 'Pantalla borrosa en misiones', 'fog'), opt('💸', 'Robo', '−60 pts a cada tripulante, +50 para ti', 'steal')),
+        h('button', { type: 'button', class: 'btn ghost small', onclick: () => e.remove() }, 'Cancelar')));
+      ovl.appendChild(e);
     }
     function onSab(v) {
-      R.sab = v; if (!v || !battle || my.finished || v.id === lastSabId) return; lastSabId = v.id;
+      R.sab = v; if (!v || (!battle && !world) || my.finished || v.id === lastSabId) return; lastSabId = v.id;
       if (v.by === pid || amImp() || N.now() - (v.t || 0) > 6000) return;
+      if (v.k === 'dark') { if (world) world.blackout(14000); sfx('boom'); toast('⚠️ ¡APAGÓN! No ves casi nada…', 'warn'); return; }
       const wrap = holder.querySelector('.bt'); if (wrap) { wrap.classList.remove('hurt'); void wrap.offsetWidth; wrap.classList.add('hurt'); }
       sfx('boom');
-      if (v.k === 'turbo') { fx.speedUntil = Date.now() + 8000; toast('⚠️ ¡SABOTAJE! Todo va más rápido…', 'warn'); }
-      else if (v.k === 'fog') { holder.classList.add('fog'); setTimeout(() => holder.classList.remove('fog'), 6000); toast('⚠️ ¡SABOTAJE! Niebla…', 'warn'); }
-      else if (v.k === 'steal') { adjScore(-60); toast('⚠️ ¡SABOTAJE! −60 puntos', 'warn'); }
+      if (v.k === 'turbo') { fx.speedUntil = Date.now() + (world ? 16000 : 8000); toast('⚠️ ¡SABOTAJE! Todo va más rápido…', 'warn'); }
+      else if (v.k === 'fog') { holder.classList.add('fog'); setTimeout(() => holder.classList.remove('fog'), world ? 12000 : 6000); toast('⚠️ ¡SABOTAJE! Niebla…', 'warn'); }
+      else if (v.k === 'steal') { adjScore(-60); syncScore(); toast('⚠️ ¡SABOTAJE! −60 puntos', 'warn'); }
     }
     subs.push(N.on(P + '/sab', onSab));
     subs.push(N.on(P + '/votes', (v) => { R.votes = v || {}; checkExpelled(); if (waitEl) updateWait(); }));
@@ -653,7 +666,7 @@
       seg = { plan: segPlan(R.cfg), i: 0, off: 0, base: { score: 0, correct: 0, answered: 0 }, agg: { mistakes: [], bestStreak: 0 }, world: true };
       const mp = myP(); if (mp) { seg.base.score = mp.score || 0; seg.base.correct = mp.correct || 0; seg.base.answered = mp.qi || 0; if (mp.dead) my.dead = mp.dead; }
       my.tasks = assignTasks(); const td0 = (mp && mp.td) || 0; my.tasks.forEach((t, i) => { if (i < td0) t.done = true; });
-      usedEmg = false; lastMeetId = ''; killCd = Date.now() + 12000; wmeet = null; clearOverlays();
+      usedEmg = false; lastMeetId = ''; killCd = Date.now() + 12000; impCd = Date.now() + 8000; fx = { speedUntil: 0 }; lastSabId = ((R.sab && R.sab.id) || ''); wmeet = null; clearOverlays();
       world = root.DuiXWorld.mount(wbox, {
         pid, getPlayers: () => R.players, getPos: () => R.pos, getBodies: () => R.bodies || {}, getLook: () => p.look,
         setPos: (x, y, f, m) => { N.update(P + '/pos/' + pid, { x, y, f, m, w: 1 }).catch(() => {}); },
@@ -661,7 +674,7 @@
         getTasks: () => (my.tasks || []).map((t) => ({ kind: t.kind, st: t.st, done: t.done })),
         killCd: () => Math.max(0, killCd - Date.now()), killMax: KILL_CD,
         canEmergency: () => nImpsAll() > 0 && !usedEmg && !my.dead && !meetBusy(),
-        onUse: useStation, onEmergency: () => callMeeting(null), onReport: (bid) => callMeeting(bid), onKill: doWorldKill, onLeave: () => confirmLeave(),
+        onSabotage: openSabMenu, sabCd: () => Math.max(0, impCd - Date.now()), onUse: useStation, onEmergency: () => callMeeting(null), onReport: (bid) => callMeeting(bid), onKill: doWorldKill, onLeave: () => confirmLeave(),
       });
       root.__roomWorld = world; world.setTasks(my.tasks, amImp()); if (my.dead) world.setGhost(true);
       N.update(P + '/players/' + pid, { tn: amImp() ? 0 : my.tasks.length, td: my.tasks.filter((t) => t.done).length }).catch(() => {});

@@ -17,15 +17,15 @@
 
   /* ---------- diseño del mapa (en baldosas de 16×16) ---------- */
   const ROOMS = [
-    { id: 'cafe', name: 'Cafetería', x: 24, y: 14, w: 22, h: 14, a: '#8d93b8', b: '#8086ac' },
-    { id: 'lab', name: 'Laboratorio', x: 3, y: 3, w: 16, h: 11, a: '#4f948e', b: '#478a84' },
-    { id: 'biblio', name: 'Biblioteca', x: 26, y: 2, w: 18, h: 8, a: '#9a7650', b: '#8e6b47' },
-    { id: 'gym', name: 'Gimnasio', x: 52, y: 3, w: 15, h: 11, a: '#c0733f', b: '#b46a38' },
-    { id: 'cancha', name: 'Cancha', x: 3, y: 32, w: 16, h: 11, a: '#4f9a60', b: '#478f58' },
-    { id: 'sotano', name: 'Sótano', x: 26, y: 34, w: 18, h: 9, a: '#50566e', b: '#484e65' },
-    { id: 'maq', name: 'Sala de máquinas', x: 52, y: 32, w: 15, h: 11, a: '#626880', b: '#596078' },
-    { id: 'enf', name: 'Enfermería', x: 3, y: 17, w: 12, h: 9, a: '#a9c0d2', b: '#9db5c8' },
-    { id: 'admin', name: 'Dirección', x: 55, y: 17, w: 12, h: 9, a: '#80618f', b: '#745784' },
+    { id: 'cafe', name: 'Plaza Cartesiana', sub: 'Plano cartesiano', x: 24, y: 14, w: 22, h: 14, a: '#8d93b8', b: '#8086ac' },
+    { id: 'lab', name: 'Laboratorio Entra-Sale', sub: 'Funciones', x: 3, y: 3, w: 16, h: 11, a: '#4f948e', b: '#478a84' },
+    { id: 'biblio', name: 'Torre de los Mil Términos', sub: 'Polinomios', x: 26, y: 2, w: 18, h: 8, a: '#9a7650', b: '#8e6b47' },
+    { id: 'gym', name: 'Gimnasio Exponencial', sub: 'Potenciación', x: 52, y: 3, w: 15, h: 11, a: '#c0733f', b: '#b46a38' },
+    { id: 'cancha', name: 'Mercado Fraccionado', sub: 'Fracciones', x: 3, y: 32, w: 16, h: 11, a: '#4f9a60', b: '#478f58' },
+    { id: 'sotano', name: 'Mina Radical', sub: 'Radicales', x: 26, y: 34, w: 18, h: 9, a: '#50566e', b: '#484e65' },
+    { id: 'maq', name: 'Fábrica de Factores', sub: 'Factorización', x: 52, y: 32, w: 15, h: 11, a: '#626880', b: '#596078' },
+    { id: 'enf', name: 'Muelle de los Extremos', sub: 'Intervalos', x: 3, y: 17, w: 12, h: 9, a: '#a9c0d2', b: '#9db5c8' },
+    { id: 'admin', name: 'Observatorio de las Ondas', sub: 'Trigonometría', x: 55, y: 17, w: 12, h: 9, a: '#80618f', b: '#745784' },
   ];
   const HALLS = [
     [33, 10, 4, 4], [33, 28, 4, 6], [15, 19, 9, 4], [46, 19, 9, 4], [8, 14, 4, 3], [19, 5, 7, 4], [44, 5, 8, 4],
@@ -33,14 +33,20 @@
   ];
   // estaciones de misión: 2 por juego
   const STATIONS = [
-    { id: 'lab', kind: 'shoot', name: 'Cañón de límites', room: 'Laboratorio', tx: 11.5, ty: 8.5 },
-    { id: 'maq', kind: 'shoot', name: 'Cañón de límites', room: 'Sala de máquinas', tx: 59.5, ty: 37.5 },
-    { id: 'gym', kind: 'run', name: 'Pista de derivadas', room: 'Gimnasio', tx: 59.5, ty: 8.5 },
-    { id: 'cancha', kind: 'run', name: 'Pista de derivadas', room: 'Cancha', tx: 10.5, ty: 37.5 },
-    { id: 'sotano', kind: 'maze', name: 'Laberinto Pac-Man', room: 'Sótano', tx: 34.5, ty: 38.5 },
-    { id: 'biblio', kind: 'maze', name: 'Laberinto Pac-Man', room: 'Biblioteca', tx: 35.5, ty: 5.5 },
+    { id: 'lab', kind: 'shoot', name: 'Disparo de respuestas', room: 'Laboratorio Entra-Sale', tx: 11.5, ty: 8.5 },
+    { id: 'maq', kind: 'shoot', name: 'Disparo de respuestas', room: 'Fábrica de Factores', tx: 59.5, ty: 37.5 },
+    { id: 'gym', kind: 'run', name: 'Carrera de carteles', room: 'Gimnasio Exponencial', tx: 59.5, ty: 8.5 },
+    { id: 'cancha', kind: 'run', name: 'Carrera de carteles', room: 'Mercado Fraccionado', tx: 10.5, ty: 37.5 },
+    { id: 'sotano', kind: 'maze', name: 'Laberinto Pac-Man', room: 'Mina Radical', tx: 34.5, ty: 38.5 },
+    { id: 'biblio', kind: 'maze', name: 'Laberinto Pac-Man', room: 'Torre de los Mil Términos', tx: 35.5, ty: 5.5 },
   ];
   STATIONS.forEach((s) => { s.x = s.tx * TS; s.y = s.ty * TS; });
+  const VENTS = [
+    { id: 'v1', tx: 4.5, ty: 12.5, room: 'Laboratorio Entra-Sale' }, { id: 'v2', tx: 28.5, ty: 8.5, room: 'Torre de los Mil Términos' }, { id: 'v3', tx: 65.5, ty: 12.5, room: 'Gimnasio Exponencial' },
+    { id: 'v4', tx: 7.5, ty: 24.5, room: 'Muelle de los Extremos' }, { id: 'v5', tx: 56.5, ty: 22.5, room: 'Observatorio de las Ondas' }, { id: 'v6', tx: 17.5, ty: 41.5, room: 'Mercado Fraccionado' },
+    { id: 'v7', tx: 42.5, ty: 41.5, room: 'Mina Radical' }, { id: 'v8', tx: 59.5, ty: 41.5, room: 'Fábrica de Factores' },
+  ];
+  VENTS.forEach((v) => { v.x = v.tx * TS; v.y = v.ty * TS; });
   const KIND_ICON = { shoot: '🎯', run: '🏃', maze: '👻' };
   const TABLE = { x: 35 * TS, y: 21.5 * TS }; // botón de emergencia
   // objetos del escenario: [tipo, x, y, w, h, sólido]
@@ -95,7 +101,7 @@
       g.fillStyle = R ? (even ? R.a : R.b) : (even ? '#737998' : '#6a7090'); g.fillRect(i * TS, j * TS, TS, TS);
       g.fillStyle = 'rgba(255,255,255,.07)'; g.fillRect(i * TS, j * TS, TS, 1); g.fillRect(i * TS, j * TS, 1, TS);
       g.fillStyle = 'rgba(0,0,0,.10)'; g.fillRect(i * TS, j * TS + TS - 1, TS, 1);
-      if (!R && (i + j * 3) % 7 === 0) { g.fillStyle = '#ffd23f'; g.globalAlpha = 0.35; g.fillRect(i * TS + 6, j * TS + 7, 4, 2); g.globalAlpha = 1; }
+      if (!R && (i * 5 + j * 3) % 6 === 0) { g.fillStyle = '#ffd23f'; g.globalAlpha = 0.5; g.font = '700 11px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(['π', '∑', '∞', '∫', 'Δ', '√', 'θ', '%'][(i + j) % 8], i * TS + 8, j * TS + 8); g.globalAlpha = 1; }
     }
     // paredes
     for (let j = 0; j < MH; j++) for (let i = 0; i < MW; i++) {
@@ -116,6 +122,31 @@
     { const r = R_('biblio'); g.fillStyle = 'rgba(160,40,60,.45)'; g.fillRect((r.x + 4) * TS, (r.y + 3) * TS, (r.w - 8) * TS, 4 * TS); g.strokeStyle = 'rgba(255,210,63,.5)'; g.lineWidth = 1; g.strokeRect((r.x + 4) * TS + 2, (r.y + 3) * TS + 2, (r.w - 8) * TS - 4, 4 * TS - 4); }
     { const r = R_('admin'); g.fillStyle = 'rgba(255,210,63,.18)'; g.fillRect((r.x + 2) * TS, (r.y + 4) * TS, (r.w - 4) * TS, 4 * TS); }
     { const r = R_('cafe'); g.fillStyle = 'rgba(255,255,255,.10)'; g.beginPath(); g.ellipse(TABLE.x, TABLE.y, 92, 70, 0, 0, 6.283); g.fill(); g.strokeStyle = 'rgba(255,60,80,.45)'; g.lineWidth = 2; g.setLineDash([6, 6]); g.stroke(); g.setLineDash([]); }
+
+    // ---- decoración matemática por escenario ----
+    const txt = (t, x, y, size, col, al) => { g.save(); g.font = '800 ' + size + 'px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = col || 'rgba(255,255,255,.8)'; if (al != null) g.globalAlpha = al; g.fillText(t, x, y); g.restore(); };
+    { // Plaza Cartesiana: ejes, marcas y parábola
+      const r = R_('cafe'), x0 = r.x * TS + 10, x1 = (r.x + r.w) * TS - 10, y0 = r.y * TS + 10, y1 = (r.y + r.h) * TS - 10;
+      g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 2; g.beginPath(); g.moveTo(x0, TABLE.y); g.lineTo(x1, TABLE.y); g.moveTo(TABLE.x, y0); g.lineTo(TABLE.x, y1); g.stroke();
+      g.fillStyle = 'rgba(255,255,255,.6)'; g.beginPath(); g.moveTo(x1, TABLE.y); g.lineTo(x1 - 7, TABLE.y - 4); g.lineTo(x1 - 7, TABLE.y + 4); g.fill(); g.beginPath(); g.moveTo(TABLE.x, y0); g.lineTo(TABLE.x - 4, y0 + 7); g.lineTo(TABLE.x + 4, y0 + 7); g.fill();
+      g.lineWidth = 1; for (let k = -10; k <= 10; k++) { if (!k) continue; g.beginPath(); g.moveTo(TABLE.x + k * 16, TABLE.y - 3); g.lineTo(TABLE.x + k * 16, TABLE.y + 3); g.stroke(); if (k % 2 === 0 && Math.abs(k) < 9) txt(String(k / 2), TABLE.x + k * 16, TABLE.y + 11, 7, 'rgba(255,255,255,.7)'); }
+      for (let k = -4; k <= 4; k++) { if (!k) continue; g.beginPath(); g.moveTo(TABLE.x - 3, TABLE.y + k * 16); g.lineTo(TABLE.x + 3, TABLE.y + k * 16); g.stroke(); }
+      txt('x', x1 - 4, TABLE.y - 10, 10, '#ffd23f'); txt('y', TABLE.x + 10, y0 + 4, 10, '#ffd23f');
+      g.strokeStyle = 'rgba(92,225,230,.8)'; g.lineWidth = 2; g.beginPath(); for (let k = -4.4; k <= 4.4; k += 0.2) { const px = TABLE.x + k * 32, py = TABLE.y - (4 - k * k * 0.4) * 16 + 64; if (k === -4.4) g.moveTo(px, py); else g.lineTo(px, py); } g.stroke();
+      txt('y = x²', TABLE.x + 126, TABLE.y - 40, 9, '#5ce1e6');
+    }
+    { const r = R_('lab'); txt('x  ➜  [ f ]  ➜  f(x)', (r.x + r.w / 2) * TS, (r.y + 9.3) * TS, 11, '#fff', 0.85); txt('f(x) = 2x + 1', (r.x + r.w / 2) * TS, (r.y + 9.9) * TS, 9, '#ffd23f', 0.9); }
+    { const r = R_('biblio'); txt('x³ + 2x² − 5x + 1', (r.x + r.w / 2) * TS, (r.y + 5) * TS, 12, '#ffe9a8', 0.95); txt('(grado 3 · 4 términos)', (r.x + r.w / 2) * TS, (r.y + 5) * TS + 14, 8, '#fff', 0.8); }
+    { const r = R_('gym'); g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 3; g.beginPath(); for (let k = 0; k <= 1.001; k += 0.04) { const px = (r.x + 2) * TS + k * (r.w - 4) * TS, py = (r.y + r.h - 1.5) * TS - Math.pow(k, 3) * (r.h - 4) * TS; if (!k) g.moveTo(px, py); else g.lineTo(px, py); } g.stroke(); txt('y = 2ˣ', (r.x + 6) * TS, (r.y + 3) * TS, 12, '#fff', 0.9); txt('2¹=2  2²=4  2³=8', (r.x + r.w - 5) * TS, (r.y + r.h - 0.9) * TS, 9, '#fff', 0.9); }
+    { const r = R_('cancha'), cx = (r.x + r.w / 2) * TS, cy = (r.y + r.h / 2) * TS; for (let k = 0; k < 4; k++) { g.fillStyle = ['rgba(255,210,63,.55)', 'rgba(255,122,200,.5)', 'rgba(92,225,230,.5)', 'rgba(255,255,255,.35)'][k]; g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, 28, k * 1.5708, (k + 1) * 1.5708); g.closePath(); g.fill(); } txt('¼', cx + 12, cy + 12, 12, '#1a1033'); txt('½', (r.x + 3) * TS, (r.y + 2.2) * TS, 16, '#fff', 0.85); txt('¾', (r.x + r.w - 3) * TS, (r.y + 2.2) * TS, 16, '#fff', 0.85); txt('⅓ + ⅙ = ½', cx, (r.y + r.h - 2.2) * TS, 10, '#fff', 0.9); }
+    { const r = R_('sotano'); [['√x', 3, 5], ['∛', 9, 7], ['√9 = 3', 14, 6], ['x^½', 6, 3.4]].forEach((a) => txt(a[0], (r.x + a[1]) * TS, (r.y + a[2]) * TS, 12, '#ffd23f', 0.7)); }
+    { const r = R_('maq'); txt('x² − x − 6', (r.x + r.w / 2) * TS, (r.y + 2.5) * TS, 10, '#fff', 0.9); txt('= (x + 2)(x − 3)', (r.x + r.w / 2) * TS, (r.y + 3.4) * TS, 9, '#ffd23f', 0.95); txt('5 × 3 = 15', (r.x + r.w / 2) * TS, (r.y + r.h - 1.5) * TS, 9, '#fff', 0.6); }
+    { const r = R_('enf'), y = (r.y + 3.4) * TS; g.strokeStyle = 'rgba(40,60,90,.9)'; g.lineWidth = 2; g.beginPath(); g.moveTo((r.x + 1) * TS, y); g.lineTo((r.x + r.w - 1) * TS, y); g.stroke(); for (let k = 0; k <= 6; k++) { const px = (r.x + 2) * TS + k * 24; g.beginPath(); g.moveTo(px, y - 4); g.lineTo(px, y + 4); g.stroke(); txt(String(k - 1), px, y + 12, 8, '#1a2a44'); } txt('[', (r.x + 3) * TS + 6, y - 9, 14, '#e02a3a'); txt(')', (r.x + 2) * TS + 5 * 24, y - 9, 14, '#e02a3a'); txt('[0, 4)', (r.x + 6) * TS, y - 20, 9, '#1a2a44'); }
+    { const r = R_('admin'), y = (r.y + 6.6) * TS; g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 2.5; g.beginPath(); for (let k = 0; k <= 1.001; k += 0.02) { const px = (r.x + 1) * TS + k * (r.w - 2) * TS, py = y - Math.sin(k * 6.283 * 1.5) * 12; if (!k) g.moveTo(px, py); else g.lineTo(px, py); } g.stroke(); txt('y = sen x', (r.x + 3) * TS, (r.y + 1.7) * TS, 10, '#ffd23f', 0.9); txt('sen²x + cos²x = 1', (r.x + r.w - 4) * TS, (r.y + r.h - 0.8) * TS, 8, '#fff', 0.85); }
+    // letreros de los escenarios sobre la pared
+    ROOMS.forEach((r) => { const cx = (r.x + r.w / 2) * TS, cy = (r.y - 1) * TS + 7, w = Math.min(r.w * TS - 10, g.measureText(r.name).width + 30); g.save(); g.font = '900 9px ' + FONT; const tw = g.measureText(r.name.toUpperCase()).width + 16; g.fillStyle = '#0f1124'; g.fillRect(cx - tw / 2, cy - 7, tw, 14); g.strokeStyle = '#ffd23f'; g.lineWidth = 1; g.strokeRect(cx - tw / 2 + 0.5, cy - 6.5, tw - 1, 13); g.fillStyle = '#ffd23f'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(r.name.toUpperCase(), cx, cy + 0.5); g.restore(); });
+    // ventilaciones
+    VENTS.forEach((v) => { const x = v.x - 11, y = v.y - 7; g.fillStyle = '#05050f'; g.fillRect(x - 2, y - 2, 26, 18); g.fillStyle = '#566078'; g.fillRect(x, y, 22, 14); g.fillStyle = '#10121f'; for (let k = 0; k < 4; k++) g.fillRect(x + 2, y + 2 + k * 3, 18, 1.6); g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(x, y, 22, 1); });
     // objetos
     const rect = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
     PROPS.forEach((p) => {
@@ -151,7 +182,7 @@
     const sp0 = spawnPoint(o.pid, 0); me.x = sp0.x; me.y = sp0.y;
     const others = {}; const keys = {}; const floats = []; const parts = [];
     let joy = null, lastSent = 0, sx = -1, sy = -1, sf = 1, roomShown = -2, roomT = 0, lastBtn = '', hintT = 0;
-    let curUse = null, curRep = null, curKill = null, tasksOpen = false;
+    let curUse = null, curRep = null, curKill = null, tasksOpen = false, blackUntil = 0;
 
     /* HUD en DOM */
     const hud = document.createElement('div'); hud.className = 'wd-hud';
@@ -170,15 +201,24 @@
     const roomEl = document.createElement('div'); roomEl.className = 'wd-room'; roomEl.hidden = true;
     const hintEl = document.createElement('div'); hintEl.className = 'wd-hint'; hintEl.hidden = true;
     const mkBtn = (cls, ico, txt) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'wd-b ' + cls; b.innerHTML = '<span>' + ico + '</span><small>' + txt + '</small>'; return b; };
-    const bUse = mkBtn('use', '🖐️', 'USAR'), bRep = mkBtn('rep', '📣', 'REPORTAR'), bKill = mkBtn('kill', '🔪', 'ELIMINAR');
+    const bUse = mkBtn('use', '🖐️', 'USAR'), bRep = mkBtn('rep', '📣', 'REPORTAR'), bKill = mkBtn('kill', '🔪', 'ELIMINAR'), bSab = mkBtn('sab', '⚡', 'SABOTAJE');
+    const cd2 = document.createElement('i'); cd2.className = 'wd-cd'; bSab.appendChild(cd2);
     const cd = document.createElement('i'); cd.className = 'wd-cd'; bKill.appendChild(cd);
-    const act = document.createElement('div'); act.className = 'wd-act'; act.appendChild(bRep); act.appendChild(bKill); act.appendChild(bUse);
+    const act = document.createElement('div'); act.className = 'wd-act'; act.appendChild(bSab); act.appendChild(bRep); act.appendChild(bKill); act.appendChild(bUse);
     hud.appendChild(left); hud.appendChild(right); hud.appendChild(roomEl); hud.appendChild(hintEl); hud.appendChild(act);
     container.appendChild(hud);
     const stop = (e) => e.stopPropagation();
     [hud].forEach((el) => el.addEventListener('pointerdown', stop));
 
-    const doUse = () => { if (frozen || !curUse) return; if (curUse.type === 'emg') o.onEmergency && o.onEmergency(); else o.onUse && o.onUse(curUse.st); };
+    const doUse = () => { if (frozen || !curUse) return; if (curUse.type === 'emg') o.onEmergency && o.onEmergency(); else if (curUse.type === 'vent') showVents(curUse.vent); else o.onUse && o.onUse(curUse.st); };
+    const doSab = () => { if (frozen || ghost) return; o.onSabotage && o.onSabotage(); };
+    bSab.addEventListener('click', doSab);
+    function showVents(from) {
+      if (container.querySelector('.wd-vent')) return; A.sfx('select');
+      const w = document.createElement('div'); w.className = 'wd-vent'; const box = document.createElement('div'); box.className = 'wd-vbox'; const h2 = document.createElement('h3'); h2.textContent = '🕳️ Túnel: ¿a dónde quieres ir?'; box.appendChild(h2);
+      VENTS.filter((v) => v.id !== from.id).forEach((v) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = v.room; b.addEventListener('click', () => { w.remove(); me.x = v.x; me.y = v.y + 8; sx = -1; A.sfx('power'); for (let k = 0; k < 16; k++) { const a = Math.random() * 6.283; parts.push({ x: me.x, y: me.y, vx: Math.cos(a) * 40, vy: Math.sin(a) * 40, t: 0, life: 0.6, c: '#9aa6c8' }); } }); box.appendChild(b); });
+      const c = document.createElement('button'); c.type = 'button'; c.className = 'cancel'; c.textContent = 'Cancelar'; c.addEventListener('click', () => w.remove()); box.appendChild(c); w.appendChild(box); w.addEventListener('pointerdown', (e) => e.stopPropagation()); container.appendChild(w);
+    }
     const doRep = () => { if (frozen || !curRep) return; o.onReport && o.onReport(curRep); };
     const doKill = () => {
       if (frozen || !curKill) return; const cdl = o.killCd ? o.killCd() : 0; if (cdl > 0) { A.sfx('deny'); return; }
@@ -193,6 +233,7 @@
       ROOMS.forEach((r) => { const tx = (r.x + r.w / 2) * 8, ty = (r.y + r.h / 2) * 8; g.fillStyle = 'rgba(0,0,0,.55)'; const tw = g.measureText(r.name).width + 8; g.fillRect(tx - tw / 2, ty - 8, tw, 16); g.fillStyle = '#fff'; g.fillText(r.name, tx, ty); });
       const tks = (o.getTasks && o.getTasks()) || [];
       STATIONS.forEach((s) => { const t = tks.find((q) => q.st === s.id); if (!t) return; g.fillStyle = t.done ? '#3fdc7a' : '#ffd23f'; g.beginPath(); g.arc(s.x / TS * 8, s.y / TS * 8, 7, 0, 6.283); g.fill(); g.fillStyle = '#1a1033'; g.font = '800 10px ' + FONT; g.fillText(t.done ? '✓' : '!', s.x / TS * 8, s.y / TS * 8 + 1); });
+      if (o.isImp && o.isImp()) VENTS.forEach((v) => { g.fillStyle = '#000'; g.fillRect(v.x / TS * 8 - 5, v.y / TS * 8 - 3, 10, 7); g.fillStyle = '#9aa6c8'; g.fillRect(v.x / TS * 8 - 4, v.y / TS * 8 - 2, 8, 5); });
       g.fillStyle = '#ff3b3b'; g.beginPath(); g.arc(TABLE.x / TS * 8, TABLE.y / TS * 8, 5, 0, 6.283); g.fill();
       g.fillStyle = '#5ce1e6'; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.arc(me.x / TS * 8, me.y / TS * 8, 5, 0, 6.283); g.stroke(); g.fill();
       const cap = document.createElement('div'); cap.className = 'wd-cap'; cap.textContent = '🟡 misión pendiente · ✅ hecha · 🔴 botón de emergencia · 🔵 tú. Toca para cerrar.';
@@ -208,7 +249,7 @@
     const jup = (e) => { if (joy && (!e || e.pointerId === joy.id)) joy = null; };
     cv.addEventListener('pointerup', jup); cv.addEventListener('pointercancel', jup); cv.addEventListener('lostpointercapture', jup);
     const KEYS = ['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'w', 'a', 's', 'd'];
-    const kd = (e) => { const k = e.key.toLowerCase(), t = e.target && e.target.tagName; if (t === 'INPUT' || t === 'TEXTAREA') return; if (KEYS.includes(k)) { keys[k] = true; e.preventDefault(); } else if (!e.repeat && (k === 'e' || k === ' ')) { doUse(); e.preventDefault(); } else if (!e.repeat && k === 'r') doRep(); else if (!e.repeat && k === 'q') doKill(); };
+    const kd = (e) => { const k = e.key.toLowerCase(), t = e.target && e.target.tagName; if (t === 'INPUT' || t === 'TEXTAREA') return; if (KEYS.includes(k)) { keys[k] = true; e.preventDefault(); } else if (!e.repeat && (k === 'e' || k === ' ')) { doUse(); e.preventDefault(); } else if (!e.repeat && k === 'r') doRep(); else if (!e.repeat && k === 'q') doKill(); else if (!e.repeat && k === 'f') doSab(); };
     const ku = (e) => { keys[e.key.toLowerCase()] = false; };
     root.addEventListener('keydown', kd); root.addEventListener('keyup', ku);
 
@@ -224,12 +265,12 @@
     function drawStation(s, t, st) {
       const x = s.x, y = s.y; const mine = st; // {done} o undefined
       g_(); function g_() {
-        ctx.save(); ctx.translate(x, y);
+        ctx.save(); ctx.translate(x, y); ctx.scale(1.45, 1.45);
         ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(-14, 6, 28, 5);
         ctx.fillStyle = '#14172a'; ctx.fillRect(-14, -12, 28, 20); ctx.fillStyle = mine ? (mine.done ? '#1f6b44' : '#2a2f5c') : '#3a3f55'; ctx.fillRect(-12, -10, 24, 14);
-        ctx.fillStyle = mine && !mine.done ? 'rgba(255,255,255,.9)' : 'rgba(255,255,255,.35)'; ctx.font = '12px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(mine && mine.done ? '✅' : KIND_ICON[s.kind], 0, -3);
+        ctx.fillStyle = mine && !mine.done ? 'rgba(255,255,255,.9)' : 'rgba(255,255,255,.35)'; ctx.font = '13px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(mine && mine.done ? '✅' : KIND_ICON[s.kind], 0, -3);
         ctx.fillStyle = '#c9ced9'; ctx.fillRect(-12, 5, 24, 2);
-        if (mine && !mine.done) { const a = 0.55 + 0.45 * Math.sin(t * 5); ctx.globalAlpha = a; ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 2; ctx.strokeRect(-17, -15, 34, 26); ctx.globalAlpha = 1; const by = -26 + Math.sin(t * 6) * 3; ctx.fillStyle = '#000'; ctx.font = '900 16px ' + FONT; ctx.fillText('❗', 0, by + 1); ctx.fillStyle = '#ffd23f'; ctx.fillText('❗', 0, by); }
+        if (mine && !mine.done) { const a = 0.55 + 0.45 * Math.sin(t * 5); ctx.globalAlpha = a; ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 2; ctx.strokeRect(-17, -15, 34, 26); ctx.globalAlpha = 1; const by = -26 + Math.sin(t * 6) * 3; ctx.fillStyle = '#000'; ctx.font = '900 20px ' + FONT; ctx.fillText('❗', 0, by + 1); ctx.fillStyle = '#ffd23f'; ctx.fillText('❗', 0, by); }
         ctx.restore();
       }
     }
@@ -238,7 +279,7 @@
       ctx.fillStyle = 'rgba(160,20,40,.55)'; ctx.beginPath(); ctx.ellipse(0, 2, 14, 6, 0, 0, 6.283); ctx.fill();
       if (spr) { const hw = S.HERO_W * HS, hh = S.HERO_H * HS; ctx.save(); ctx.translate(0, -4); ctx.rotate(Math.PI / 2); ctx.globalAlpha = 0.95; ctx.drawImage(spr, -hw / 2, -hh + 2, hw, hh); ctx.restore(); }
       ctx.font = '12px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🦴', 8, -4); ctx.restore();
-      ctx.save(); ctx.translate(b.x, b.y - 16 + Math.sin(t * 5) * 2); ctx.font = '900 12px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#000'; ctx.fillText('💀', 0.5, 0.5); ctx.fillText('💀', 0, 0); ctx.restore();
+      ctx.save(); ctx.translate(b.x, b.y - 16 + Math.sin(t * 5) * 2); ctx.font = '900 22px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#000'; ctx.fillText('💀', 0.5, 0.5); ctx.fillText('💀', 0, 0); ctx.restore();
     }
     function drawPlayer(pl, look, x, y, f, moving, isMe, t, isGhost, alpha) {
       const spr = spriteFor(look, moving ? Math.floor(t * 10) % 4 : 0); if (!spr) return;
@@ -272,32 +313,33 @@
       parts.forEach((p) => { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; }); for (let i = parts.length - 1; i >= 0; i--) if (parts[i].t >= parts[i].life) parts.splice(i, 1);
       floats.forEach((f) => { f.t += dt; f.y -= 16 * dt; }); for (let i = floats.length - 1; i >= 0; i--) if (floats[i].t >= floats[i].life) floats.splice(i, 1);
       // ¿qué tengo cerca?
-      const R = ghost ? 9999 : (o.isImp && o.isImp() ? VIS_IMP : VIS_CREW);
+      const R = ghost ? 9999 : (o.isImp && o.isImp() ? VIS_IMP : (Date.now() < blackUntil ? 34 : VIS_CREW));
       const tks = (o.getTasks && o.getTasks()) || [], imp = !!(o.isImp && o.isImp());
       let use = null, ud = 1e9;
       STATIONS.forEach((s) => { const d = dist(me.x, me.y, s.x, s.y), tk = tks.find((q) => q.st === s.id); if (d < USE_R && d < ud && ((tk && !tk.done) || (imp && !ghost))) { use = { type: 'st', st: s, tk }; ud = d; } });
       if (!use && !ghost && dist(me.x, me.y, TABLE.x, TABLE.y) < EMG_R && o.canEmergency && o.canEmergency()) use = { type: 'emg' };
+      if (!use && imp && !ghost) VENTS.forEach((v) => { const d = dist(me.x, me.y, v.x, v.y); if (d < 26 && d < ud) { use = { type: 'vent', vent: v }; ud = d; } });
       curUse = use;
       curRep = null; let rd = 1e9; if (!ghost) Object.keys(bodies).forEach((id) => { const b = bodies[id]; if (!b) return; const d = dist(me.x, me.y, b.x, b.y); if (d < REP_R && d < rd) { rd = d; curRep = id; } });
       curKill = null; let kd2 = 1e9; if (imp && !ghost) Object.keys(others).forEach((id) => { const pl = players[id]; if (!pl || pl.dead || pl.online === false || (o.isImpId && o.isImpId(id))) return; const c = others[id], d = dist(me.x, me.y, c.x, c.y); if (d < KILL_R && d < kd2) { kd2 = d; curKill = id; } });
       const cdl = imp && o.killCd ? o.killCd() : 0;
-      const sig = (use ? (use.type === 'emg' ? 'E' : 'U') : '-') + (curRep ? 'R' : '-') + (imp ? (ghost ? '-' : 'K') : '-') + (curKill ? 'k' : '-') + (cdl > 0 ? 'c' : '-') + (frozen ? 'f' : '-') + (ghost ? 'g' : '-');
+      const sig = (use ? (use.type === 'emg' ? 'E' : 'U') : '-') + (curRep ? 'R' : '-') + (imp ? (ghost ? '-' : 'K') : '-') + (curKill ? 'k' : '-') + (cdl > 0 ? 'c' : '-') + (frozen ? 'f' : '-') + (ghost ? 'g' : '-') + (use && use.type === 'vent' ? 'V' : '-');
       if (sig !== lastBtn) {
-        lastBtn = sig; bUse.classList.toggle('on', !!use); bUse.querySelector('span').textContent = use && use.type === 'emg' ? '🚨' : use && use.st && imp && !(use.tk && !use.tk.done) ? '🎭' : '🖐️'; bUse.querySelector('small').textContent = use && use.type === 'emg' ? 'REUNIÓN' : use ? (imp && !(use.tk && !use.tk.done) ? 'FINGIR' : 'MISIÓN') : 'USAR';
-        bRep.classList.toggle('on', !!curRep); bRep.hidden = ghost; bKill.hidden = !imp || ghost; bKill.classList.toggle('on', !!curKill && cdl <= 0); bKill.classList.toggle('cool', cdl > 0);
+        lastBtn = sig; bUse.classList.toggle('on', !!use); bUse.querySelector('span').textContent = use && use.type === 'vent' ? '🕳️' : use && use.type === 'emg' ? '🚨' : use && use.st && imp && !(use.tk && !use.tk.done) ? '🎭' : '🖐️'; bUse.querySelector('small').textContent = use && use.type === 'vent' ? 'TÚNEL' : use && use.type === 'emg' ? 'REUNIÓN' : use ? (imp && !(use.tk && !use.tk.done) ? 'FINGIR' : 'MISIÓN') : 'USAR';
+        bRep.classList.toggle('on', !!curRep); bRep.hidden = ghost; bKill.hidden = !imp || ghost; bSab.hidden = !imp || ghost; bSab.classList.toggle('on', !(o.sabCd && o.sabCd() > 0)); bKill.classList.toggle('on', !!curKill && cdl <= 0); bKill.classList.toggle('cool', cdl > 0);
       }
+      if (imp) { const sc = o.sabCd ? o.sabCd() : 0; cd2.style.setProperty('--p', sc > 0 ? Math.min(1, sc / 22000) : 0); bSab.querySelector('small').textContent = sc > 0 ? Math.ceil(sc / 1000) + ' s' : 'SABOTAJE'; bSab.classList.toggle('on', sc <= 0); }
       if (imp) cd.style.setProperty('--p', cdl > 0 ? Math.min(1, cdl / (o.killMax || 20000)) : 0); if (imp && cdl > 0) bKill.querySelector('small').textContent = Math.ceil(cdl / 1000) + ' s'; else if (imp) bKill.querySelector('small').textContent = 'ELIMINAR';
       // nombre de la sala
-      const ri = roomIdxAt(me.x, me.y); if (ri !== roomShown) { roomShown = ri; if (ri >= 0) { roomEl.textContent = ROOMS[ri].name; roomEl.hidden = false; roomEl.classList.remove('in'); void roomEl.offsetWidth; roomEl.classList.add('in'); roomT = now + 2200; } }
+      const ri = roomIdxAt(me.x, me.y); if (ri !== roomShown) { roomShown = ri; if (ri >= 0) { roomEl.textContent = ROOMS[ri].name + ' · ' + ROOMS[ri].sub; roomEl.hidden = false; roomEl.classList.remove('in'); void roomEl.offsetWidth; roomEl.classList.add('in'); roomT = now + 2200; } }
       if (roomT && now > roomT) { roomEl.hidden = true; roomT = 0; }
       // pista contextual
-      const hint = use && use.type === 'emg' ? 'Botón de emergencia: convoca una reunión' : use && use.st ? (use.tk && !use.tk.done ? '¡Toca USAR para empezar: ' + use.st.name + '!' : 'Finge hacer la tarea') : curRep ? '¡Hay un cuerpo! Toca REPORTAR' : curKill && imp && cdl <= 0 ? 'Cerca de un tripulante: ELIMINAR' : '';
+      const hint = use && use.type === 'vent' ? 'Túnel secreto: toca TÚNEL para viajar a otro escenario' : use && use.type === 'emg' ? 'Botón de emergencia: convoca una reunión' : use && use.st ? (use.tk && !use.tk.done ? '¡Toca USAR para empezar: ' + use.st.name + '!' : 'Finge hacer la tarea') : curRep ? '¡Hay un cuerpo! Toca REPORTAR' : curKill && imp && cdl <= 0 ? 'Cerca de un tripulante: ELIMINAR' : '';
       if (hint !== hintEl.dataset.h) { hintEl.dataset.h = hint; hintEl.textContent = hint; hintEl.hidden = !hint; }
 
       /* ---- dibujar ---- */
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.imageSmoothingEnabled = false; ctx.fillStyle = '#06041a'; ctx.fillRect(0, 0, W, H);
-      const vw = W / z, vh = H / z; let cx = clamp(me.x - vw / 2, 0, Math.max(0, MW * TS - vw)), cy = clamp(me.y - vh / 2, 0, Math.max(0, MH * TS - vh));
-      if (MW * TS < vw) cx = (MW * TS - vw) / 2; if (MH * TS < vh) cy = (MH * TS - vh) / 2;
+      const vw = W / z, vh = H / z; const cx = me.x - vw / 2, cy = me.y - vh * 0.48;   // la cámara siempre centra al jugador: nunca queda tapado en los bordes del mapa
       ctx.save(); ctx.scale(z, z); ctx.translate(-Math.round(cx * z) / z, -Math.round(cy * z) / z);
       ctx.drawImage(map, 0, 0);
       // botón rojo de la mesa
@@ -325,6 +367,16 @@
         fctx.globalCompositeOperation = 'destination-out'; const px = (me.x - cx) * k, py = (me.y - 8 - cy) * k, rr = R * k, gr = fctx.createRadialGradient(px, py, rr * 0.35, px, py, rr); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.7, 'rgba(0,0,0,.85)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); fctx.fillStyle = gr; fctx.beginPath(); fctx.arc(px, py, rr, 0, 6.283); fctx.fill();
         ctx.imageSmoothingEnabled = true; ctx.drawImage(fogCv, 0, 0, W, H); ctx.imageSmoothingEnabled = false;
       } else { ctx.fillStyle = 'rgba(80,120,255,.10)'; ctx.fillRect(0, 0, W, H); }
+      // flechas hacia las misiones pendientes (y botón de emergencia lejos): siempre se ven en el borde
+      if (!frozen) {
+        const pend = STATIONS.filter((s2) => { const tk = tks.find((q) => q.st === s2.id); return tk && !tk.done; }); const mx0 = 40, mx1 = W - 40, my0 = 128, my1 = H - 128;
+        pend.forEach((s2) => {
+          const sx2 = (s2.x - cx) * z, sy2 = (s2.y - cy) * z; if (sx2 > 30 && sx2 < W - 30 && sy2 > 110 && sy2 < H - 110) return;
+          const ccx = (me.x - cx) * z, ccy = (me.y - cy) * z, ang = Math.atan2(sy2 - ccy, sx2 - ccx); let ax = clamp(sx2, mx0, mx1), ay = clamp(sy2, my0, my1);
+          ctx.save(); ctx.translate(ax, ay); ctx.globalAlpha = 0.95; ctx.fillStyle = '#ffd23f'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 21, 0, 6.283); ctx.fill(); ctx.stroke();
+          ctx.rotate(ang); ctx.beginPath(); ctx.moveTo(30, 0); ctx.lineTo(21, -8); ctx.lineTo(21, 8); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.rotate(-ang); ctx.font = '22px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#000'; ctx.fillText(KIND_ICON[s2.kind], 0, 1); ctx.restore();
+        });
+      }
       // joystick
       if (joy && !frozen) { const dx = joy.x - joy.ox, dy = joy.y - joy.oy, d = Math.hypot(dx, dy), m = Math.min(d, 44), nx = d ? dx / d * m : 0, ny = d ? dy / d * m : 0; ctx.globalAlpha = 0.5; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(joy.ox, joy.oy, 46, 0, 6.283); ctx.fill(); ctx.globalAlpha = 0.85; ctx.fillStyle = '#cfd6ff'; ctx.beginPath(); ctx.arc(joy.ox + nx, joy.oy + ny, 22, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1; }
     }
@@ -337,6 +389,7 @@
       setFrozen(b) { frozen = !!b; if (b) joy = null; },
       setGhost(b) { ghost = !!b; lastBtn = ''; if (b) { role.textContent = '👻 Fantasma'; role.classList.add('ghost'); } },
       setLook() { /* el avatar se lee con getLook() en cada cuadro */ },
+      blackout(ms) { blackUntil = Date.now() + ms; },
       gather(n) { const s = spawnPoint(o.pid, n || 0); me.x = s.x; me.y = s.y; sx = -1; joy = null; },
       setProgress(frac, txt) { barFill.style.width = Math.round(clamp(frac, 0, 1) * 100) + '%'; barTxt.textContent = txt || Math.round(clamp(frac, 0, 1) * 100) + '%'; },
       setTasks(list, imp) {
@@ -348,5 +401,5 @@
     };
   }
 
-  root.DuiXWorld = { mount, layout, STATIONS, ROOMS, TABLE, TS, MW, MH, _walkable: walkable, _canStand: canStand, KIND_ICON, spawnPoint };
+  root.DuiXWorld = { mount, layout, STATIONS, VENTS, ROOMS, TABLE, TS, MW, MH, _walkable: walkable, _canStand: canStand, KIND_ICON, spawnPoint };
 })(window);
