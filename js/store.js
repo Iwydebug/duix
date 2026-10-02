@@ -49,7 +49,24 @@
     p.coins = p.coins || 0; p.xp = p.xp || 0; p.level = p.level || 1; p.sigma = p.sigma || 0;
     p.wheel = Object.assign({ day: '', freeUsed: false, extra: 0, qDay: '', qCount: 0 }, p.wheel || {});
     STARTERS.forEach((s) => { if (!p.owned.includes(s)) p.owned.push(s); });
+    if (p.dev) devApply(p);
   }
+
+  // ---- Modo desarrollador (código secreto del autor): todo infinito y desbloqueado ----
+  const DEV_HASH = 2428737696;
+  const isDev = () => { const p = profile(); return !!(p && p.dev); };
+  function devApply(p) {
+    p.coins = 999999999; p.sigma = 999999; p.level = Math.max(p.level || 1, 30); p.xp = p.xp || 0;
+    p.owned = D.ITEMS.map((i) => i.id);
+    D.VILLAINS.forEach((v) => { const pr = p.progress[v.id] || (p.progress[v.id] = { stars: 0, tier: 0, plays: 0, wins: 0 }); pr.tier = 3; pr.stars = Math.max(pr.stars || 0, 3); pr.plays = Math.max(pr.plays || 0, 1); pr.wins = Math.max(pr.wins || 0, 1); });
+    p.wheel.extra = 999; p.wheel.freeUsed = false; p.wheel.qCount = 0;
+  }
+  function devActivate(code) {
+    const p = profile(); if (!p) return { ok: false, err: 'Primero crea o elige un héroe' };
+    if (hashStr(String(code || '').trim().toUpperCase()) !== DEV_HASH) return { ok: false, err: 'Código incorrecto' };
+    p.dev = true; devApply(p); save(); notify('coins'); notify('profile'); return { ok: true };
+  }
+  function devOff() { const p = profile(); if (p) { p.dev = false; save(); notify('coins'); notify('profile'); } }
   function save() { ls.set(KEY_P, JSON.stringify(db)); }
   function saveSettings() { ls.set(KEY_S, JSON.stringify(settings)); }
 
@@ -108,13 +125,13 @@
 
   /* ---------- economía / XP ---------- */
   function addCoins(n) { const p = profile(); if (!p) return; p.coins = Math.max(0, p.coins + Math.round(n)); notify('coins'); }
-  function spend(n) { const p = profile(); if (!p || p.coins < n) return false; p.coins -= n; notify('coins'); return true; }
+  function spend(n) { const p = profile(); if (p && p.dev) return true; if (!p || p.coins < n) return false; p.coins -= n; notify('coins'); return true; }
   /* ---------- Σ (símbolos matemáticos) y ruleta ---------- */
   function addSigma(n) { const p = profile(); if (!p || !n) return; p.sigma = Math.max(0, (p.sigma || 0) + Math.round(n)); notify('coins'); }
-  function spendSigma(n) { const p = profile(); if (!p || (p.sigma || 0) < n) return false; p.sigma -= n; notify('coins'); return true; }
-  function wheelState() { const p = profile(); if (!p) return { free: false, extra: 0, qLeft: 0 }; const t = today(); if (p.wheel.day !== t) { p.wheel.day = t; p.wheel.freeUsed = false; } if (p.wheel.qDay !== t) { p.wheel.qDay = t; p.wheel.qCount = 0; } return { free: !p.wheel.freeUsed, extra: p.wheel.extra || 0, qLeft: Math.max(0, 3 - p.wheel.qCount) }; }
+  function spendSigma(n) { const p = profile(); if (p && p.dev) return true; if (!p || (p.sigma || 0) < n) return false; p.sigma -= n; notify('coins'); return true; }
+  function wheelState() { const p = profile(); if (!p) return { free: false, extra: 0, qLeft: 0 }; const t = today(); if (p.wheel.day !== t) { p.wheel.day = t; p.wheel.freeUsed = false; } if (p.wheel.qDay !== t) { p.wheel.qDay = t; p.wheel.qCount = 0; } return { free: !p.wheel.freeUsed, extra: p.wheel.extra || 0, qLeft: p.dev ? 99 : Math.max(0, 3 - p.wheel.qCount) }; }
   function spinsLeft() { const w = wheelState(); return (w.free ? 1 : 0) + w.extra; }
-  function useSpin() { const p = profile(); if (!p) return false; const w = wheelState(); if (w.free) p.wheel.freeUsed = true; else if (w.extra > 0) p.wheel.extra--; else return false; save(); return true; }
+  function useSpin() { const p = profile(); if (!p) return false; if (p.dev) { p.wheel.extra = 999; return true; } const w = wheelState(); if (w.free) p.wheel.freeUsed = true; else if (w.extra > 0) p.wheel.extra--; else return false; save(); return true; }
   function grantSpin(n) { const p = profile(); if (!p) return; wheelState(); p.wheel.extra = (p.wheel.extra || 0) + (n || 1); save(); }
   function wheelQuestionDone() { const p = profile(); if (!p) return; wheelState(); p.wheel.qCount++; save(); }
   const WHEEL = [
@@ -166,6 +183,7 @@
   function prog(id) { const p = profile(); return (p && p.progress[id]) || { stars: 0, tier: 0, plays: 0, wins: 0 }; }
   function isCleared(id) { return prog(id).tier >= 3; }
   function unlocked(v) {
+    if (isDev()) return true;
     const i = D.VILLAINS.indexOf(v);
     if (i === 0) return true;
     if (v.id === 'indeterminado') return FIRST14.every((x) => isCleared(x.id));
@@ -310,7 +328,7 @@
   const S = {
     persistent, MAX_PROFILES, DEFAULT_LOOK, xpNeed, CHEST_COST, today, settings: () => settings, setSetting(k, v) { settings[k] = v; saveSettings(); notify('settings'); },
     list: () => db.list, profile, newProfile, switchTo, removeProfile, logout, save,
-    has, buy, equip, setLook, openChest, grantItem, perks, addCoins, spend, addXp, addSigma, spendSigma, wheelState, spinsLeft, useSpin, grantSpin, wheelQuestionDone, WHEEL, rollWheel, applyPrize, EXCHANGE, exchange,
+    isDev, devActivate, devOff, has, buy, equip, setLook, openChest, grantItem, perks, addCoins, spend, addXp, addSigma, spendSigma, wheelState, spinsLeft, useSpin, grantSpin, wheelQuestionDone, WHEEL, rollWheel, applyPrize, EXCHANGE, exchange,
     prog, isCleared, unlocked, score, boardScore, recordBattle, recordRoom, stats, checkAch, ensureDaily, trackDaily, exportCode, importCode, resetAll,
     on(f) { listeners.push(f); },
   };

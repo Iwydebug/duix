@@ -52,7 +52,7 @@
     api.damage = () => {
       if (room && room.noHearts) { A.sfx('hurt'); wrap.classList.remove('hurt'); void wrap.offsetWidth; wrap.classList.add('hurt'); return true; }
       if (st.shield > 0) { st.shield--; A.sfx('power'); api.hearts(); return false; }
-      st.hearts--; st.heartsLost++; A.sfx('hurt'); api.hearts();
+      if (!St.isDev()) { st.hearts--; st.heartsLost++; } A.sfx('hurt'); api.hearts();
       wrap.classList.remove('hurt'); void wrap.offsetWidth; wrap.classList.add('hurt'); return true;
     };
     api.gain = (clean, extra) => {

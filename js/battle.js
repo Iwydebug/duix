@@ -220,7 +220,7 @@
     function damageHero() {
       if (st.shield > 0) { st.shield--; float(hero.x, LH - 130, '¡ESCUDO!', '#8fe6ff', 16); A.sfx('power'); renderHearts(); return false; }
       if (room && room.noHearts) { hero.hurtT = 0.4; shake = 6; flash = 0.2; A.sfx('hurt'); return true; }
-      st.hearts--; st.heartsLost++; hero.hurtT = 0.4; shake = 9; flash = 0.35; A.sfx('hurt'); renderHearts();
+      if (!St.isDev()) { st.hearts--; st.heartsLost++; } hero.hurtT = 0.4; shake = 9; flash = 0.35; A.sfx('hurt'); renderHearts();
       eshots.push({ x: vil.x, y: 90, tx: hero.x, ty: LH - 90, t: 0 });
       if (Math.random() < 0.5) say(TAUNTS[Math.floor(Math.random() * TAUNTS.length)], 1100);
       return true;

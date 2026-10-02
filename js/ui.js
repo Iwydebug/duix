@@ -739,6 +739,11 @@
     const musicPick = h('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Estilo de música' });
     const renderMusicPick = () => { musicPick.innerHTML = ''; [['arcade', 'Arcade'], ['calma', 'Calmada'], ['off', 'Sin música']].forEach(([id, label]) => musicPick.appendChild(h('button', { class: 'segb' + (styleNow() === id ? ' on' : ''), role: 'radio', 'aria-checked': styleNow() === id ? 'true' : 'false', onclick: () => { A.unlock(); if (id === 'off') St.setSetting('music', false); else { St.setSetting('musicStyle', id); St.setSetting('music', true); A.play(MUSIC.settings); } sfx('click'); renderMusicPick(); } }, label))); };
     renderMusicPick();
+    const devIn = h('input', { class: 'input', type: 'password', autocomplete: 'off', placeholder: 'Código secreto', 'aria-label': 'Código secreto' });
+    const devMsg = h('small', { class: 'hint', text: St.isDev() ? '🛠️ Modo desarrollador ACTIVO en este héroe.' : '' });
+    const devBlock = h('div', { class: 'set-block' }, h('h3', { text: '🛠️ Código secreto' }), devIn, devMsg,
+      h('button', { class: 'btn', onclick: () => { const r = St.devActivate(devIn.value); if (r.ok) { sfx('win'); devMsg.textContent = '🛠️ ¡Modo desarrollador ACTIVADO! Todo infinito y desbloqueado.'; toast('🛠️ Modo desarrollador activado', 'ach'); devIn.value = ''; } else { sfx('deny'); devMsg.textContent = r.err; } } }, 'Activar'),
+      St.isDev() ? h('button', { class: 'btn ghost small', onclick: () => { St.devOff(); go('settings'); } }, 'Desactivar') : null);
     const code = h('textarea', { class: 'input code', rows: '3', placeholder: 'Pega aquí un código de guardado…', 'aria-label': 'Código de guardado' });
     const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent), standalone = root.matchMedia && root.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
     const inst = h('div', { class: 'set-block' }, h('h3', { text: 'Instalar como app' }),
@@ -755,6 +760,7 @@
           h('button', { class: 'btn small ghost', onclick: () => { const r = St.importCode(code.value); if (r.ok) { toast('¡Héroe cargado!', ''); go('hub'); } else toast(r.err, 'warn'); } }, 'Cargar código')), code,
         h('div', { class: 'row' }, h('button', { class: 'btn small ghost', onclick: () => { St.logout(); go('profiles'); } }, 'Cambiar de héroe'),
           h('button', { class: 'btn small danger', onclick: () => modal({ title: '¿Borrar todo?', body: h('p', { text: 'Se borrarán TODOS los héroes y su progreso en este dispositivo.' }), buttons: [{ label: 'Cancelar', cls: 'ghost' }, { label: 'Borrar todo', cls: 'danger', onClick: () => { St.resetAll(); go('title'); } }] }) }, 'Borrar todo'))),
+      devBlock,
       h('div', { class: 'about' }, h('b', { text: 'DuiX' }), h('p', { text: 'Juego de Cálculo Diferencial hecho por ' + D.AUTHOR.full + ', estudiante de Estadística.' }), h('small', { text: 'Temas: intervalos, fracciones, factorización, polinomios, plano cartesiano, desigualdades, funciones, desplazamientos, tabulaciones, potenciación, composición, radicales, logaritmos y trigonometría.' }))));
   };
 

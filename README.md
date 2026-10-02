@@ -181,3 +181,6 @@ Así nadie puede listar todas las salas: solo entra quien conoce el código. Las
 
 ## Novedades 1.9.0
 - Las preguntas que mencionan una gráfica ahora la dibujan (desplazamientos, reflexiones, estiramientos, parábola y punto en el plano), en batalla, minijuegos, ruleta y repaso. Las que mencionan tablas ya las mostraban en todos lados.
+
+## Novedades 1.9.1
+- Código secreto del autor en Ajustes (modo desarrollador): monedas, sigmas, giros y vidas infinitos, todo desbloqueado.
