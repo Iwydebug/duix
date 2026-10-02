@@ -980,3 +980,6 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:var(--safe-t,
 .vopt .vbadge[hidden]{display:none}
 .bt-rank .rk.dead{opacity:.55;filter:grayscale(.7)}
 .rov.wmeet{z-index:130}
+
+.coach{height:112px;overflow:hidden;animation:none}
+.coach-tx{overflow:hidden}

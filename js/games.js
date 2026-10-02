@@ -623,7 +623,7 @@
     timer = setInterval(() => {
       if (dead || switched || !inner) return;
       if (Date.now() < flashUntil) return;
-      if (si >= STEPS.length) { if (!fin) { fin = true; clearInterval(timer); setTimeout(() => { if (dead || switched) return; if (inner) { try { inner.destroy(); } catch (e) { /* ok */ } inner = null; } strip.remove(); modal('¡Felicidades! Ya estás listo para tu primer juego.', 'Jugar', toReal, false); A.sfx('levelup'); }, 1100); } return; }
+      if (si >= STEPS.length) { if (!fin) { fin = true; clearInterval(timer); A.sfx('levelup'); setTimeout(() => { if (!dead && !switched) toReal(); }, 500); } return; }
       const s = STEPS[si]; if (!s) return;
       if (base == null && s.init) base = s.init();
       let ok = false; try { ok = s.done(base); } catch (e) { ok = false; }
@@ -641,7 +641,7 @@
     strip.addEventListener('click', (e) => { if (e.target.closest('[data-a=skip]')) { A.sfx('click'); toReal(); } });
     const pcfg = Object.assign({}, cfg, { extraTop: strip, onProgress: null, speedMul: () => 0.75, fallSecs: 42,
       room: { total: 99, getQuestion: (i) => { if (!i) return pq; try { return Q.generate(cfg.villain.topic === 'mix' || cfg.villain.endless ? 'fracciones' : cfg.villain.topic, 1); } catch (e) { return pq; } }, hp: () => ({ frac: 1, text: 'Práctica' }), noHearts: true, label: '🎓 Práctica' },
-      onEnd: () => { setTimeout(() => { if (switched || dead) return; if (inner) { try { inner.destroy(); } catch (e) { /* ok */ } inner = null; } modal('¡Felicidades! Ya estás listo para tu primer juego.', 'Jugar', toReal, false); A.sfx('levelup'); }, 0); },
+      onEnd: () => { setTimeout(() => { if (!switched && !dead) toReal(); }, 0); },
       onQuit: () => { clearInterval(timer); dead = true; cfg.onQuit && cfg.onQuit(); }, onRestart: null });
     const welcome = { 'shoot': 'Antes de jugar de verdad te enseñamos los controles del juego de DISPARO. Solo sigue las instrucciones.', 'run': 'Antes de jugar de verdad te enseñamos los controles de la CARRERA. Solo sigue las instrucciones.', 'maze': 'Antes de jugar de verdad te enseñamos los controles del LABERINTO. Solo sigue las instrucciones.' }[kind];
     modal('¡Bienvenido! ' + welcome, 'OK', () => { if (!dead && !switched && !inner) inner = startFn(pcfg); }, true);

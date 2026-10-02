@@ -124,6 +124,9 @@ Así nadie puede listar todas las salas: solo entra quien conoce el código. Las
 - Retroalimentación solo al final. Avatares corregidos. Créditos con el tema del juego, «Deiwy Mondragon» y citas de Precálculo y Cálculo (Stewart).
 - Salas: impostores con Ninguno / Auto / 1 / 2 / 3 y casilla numérica.
 
+## Novedades 1.8.6
+- **Tutorial:** al terminar la práctica el juego real empieza de una (sin pantalla extra, como en Parchís). La tarjeta de pasos ya no cambia de tamaño, así que no hay parpadeos ni saltos.
+
 ## Novedades 1.8.5
 - **Mapa tipo Among Us en las salas:** al empezar, todos aparecen en la Cafetería de un colegio-nave (Laboratorio, Biblioteca, Gimnasio, Cancha, Sótano, Sala de máquinas, Enfermería y Dirección). Se camina con joystick (o WASD/flechas), con visión limitada y botón rojo de emergencia en la mesa.
 - **Los 3 juegos son MISIONES:** cada jugador tiene una consola de Disparo, una de Carrera y una de Laberinto Pac-Man repartidas por el mapa (lista de tareas + barra "Tareas completadas"). Al terminar vuelves al mapa.
