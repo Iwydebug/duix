@@ -163,6 +163,7 @@
       const qt = $('.bt-qtext'); qt.textContent = q.text; qt.className = 'bt-qtext' + (q.text.length > 70 ? ' long' : q.text.length > 46 ? ' mid' : '');
       const tb = $('.bt-qtable'); tb.innerHTML = '';
       if (q.table) { let h = '<table><tr>' + q.table.head.map((c, i) => (i ? '<td>' : '<th>') + esc(c) + (i ? '</td>' : '</th>')).join('') + '</tr>'; q.table.rows.forEach((r) => { h += '<tr>' + r.map((c, i) => (i ? '<td class="' + (c === '?' ? 'qm' : '') + '">' : '<th>') + esc(c) + (i ? '</td>' : '</th>')).join('') + '</tr>'; }); tb.innerHTML = h + '</table>'; }
+      if (q.graph) tb.innerHTML = Q.graphSVG(q.graph);
       $('.bt-explain').hidden = true;
       const speed = baseSpeed() * (1 + Math.min(0.15, st.qIndex * 0.01)) * (1 - (perks.slow || 0)) * (endless ? 1 + Math.min(0.6, st.correct * 0.02) : 1);
       caps.length = 0;
@@ -202,7 +203,7 @@
     function onCorrect(c) {
       const clean = !st.qWrong && !st.qMiss;
       c.state = 'dead'; st.answered++;
-      if (clean) { st.correct++; st.streak++; st.bestStreak = Math.max(st.bestStreak, st.streak); (st.goods = st.goods || []).push({ topic: st.q.topic, text: st.q.text, correctText: st.q.options[st.q.correct], explain: st.q.explain, table: st.q.table || null }); } else st.streak = 0;
+      if (clean) { st.correct++; st.streak++; st.bestStreak = Math.max(st.bestStreak, st.streak); (st.goods = st.goods || []).push({ topic: st.q.topic, text: st.q.text, correctText: st.q.options[st.q.correct], explain: st.q.explain, table: st.q.table || null, graph: st.q.graph || null }); } else st.streak = 0;
       const mult = clean ? multOf() : 1, tb = clamp(1 - c.y / FLOOR(), 0, 1) * 40;
       const gain = Math.round((clean ? 100 : 40) * mult * (st.goldQ ? 2 : 1) + (clean ? tb : 0));
       st.score += gain; const cg = clean ? 3 + (st.streak >= 5 ? 2 : 0) + (st.goldQ ? 2 : 0) : 1; st.coins += Math.round(cg * (1 + (perks.coins || 0)));
@@ -224,7 +225,7 @@
       if (Math.random() < 0.5) say(TAUNTS[Math.floor(Math.random() * TAUNTS.length)], 1100);
       return true;
     }
-    function logMistake(chosen) { const q = st.q; if (!st.qLogged) { st.qLogged = true; st.mistakes.push({ topic: q.topic, text: q.text, options: q.options, correct: q.correct, chosen: typeof chosen === 'number' ? chosen : -1, explain: q.explain, table: q.table || null }); } }
+    function logMistake(chosen) { const q = st.q; if (!st.qLogged) { st.qLogged = true; st.mistakes.push({ topic: q.topic, text: q.text, options: q.options, correct: q.correct, chosen: typeof chosen === 'number' ? chosen : -1, explain: q.explain, table: q.table || null, graph: q.graph || null }); } }
     function onWrong(c) {
       c.state = 'dead'; st.qWrong = true; st.streak = 0; st.power = Math.floor(st.power * 0.5); st.qLogged = false; logMistake(c.lane);
       A.sfx('wrong'); float(c.x, c.y, '✖', '#ff4d4d', 30);

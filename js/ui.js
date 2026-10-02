@@ -464,7 +464,7 @@
       h('div', { class: 'rw' }, img('star', 3), h('b', { text: acc + '%' }), h('small', { text: 'precisión' })),
       h('div', { class: 'rw' }, img('heart', 3), h('b', { text: String(res.bestStreak) }), h('small', { text: 'mejor racha' })));
     const mist = res.mistakes.length ? h('div', { class: 'mist' }, h('h3', { class: 'h3', text: `Para repasar (${res.mistakes.length})` }), res.mistakes.map(mistakeCard)) : h('p', { class: 'hint', text: res.answered ? '¡Ni un error para repasar!' : '' });
-    const goodCard = (m) => { const c = h('div', { class: 'mcard good' }, h('div', { class: 'mq', text: m.text })); if (m.table) c.appendChild(h('div', { class: 'mtable', html: '<table><tr>' + m.table.head.map((x, i) => (i ? '<td>' : '<th>') + esc(x) + (i ? '</td>' : '</th>')).join('') + '</tr>' + m.table.rows.map((r) => '<tr>' + r.map((x, i) => (i ? '<td>' : '<th>') + esc(x) + (i ? '</td>' : '</th>')).join('') + '</tr>').join('') + '</table>' })); c.appendChild(h('div', { class: 'mans' }, h('span', { class: 'ok', text: '✔ Correcta: ' + m.correctText }))); c.appendChild(h('div', { class: 'mexp', text: '💡 ' + m.explain })); return c; };
+    const goodCard = (m) => { const c = h('div', { class: 'mcard good' }, h('div', { class: 'mq', text: m.text })); if (m.graph) c.appendChild(h('div', { class: 'mtable', html: root.DuiXQ.graphSVG(m.graph) })); if (m.table) c.appendChild(h('div', { class: 'mtable', html: '<table><tr>' + m.table.head.map((x, i) => (i ? '<td>' : '<th>') + esc(x) + (i ? '</td>' : '</th>')).join('') + '</tr>' + m.table.rows.map((r) => '<tr>' + r.map((x, i) => (i ? '<td>' : '<th>') + esc(x) + (i ? '</td>' : '</th>')).join('') + '</tr>').join('') + '</table>' })); c.appendChild(h('div', { class: 'mans' }, h('span', { class: 'ok', text: '✔ Correcta: ' + m.correctText }))); c.appendChild(h('div', { class: 'mexp', text: '💡 ' + m.explain })); return c; };
     const goods = res.goods && res.goods.length ? h('details', { class: 'acc goodlist' }, h('summary', null, h('b', { text: `✅ Lo que acertaste y por qué (${res.goods.length})` })), res.goods.map(goodCard)) : null;
     const resHero = (() => { const cv = h('canvas', { class: 'px' }); liveHero(cv, () => p.look, { scale: 3, pose: () => 'idle' }); const box = h('div', { class: 'rhero' }, cv); const em = D.ITEM_BY_ID[p.look.emote]; if (res.win && em && em.anim !== 'none') later(() => playEmoteOn(cv, box, em, 4200), 700); return box; })();
     const nextV = V[V.indexOf(v) + 1];
@@ -498,7 +498,7 @@
   }
   function mistakeCard(m) {
     const q = h('div', { class: 'mcard' }, h('div', { class: 'mq', text: m.text }));
-    if (m.table) q.appendChild(h('div', { class: 'mtable', html: '<table><tr>' + m.table.head.map((c, i) => (i ? '<td>' : '<th>') + esc(c) + (i ? '</td>' : '</th>')).join('') + '</tr>' + m.table.rows.map((r) => '<tr>' + r.map((c, i) => (i ? '<td>' : '<th>') + esc(c) + (i ? '</td>' : '</th>')).join('') + '</tr>').join('') + '</table>' }));
+    if (m.graph) q.appendChild(h('div', { class: 'mtable', html: root.DuiXQ.graphSVG(m.graph) })); if (m.table) q.appendChild(h('div', { class: 'mtable', html: '<table><tr>' + m.table.head.map((c, i) => (i ? '<td>' : '<th>') + esc(c) + (i ? '</td>' : '</th>')).join('') + '</tr>' + m.table.rows.map((r) => '<tr>' + r.map((c, i) => (i ? '<td>' : '<th>') + esc(c) + (i ? '</td>' : '</th>')).join('') + '</tr>').join('') + '</table>' }));
     const mans = h('div', { class: 'mans' });
     if (typeof m.chosen === 'number' && m.chosen >= 0 && m.options[m.chosen] !== undefined) mans.appendChild(h('span', { class: 'bad', text: '✖ Elegiste: ' + m.options[m.chosen] }));
     else if (m.chosen === -1) mans.appendChild(h('span', { class: 'bad', text: '⏱ No alcanzaste a responder' }));
@@ -666,6 +666,8 @@
     function askQ() {
       let q; try { q = root.DuiXQ.generateAny(2); } catch (e) { return; }
       const body = h('div', { class: 'wh-qb' }, h('p', { class: 'wh-qt', text: q.text }));
+      if (q.graph) body.appendChild(h('div', { class: 'mtable', html: root.DuiXQ.graphSVG(q.graph) }));
+      if (q.table) body.appendChild(h('div', { class: 'mtable', html: '<table><tr>' + q.table.head.map((c, i) => (i ? '<td>' : '<th>') + esc(c) + (i ? '</td>' : '</th>')).join('') + '</tr>' + q.table.rows.map((r) => '<tr>' + r.map((c, i) => (i ? '<td class="' + (c === '?' ? 'qm' : '') + '">' : '<th>') + esc(c) + (i ? '</td>' : '</th>')).join('') + '</tr>').join('') + '</table>' }));
       let closeM;
       const fb = h('p', { class: 'hint' });
       let done = false;

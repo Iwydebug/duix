@@ -47,6 +47,9 @@
     { id: 'v7', tx: 42.5, ty: 41.5, room: 'Mina Radical' }, { id: 'v8', tx: 59.5, ty: 41.5, room: 'Fábrica de Factores' },
   ];
   VENTS.forEach((v) => { v.x = v.tx * TS; v.y = v.ty * TS; });
+  // red de túneles: cada rejilla conecta solo con sus 2 vecinas más cercanas (como Among Us)
+  const VLINK = {}; VENTS.forEach((v) => { VLINK[v.id] = VLINK[v.id] || new Set(); VENTS.filter((w) => w !== v).sort((a, b) => Math.hypot(a.x - v.x, a.y - v.y) - Math.hypot(b.x - v.x, b.y - v.y)).slice(0, 2).forEach((w) => { VLINK[v.id].add(w.id); (VLINK[w.id] = VLINK[w.id] || new Set()).add(v.id); }); });
+  function ventNeighbors(v) { return VENTS.filter((w) => VLINK[v.id].has(w.id)); }
   const KIND_ICON = { shoot: '🎯', run: '🏃', maze: '👻' };
   const TABLE = { x: 35 * TS, y: 21.5 * TS }; // botón de emergencia
   // objetos del escenario: [tipo, x, y, w, h, sólido]
@@ -211,13 +214,19 @@
     [hud].forEach((el) => el.addEventListener('pointerdown', stop));
 
     const doUse = () => { if (frozen || !curUse) return; if (curUse.type === 'emg') o.onEmergency && o.onEmergency(); else if (curUse.type === 'vent') showVents(curUse.vent); else o.onUse && o.onUse(curUse.st); };
-    const doSab = () => { if (frozen || ghost) return; o.onSabotage && o.onSabotage(); };
+    const extra = document.createElement('div'); extra.className = 'wd-extra'; hud.appendChild(extra); let extraKey = '', extraT = 0;
+    function closeExtra() { hud.classList.remove('xo'); extra.innerHTML = ''; extraKey = ''; clearTimeout(extraT); }
+    function openExtra(key, items) {
+      if (extraKey === key) { closeExtra(); return; } closeExtra(); extraKey = key; hud.classList.add('xo'); A.sfx('select');
+      items.forEach((it) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'wd-x ' + (it.cls || ''); b.innerHTML = '<span>' + it.ico + '</span><small>' + it.txt + '</small>'; b.addEventListener('click', (e) => { e.stopPropagation(); closeExtra(); it.fn(); }); b.addEventListener('pointerdown', (e) => e.stopPropagation()); extra.appendChild(b); });
+      extraT = setTimeout(closeExtra, 7000);
+    }
+    const SABS = [{ k: 'dark', ico: '🌑', txt: 'Apagón' }, { k: 'turbo', ico: '⏩', txt: 'Turbo' }, { k: 'fog', ico: '🌫️', txt: 'Niebla' }, { k: 'steal', ico: '💸', txt: 'Robo' }];
+    const doSab = () => { if (frozen || ghost) return; if (o.sabCd && o.sabCd() > 0) { A.sfx('deny'); return; } openExtra('sab', SABS.map((x) => ({ ico: x.ico, txt: x.txt, cls: 'sab', fn: () => o.onSabotage && o.onSabotage(x.k) }))); };
     bSab.addEventListener('click', doSab);
     function showVents(from) {
-      if (container.querySelector('.wd-vent')) return; A.sfx('select');
-      const w = document.createElement('div'); w.className = 'wd-vent'; const box = document.createElement('div'); box.className = 'wd-vbox'; const h2 = document.createElement('h3'); h2.textContent = '🕳️ Túnel: ¿a dónde quieres ir?'; box.appendChild(h2);
-      VENTS.filter((v) => v.id !== from.id).forEach((v) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = v.room; b.addEventListener('click', () => { w.remove(); me.x = v.x; me.y = v.y + 8; sx = -1; A.sfx('power'); for (let k = 0; k < 16; k++) { const a = Math.random() * 6.283; parts.push({ x: me.x, y: me.y, vx: Math.cos(a) * 40, vy: Math.sin(a) * 40, t: 0, life: 0.6, c: '#9aa6c8' }); } }); box.appendChild(b); });
-      const c = document.createElement('button'); c.type = 'button'; c.className = 'cancel'; c.textContent = 'Cancelar'; c.addEventListener('click', () => w.remove()); box.appendChild(c); w.appendChild(box); w.addEventListener('pointerdown', (e) => e.stopPropagation()); container.appendChild(w);
+      const nb = ventNeighbors(from);
+      openExtra('vent', nb.map((v) => ({ ico: '🕳️', txt: v.room, cls: 'vent', fn: () => { me.x = v.x; me.y = v.y + 8; sx = -1; A.sfx('power'); for (let k = 0; k < 16; k++) { const a = Math.random() * 6.283; parts.push({ x: me.x, y: me.y, vx: Math.cos(a) * 40, vy: Math.sin(a) * 40, t: 0, life: 0.6, c: '#9aa6c8' }); } } })));
     }
     const doRep = () => { if (frozen || !curRep) return; o.onReport && o.onReport(curRep); };
     const doKill = () => {
@@ -319,7 +328,7 @@
       STATIONS.forEach((s) => { const d = dist(me.x, me.y, s.x, s.y), tk = tks.find((q) => q.st === s.id); if (d < USE_R && d < ud && ((tk && !tk.done) || (imp && !ghost))) { use = { type: 'st', st: s, tk }; ud = d; } });
       if (!use && !ghost && dist(me.x, me.y, TABLE.x, TABLE.y) < EMG_R && o.canEmergency && o.canEmergency()) use = { type: 'emg' };
       if (!use && imp && !ghost) VENTS.forEach((v) => { const d = dist(me.x, me.y, v.x, v.y); if (d < 26 && d < ud) { use = { type: 'vent', vent: v }; ud = d; } });
-      curUse = use;
+      curUse = use; if (extraKey === 'vent' && !(use && use.type === 'vent')) closeExtra(); if (frozen || ghost) closeExtra();
       curRep = null; let rd = 1e9; if (!ghost) Object.keys(bodies).forEach((id) => { const b = bodies[id]; if (!b) return; const d = dist(me.x, me.y, b.x, b.y); if (d < REP_R && d < rd) { rd = d; curRep = id; } });
       curKill = null; let kd2 = 1e9; if (imp && !ghost) Object.keys(others).forEach((id) => { const pl = players[id]; if (!pl || pl.dead || pl.online === false || (o.isImpId && o.isImpId(id))) return; const c = others[id], d = dist(me.x, me.y, c.x, c.y); if (d < KILL_R && d < kd2) { kd2 = d; curKill = id; } });
       const cdl = imp && o.killCd ? o.killCd() : 0;
@@ -401,5 +410,5 @@
     };
   }
 
-  root.DuiXWorld = { mount, layout, STATIONS, VENTS, ROOMS, TABLE, TS, MW, MH, _walkable: walkable, _canStand: canStand, KIND_ICON, spawnPoint };
+  root.DuiXWorld = { ventNeighbors, mount, layout, STATIONS, VENTS, ROOMS, TABLE, TS, MW, MH, _walkable: walkable, _canStand: canStand, KIND_ICON, spawnPoint };
 })(window);

@@ -675,6 +675,8 @@
    * 8. DESPLAZAMIENTOS EN EL PLANO
    * ============================================================ */
   const un = (n) => `${n} ${n === 1 ? 'unidad' : 'unidades'}`;
+const FSH = [[[-4, -2], [-2, 2], [0, 0], [2, 3], [4, -1]], [[-4, 1], [-2, -2], [0, 1], [3, 3], [4, 0]], [[-4, 3], [-1, 0], [1, 2], [3, -2], [4, -1]], [[-4, -1], [-3, 2], [0, 2], [2, -2], [4, 1]]];
+  const fgraph = () => ({ pts: pick(FSH), lbl: 'y = f(x)', r: 5 });
   def('desplazamientos', 1, 'f(x±h) ó f(x)±k', () => {
     const n = ri(1, 6), t = ri(0, 3);
     const F1 = [[`f(x ${MINUS} ${n})`, 'a la derecha'], [`f(x + ${n})`, 'a la izquierda'], [`f(x) + ${n}`, 'hacia arriba'], [`f(x) ${MINUS} ${n}`, 'hacia abajo']];
@@ -683,7 +685,7 @@
     return mk('desplazamientos', 1, `La gráfica de y = ${F1[t][0]} se obtiene desplazando la de y = f(x)…`, cor,
       opts.filter((o) => o !== F1[t][1]).map((o) => `${n} ${n === 1 ? 'unidad' : 'unidades'} ${o}`),
       t < 2 ? `En ${F1[t][0]} el ${t === 0 ? MINUS : '+'}${n} está DENTRO del paréntesis → movimiento horizontal, al revés del signo: ${n} ${n === 1 ? 'unidad' : 'unidades'} ${F1[t][1]}. Error común: leer ${t === 0 ? MINUS : '+'}${n} tal cual y mover ${t === 0 ? 'a la izquierda' : 'a la derecha'}.` : `En ${F1[t][0]} el ${t === 2 ? '+' : MINUS}${n} está FUERA de f → movimiento vertical tal cual: ${n} ${n === 1 ? 'unidad' : 'unidades'} ${F1[t][1]}. Error común: confundirlo con un desplazamiento horizontal (izquierda/derecha).`,
-      'Dentro del paréntesis: horizontal (al revés). Fuera: vertical.');
+      'Dentro del paréntesis: horizontal (al revés). Fuera: vertical.', { graph: fgraph() });
   });
   def('desplazamientos', 2, 'vertice', () => {
     const h = nz(-6, 6), k = nz(-6, 6);
@@ -696,7 +698,7 @@
     const txt = `${un(Math.abs(dx))} ${dx > 0 ? 'a la derecha' : 'a la izquierda'} y ${un(Math.abs(dy))} ${dy > 0 ? 'hacia arriba' : 'hacia abajo'}`;
     return mk('desplazamientos', 1, `Se desplaza el punto ${pt(x, y)} ${txt}. ¿Cuál es su nueva posición?`, pt(x + dx, y + dy),
       [pt(x - dx, y + dy), pt(x + dx, y - dy), pt(x - dx, y - dy), pt(x + dy, y + dx)],
-      `x: ${sgn(x)} ${dx > 0 ? '+' : MINUS} ${Math.abs(dx)} = ${sgn(x + dx)} (${dx > 0 ? 'derecha' : 'izquierda'}); y: ${sgn(y)} ${dy > 0 ? '+' : MINUS} ${Math.abs(dy)} = ${sgn(y + dy)} (${dy > 0 ? 'arriba' : 'abajo'}) → ${pt(x + dx, y + dy)}. Error común: invertir un signo (${pt(x - dx, y + dy)}) o intercambiar los ejes y mover x con el valor vertical (${pt(x + dy, y + dx)}).`, 'Derecha/izquierda cambia x; arriba/abajo cambia y.');
+      `x: ${sgn(x)} ${dx > 0 ? '+' : MINUS} ${Math.abs(dx)} = ${sgn(x + dx)} (${dx > 0 ? 'derecha' : 'izquierda'}); y: ${sgn(y)} ${dy > 0 ? '+' : MINUS} ${Math.abs(dy)} = ${sgn(y + dy)} (${dy > 0 ? 'arriba' : 'abajo'}) → ${pt(x + dx, y + dy)}. Error común: invertir un signo (${pt(x - dx, y + dy)}) o intercambiar los ejes y mover x con el valor vertical (${pt(x + dy, y + dx)}).`, 'Derecha/izquierda cambia x; arriba/abajo cambia y.', { graph: { dots: [[x, y]], r: 8 } });
   });
   def('desplazamientos', 2, 'reflexion y estiramiento', () => {
     const c = pick([2, 3, 4]), t = ri(0, 3);
@@ -709,7 +711,7 @@
     const all = ['Reflexión respecto al eje x', 'Reflexión respecto al eje y', `Estiramiento vertical (factor ${c})`, `Compresión horizontal (factor 1/${c})`];
     return mk('desplazamientos', 2, `¿Qué transformación aplica ${S[t][0]} a la gráfica de y = f(x)?`, S[t][1], all.filter((s) => s !== S[t][1]),
       [`${S[0][0]}: el signo FUERA de f cambia las y → reflexión respecto al eje x. Error común: pensar que es respecto al eje y, que sería f(${MINUS}x).`, `${S[1][0]}: el signo DENTRO de f cambia las x → reflexión respecto al eje y. Error común: pensar que es respecto al eje x, que sería ${MINUS}f(x).`, `${S[2][0]}: el ${c} multiplica FUERA, cada altura y se vuelve ${c} veces mayor → estiramiento vertical de factor ${c}. Error común: creer que es horizontal (eso sería f(${c}x), compresión 1/${c}).`, `${S[3][0]}: el ${c} multiplica DENTRO, así f alcanza cada valor con x ${c} veces menor → compresión horizontal de factor 1/${c}. Error común: creer que estira verticalmente (eso sería ${c}f(x)).`][t],
-      'Fuera de f: vertical. Dentro de f: horizontal.');
+      'Fuera de f: vertical. Dentro de f: horizontal.', { graph: fgraph() });
   });
   def('desplazamientos', 2, 'combinado', () => {
     const h = nz(-6, 6), k = nz(-6, 6);
@@ -718,8 +720,7 @@
     const vd = (v) => `${un(Math.abs(v))} ${v > 0 ? 'hacia arriba' : 'hacia abajo'}`;
     return mk('desplazamientos', 2, `¿Qué desplazamiento produce ${expr}?`, `${hd(h)} y ${vd(k)}`,
       [`${hd(-h)} y ${vd(k)}`, `${hd(h)} y ${vd(-k)}`, `${hd(-h)} y ${vd(-k)}`],
-      `${expr}: dentro, (x ${h < 0 ? '+' : MINUS} ${Math.abs(h)}) mueve ${hd(h)} (al revés del signo); fuera, ${k < 0 ? MINUS : '+'} ${Math.abs(k)} mueve ${vd(k)} (tal cual). Error común: leer el signo de dentro tal cual y mover ${hd(-h)}.`, 'Dentro: al revés. Fuera: tal cual.');
-  });
+      `${expr}: dentro, (x ${h < 0 ? '+' : MINUS} ${Math.abs(h)}) mueve ${hd(h)} (al revés del signo); fuera, ${k < 0 ? MINUS : '+'} ${Math.abs(k)} mueve ${vd(k)} (tal cual). Error común: leer el signo de dentro tal cual y mover ${hd(-h)}.`, 'Dentro: al revés. Fuera: tal cual.', { graph: fgraph() });  });
   def('desplazamientos', 3, 'ecuacion desplazada', () => {
     const h = nz(-5, 5), k = nz(-5, 5);
     const hd = `${un(Math.abs(h))} ${h > 0 ? 'a la derecha' : 'a la izquierda'}`;
@@ -727,8 +728,7 @@
     const eq = (hh, kk) => `y = (x ${hh < 0 ? '+' : MINUS} ${Math.abs(hh)})² ${kk < 0 ? MINUS : '+'} ${Math.abs(kk)}`;
     return mk('desplazamientos', 3, `Se desplaza la parábola  y = x²  ${hd} y ${vd}. ¿Cuál es su nueva ecuación?`, eq(h, k),
       [eq(-h, k), eq(h, -k), eq(-h, -k)],
-      `${hd}: x → x ${h > 0 ? MINUS : '+'} ${Math.abs(h)} dentro del cuadrado; ${vd}: ${k > 0 ? '+' : MINUS} ${Math.abs(k)} afuera → ${eq(h, k)}. Error común: poner el signo de h tal cual dentro (${eq(-h, k)}) o invertir el de k (${eq(h, -k)}).`, 'Escribe y = (x − h)² + k.');
-  });
+      `${hd}: x → x ${h > 0 ? MINUS : '+'} ${Math.abs(h)} dentro del cuadrado; ${vd}: ${k > 0 ? '+' : MINUS} ${Math.abs(k)} afuera → ${eq(h, k)}. Error común: poner el signo de h tal cual dentro (${eq(-h, k)}) o invertir el de k (${eq(h, -k)}).`, 'Escribe y = (x − h)² + k.', { graph: { pts: [-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2].map((x) => [x, x * x]), lbl: 'y = x²', r: 5 } });  });
 
   /* ============================================================
    * 9. TABULACIONES
@@ -1222,6 +1222,21 @@
   }
   function generateAny(level, opts) { return generate(pick(TOPICS), level, opts); }
 
-  const API = { TOPICS, generate, generateAny, _gens: G, _setRandom: (fn) => { R = fn; }, _fmt: { poly, ifmt, fs, rad, exact } };
+
+  // Dibujo de gráficas para preguntas (devuelve SVG como texto). g = { pts:[[x,y]...], dots:[[x,y]...], lbl:'y = f(x)', r:5 }
+  function graphSVG(g) {
+    if (!g) return '';
+    const r = g.r || 5, W = 190, H = 150, px = (x) => (W / 2 + (x / r) * (W / 2 - 10)).toFixed(1), py = (y) => (H / 2 - (y / r) * (H / 2 - 10)).toFixed(1);
+    let s = `<svg class="qgraph" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Gráfica">`;
+    s += `<rect width="${W}" height="${H}" rx="8" fill="#fff"/>`;
+    for (let k = -r; k <= r; k++) { s += `<line x1="${px(k)}" y1="6" x2="${px(k)}" y2="${H - 6}" stroke="${k ? '#dfe3ef' : '#1a1033'}" stroke-width="${k ? 1 : 1.8}"/><line x1="6" y1="${py(k)}" x2="${W - 6}" y2="${py(k)}" stroke="${k ? '#dfe3ef' : '#1a1033'}" stroke-width="${k ? 1 : 1.8}"/>`; if (k && k % 2 === 0) s += `<text x="${px(k)}" y="${(H / 2 + 11).toFixed(0)}" font-size="8" text-anchor="middle" fill="#555">${k}</text><text x="${(W / 2 - 4).toFixed(0)}" y="${(+py(k) + 3).toFixed(0)}" font-size="8" text-anchor="end" fill="#555">${k}</text>`; }
+    s += `<text x="${W - 8}" y="${H / 2 - 4}" font-size="9" font-weight="800" text-anchor="end" fill="#1a1033">x</text><text x="${W / 2 + 5}" y="14" font-size="9" font-weight="800" fill="#1a1033">y</text>`;
+    if (g.pts) { s += `<polyline fill="none" stroke="#e02a3a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" points="${g.pts.map((p) => px(p[0]) + ',' + py(p[1])).join(' ')}"/>`; g.pts.forEach((p) => { s += `<circle cx="${px(p[0])}" cy="${py(p[1])}" r="3" fill="#e02a3a"/>`; }); }
+    (g.dots || []).forEach((p) => { s += `<circle cx="${px(p[0])}" cy="${py(p[1])}" r="5" fill="#2a6bff" stroke="#000" stroke-width="1.5"/><text x="${(+px(p[0]) + 7).toFixed(0)}" y="${(+py(p[1]) - 6).toFixed(0)}" font-size="10" font-weight="800" fill="#1a1033">(${p[0]}, ${p[1]})</text>`; });
+    if (g.lbl) s += `<text x="8" y="${H - 8}" font-size="11" font-weight="800" fill="#e02a3a">${g.lbl}</text>`;
+    return s + '</svg>';
+  }
+
+  const API = { graphSVG, TOPICS, generate, generateAny, _gens: G, _setRandom: (fn) => { R = fn; }, _fmt: { poly, ifmt, fs, rad, exact } };
   if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.DuiXQ = API;
 })(typeof window !== 'undefined' ? window : globalThis);

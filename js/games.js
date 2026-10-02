@@ -59,8 +59,8 @@
       const m = clean ? mult() : 1, g = Math.round((clean ? 100 : 40) * m + (extra || 0)); st.score += g;
       const cg = Math.round((clean ? 3 + (st.streak >= 5 ? 2 : 0) : 1) * (1 + (perks.coins || 0))); st.coins += cg; return { g, cg };
     };
-    api.log = (q, chosenIdx, options, correctIdx) => { st.mistakes.push({ topic: q.topic, text: q.text, options: options || q.options, correct: correctIdx != null ? correctIdx : q.correct, chosen: chosenIdx, explain: q.explain, table: q.table || null }); };
-    api.good = (q) => { (st.goods = st.goods || []).push({ topic: q.topic, text: q.text, correctText: q.options[q.correct], explain: q.explain, table: q.table || null }); };
+    api.log = (q, chosenIdx, options, correctIdx) => { st.mistakes.push({ topic: q.topic, text: q.text, options: options || q.options, correct: correctIdx != null ? correctIdx : q.correct, chosen: chosenIdx, explain: q.explain, table: q.table || null, graph: q.graph || null }); };
+    api.good = (q) => { (st.goods = st.goods || []).push({ topic: q.topic, text: q.text, correctText: q.options[q.correct], explain: q.explain, table: q.table || null, graph: q.graph || null }); };
     api.banner = (text, cls, ms) => { let b = $('.bt-banner'); if (!b) { b = el('div', 'bt-banner'); wrap.appendChild(b); } b.textContent = text; b.className = 'bt-banner gmb ' + (cls || ''); b.hidden = false; b.style.animation = 'none'; void b.offsetWidth; b.style.animation = ''; if (ms) setTimeout(() => { if (!api.destroyed) b.hidden = true; }, ms); };
     api.report = () => {
       const acc = st.answered ? st.correct / st.answered : 0; let stars = 0; if (st.win) stars = st.heartsLost === 0 ? 3 : (st.heartsLost === 1 || acc >= 0.75) ? 2 : 1;
@@ -118,6 +118,7 @@
     const $ = c.$; $('.bt-qtag').textContent = tag; const qt = $('.bt-qtext'); qt.textContent = q.text; qt.className = 'bt-qtext' + (q.text.length > 70 ? ' long' : q.text.length > 46 ? ' mid' : '');
     const tb = $('.bt-qtable'); tb.innerHTML = '';
     if (q.table) { let h = '<table><tr>' + q.table.head.map((x, i) => (i ? '<td>' : '<th>') + esc(x) + (i ? '</td>' : '</th>')).join('') + '</tr>'; q.table.rows.forEach((r) => { h += '<tr>' + r.map((x, i) => (i ? '<td class="' + (x === '?' ? 'qm' : '') + '">' : '<th>') + esc(x) + (i ? '</td>' : '</th>')).join('') + '</tr>'; }); tb.innerHTML = h + '</table>'; }
+    if (q.graph) tb.innerHTML = root.DuiXQ.graphSVG(q.graph);
     $('.bt-explain').hidden = true;
   }
   const explainBox = (c, t, ms) => { const e = c.$('.bt-explain'); e.textContent = t; e.hidden = false; clearTimeout(e._t); e._t = setTimeout(() => { e.hidden = true; }, ms || 6000); };

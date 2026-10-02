@@ -170,3 +170,14 @@ Así nadie puede listar todas las salas: solo entra quien conoce el código. Las
 - Carrera: sin salto, movimiento libre hacia todos lados.
 - Mapa: sabotajes del impostor (Apagón, Turbo, Niebla, Robo), túneles para teletransportarse, iconos más grandes y flechas en el borde, cámara sin recortes en los límites, escenarios con nombres de temas y decoración matemática.
 - Al expulsar a alguien sale siempre un villano al azar entre los existentes.
+
+## Novedades 1.8.8
+- Sabotajes y túneles ahora son botones extra pequeños sobre los botones de acción (ya no ocultan la pantalla del impostor).
+- Túneles estilo Among Us: cada rejilla solo conecta con las 2 más cercanas.
+
+## Novedades 1.8.9
+- La pregunta relámpago de la ruleta ahora muestra las tablas.
+- Ruleta: sorteo con "bolsa" (cada 8 giros salen las 8 casillas una vez, sin repetir seguido; misma probabilidad para todas).
+
+## Novedades 1.9.0
+- Las preguntas que mencionan una gráfica ahora la dibujan (desplazamientos, reflexiones, estiramientos, parábola y punto en el plano), en batalla, minijuegos, ruleta y repaso. Las que mencionan tablas ya las mostraban en todos lados.
